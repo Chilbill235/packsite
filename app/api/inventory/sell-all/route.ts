@@ -1,0 +1,60 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export async function POST(req: Request) {
+  try {
+    const session = await auth();
+    
+    // Extract email outside the transaction to satisfy TypeScript
+    const email = session?.user?.email;
+    
+    if (!email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      // 1. Get the user using the extracted email
+      const user = await tx.user.findUnique({ 
+        where: { email: email } 
+      });
+
+      if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      // 2. Get all inventory items for this user
+      const inventory = await tx.inventory.findMany({ 
+        where: { userId: user.id }, 
+        include: { item: true } 
+      });
+
+      if (inventory.length === 0) {
+        return NextResponse.json({ error: "No items to sell" }, { status: 400 });
+      }
+
+      // 3. Calculate total value
+      const totalValue = inventory.reduce((sum, inv) => sum + inv.item.value, 0);
+
+      // 4. Delete all inventory records
+      await tx.inventory.deleteMany({ 
+        where: { userId: user.id } 
+      });
+
+      // 5. Update user balance
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: { balance: { increment: totalValue } }
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        newBalance: updatedUser.balance,
+        soldCount: inventory.length 
+      });
+    });
+  } catch (error) {
+    console.error("SELL_ALL_ERROR", error);
+    return NextResponse.json({ error: "Failed to sell all items" }, { status: 500 });
+  }
+}
