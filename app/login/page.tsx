@@ -26,7 +26,6 @@ function LoginForm() {
         redirect: false,
         email,
         password,
-        callbackUrl, // Pass the callbackUrl here
       });
 
       if (res?.error) {
