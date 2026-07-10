@@ -1,30 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { username, email, password } = await req.json();
+    const { username, email, password } = await request.json();
 
     if (!username || !email || !password) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Pre-check email unique constraint
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingEmail) {
-      return NextResponse.json({ error: "Email is already taken" }, { status: 400 });
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json({ error: "User already exists" }, { status: 400 });
     }
 
-    // Pre-check username unique constraint
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
-    if (existingUsername) {
-      return NextResponse.json({ error: "Username is already taken" }, { status: 400 });
-    }
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Secure encryption matching the login check
-    const hashedPassword = await bcrypt.hash(password, 12);
-    
+    // Create user
     const user = await prisma.user.create({
       data: {
         username,
@@ -33,9 +28,9 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, userId: user.id });
-  } catch (error) {
-    console.error("REGISTRATION_FAILURE:", error);
+    return NextResponse.json({ message: "User created successfully" }, { status: 201 });
+  } catch (error: any) {
+    console.error("REGISTRATION_ERROR:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
