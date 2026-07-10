@@ -9,8 +9,8 @@ const nextConfig: NextConfig = {
           {
             key: "Content-Security-Policy",
             value: 
-              "default-src 'self' https://*.google.com https://*.gstatic.com https://*.googlesyndication.com; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.gstatic.com https://*.googlesyndication.com https://*.google-analytics.com; " +
+              "default-src 'self' https://*.google.com https://*.gstatic.com https://*.googlesyndication.com https://*.doubleclick.net; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.google.com https://*.gstatic.com https://*.googlesyndication.com https://*.google-analytics.com https://*.doubleclick.net; " +
               "connect-src 'self' https://*.google.com https://*.gstatic.com https://*.googlesyndication.com https://*.google-analytics.com https://*.doubleclick.net; " +
               "frame-src 'self' https://*.google.com https://*.googlesyndication.com https://*.doubleclick.net; " +
               "img-src 'self' data: https://*.google.com https://*.gstatic.com https://*.googlesyndication.com https://*.doubleclick.net; " +
