@@ -21,28 +21,41 @@ export default function ShopPage() {
   useEffect(() => {
     async function loadShopData() {
       try {
-        const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
+        // Added { credentials: 'include' } to send session cookies/auth tokens
+        const [userRes, packRes] = await Promise.all([
+          fetch("/api/user/profile", { credentials: 'include' }), 
+          fetch("/api/packs", { credentials: 'include' })
+        ]);
+        
         if (userRes.ok) setUser(await userRes.json());
         if (packRes.ok) setPacks(await packRes.json());
-      } catch (err) { console.error(err); } 
-      finally { setLoading(false); }
+      } catch (err) { 
+        console.error("Failed to load shop data:", err); 
+      } finally { 
+        setLoading(false); 
+      }
     }
     loadShopData();
   }, []);
 
   const updateBalance = (newBalance: number) => {
-    setUser({ balance: newBalance });
+    setUser((prev) => prev ? { ...prev, balance: newBalance } : { balance: newBalance });
     document.dispatchEvent(new CustomEvent("balanceChanged", { detail: newBalance }));
   };
 
   const handleWatchAd = async () => {
     try {
-      const res = await fetch("/api/user/add-coins", { method: "POST" });
+      const res = await fetch("/api/user/add-coins", { 
+        method: "POST",
+        credentials: 'include' // Required for auth
+      });
       if (!res.ok) throw new Error("Failed to add coins");
       const data = await res.json();
       updateBalance(data.newBalance);
-      setAdCooldownEnd(Date.now() + 30000); // 30s cooldown
-    } catch (err) { setErrorDialog({ message: "Error watching ad" }); }
+      setAdCooldownEnd(Date.now() + 30000); 
+    } catch (err) { 
+      setErrorDialog({ message: "Error watching ad" }); 
+    }
   };
 
   const handleOpenPack = async (pack: PackWithItems) => {
@@ -50,15 +63,16 @@ export default function ShopPage() {
       const res = await fetch("/api/packs/open", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include', // Required for auth
         body: JSON.stringify({ packId: pack.id })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || "Failed to open pack");
 
       updateBalance(data.newBalance);
 
       if (isFastOpen) {
-        // Fast mode: trigger notification only
+        // Fast mode logic
       } else {
         setRolledItem(data.wonItem);
         setIsRevealing(true);
