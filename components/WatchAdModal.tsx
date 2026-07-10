@@ -15,17 +15,17 @@ export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModal
     if (!open || typeof window === "undefined" || !(window as any).initializeAndOpenPlayer) return;
 
     const options = {
-      apiKey: "6c5dc649-a3f2-4fd5-907f-9a9d7d6f5422",
-      adStatusCallbackFn: (status: string) => {
-        // 'ad-watched' is the status for a completed video in the v6 SDK
-        if (status === "ad-watched") {
-          onFinished(); 
-          onClose();
-        } else if (status === "ad-closed") {
-          onClose();
-        }
-      },
-    };
+  apiKey: "6c5dc649-a3f2-4fd5-907f-9a9d7d6f5422",
+  injectionElementId: "applixir_vanishing_ad", // This MUST match the id of your div
+  adStatusCallbackFn: (status: string) => {
+    if (status === "ad-watched") {
+      onFinished();
+      onClose();
+    } else if (status === "ad-closed") {
+      onClose();
+    }
+  },
+};
 
     (window as any).initializeAndOpenPlayer(options);
   }, [open, onFinished, onClose]);
