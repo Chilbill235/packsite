@@ -2,14 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Utility type to extract the transaction client type directly from the prisma instance
 type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    
-    // Extract email outside the transaction to satisfy TypeScript
     const email = session?.user?.email;
     
     if (!email) {
@@ -17,18 +14,14 @@ export async function POST(req: Request) {
     }
 
     return await prisma.$transaction(async (tx: TransactionClient) => {
-      // 1. Get the user using the extracted email
       const user = await tx.user.findUnique({ 
         where: { email: email } 
       });
 
       if (!user) {
-        // Note: Returning a NextResponse inside a transaction callback
-        // will resolve the transaction and return this response.
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
-      // 2. Get all inventory items for this user
       const inventory = await tx.inventory.findMany({ 
         where: { userId: user.id }, 
         include: { item: true } 
@@ -38,15 +31,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "No items to sell" }, { status: 400 });
       }
 
-      // 3. Calculate total value
-      const totalValue = inventory.reduce((sum, inv) => sum + inv.item.value, 0);
+      // Explicitly type the accumulator as 'number'
+      const totalValue = inventory.reduce((sum: number, inv) => sum + inv.item.value, 0);
 
-      // 4. Delete all inventory records
       await tx.inventory.deleteMany({ 
         where: { userId: user.id } 
       });
 
-      // 5. Update user balance
       const updatedUser = await tx.user.update({
         where: { id: user.id },
         data: { balance: { increment: totalValue } }
