@@ -6,6 +6,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-black text-white selection:bg-blue-500 selection:text-white">
+      {/* Hero Section */}
       <div className="max-w-5xl mx-auto px-6 py-24 text-center">
         <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tight bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
           {session ? `Welcome back, ${session.user?.name || "Player"}` : "Open Amazing Packs"}
@@ -27,7 +28,27 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Feature Showcase: Added this to fill the "rest of divider code" area */}
+      {/* Ad Section */}
+      <section className="max-w-5xl mx-auto px-6 py-8">
+        <div className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center">
+          <ins
+            className="adsbygoogle"
+            style={{ display: "block", minHeight: "250px", width: "100%" }}
+            data-ad-format="fluid"
+            data-ad-layout-key="-ef+6k-36-a8+uh"
+            data-ad-client="ca-pub-1167000799645777"
+            data-ad-slot="9501413049"
+          ></ins>
+        </div>
+        {/* Ad Initialization script for this specific container */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(adsbygoogle = window.adsbygoogle || []).push({});`,
+          }}
+        />
+      </section>
+
+      {/* Feature Showcase */}
       <section className="max-w-7xl mx-auto px-6 py-16 border-t border-zinc-900">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
