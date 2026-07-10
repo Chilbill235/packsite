@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// Define the transaction type
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -28,7 +31,8 @@ export async function POST(req: Request) {
     }
 
     // Execute atomic deletion and credit refund
-    const result = await prisma.$transaction(async (tx) => {
+    // Pass the typed TransactionClient to the callback
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
       await tx.inventory.delete({
         where: { id: inventoryId },
       });
