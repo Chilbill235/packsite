@@ -3,9 +3,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
 
+// Utility type to extract the transaction client type
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function POST(req: Request) {
   try {
-    const { packId, isFastOpen } = await req.json(); // Accept isFastOpen
+    const { packId, isFastOpen } = await req.json();
     const session = await auth();
     
     // Extract email to satisfy TypeScript type checking
@@ -14,7 +17,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    // Apply the typed TransactionClient to the callback
+    const result = await prisma.$transaction(async (tx: TransactionClient) => {
       const pack = await tx.pack.findUnique({ where: { id: packId }, include: { items: true } });
       
       // Use the extracted 'email' variable
@@ -29,7 +33,10 @@ export async function POST(req: Request) {
 
       const wonItem = rollItem(pack.items);
 
-      await tx.user.update({ where: { id: user.id }, data: { balance: { decrement: finalPrice } } });
+      await tx.user.update({ 
+        where: { id: user.id }, 
+        data: { balance: { decrement: finalPrice } } 
+      });
       await tx.inventory.create({ data: { userId: user.id, itemId: wonItem.id } });
       await tx.opening.create({ data: { userId: user.id, packId, itemId: wonItem.id } });
 
