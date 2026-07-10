@@ -31,8 +31,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "No items to sell" }, { status: 400 });
       }
 
-      // Explicitly type the accumulator as 'number'
-      const totalValue = inventory.reduce((sum: number, inv) => sum + inv.item.value, 0);
+      // Explicitly typing both the accumulator 'sum' and the current item 'inv'
+      const totalValue = inventory.reduce((sum: number, inv: { item: { value: number } }) => {
+        return sum + inv.item.value;
+      }, 0);
 
       await tx.inventory.deleteMany({ 
         where: { userId: user.id } 
