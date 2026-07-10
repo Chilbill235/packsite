@@ -35,10 +35,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Navbar user={user} />
-        <main className="flex-grow">
-          {children}
-        </main>
-        {/* AdSense Script - Placed at the end of body for best performance */}
+        <main className="flex-grow">{children}</main>
+        
+        {/* AdSense Initialization */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"

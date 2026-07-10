@@ -28,27 +28,28 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Ad Section */}
+      {/* Ad Section - Optimized for Mobile & Performance */}
       <section className="max-w-5xl mx-auto px-6 py-8">
-        <div className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center">
+        <div className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center overflow-hidden min-h-[250px]">
           <ins
             className="adsbygoogle"
-            style={{ display: "block", minHeight: "250px", width: "100%" }}
+            style={{ display: "block", width: "100%" }}
             data-ad-format="fluid"
             data-ad-layout-key="-ef+6k-36-a8+uh"
             data-ad-client="ca-pub-1167000799645777"
             data-ad-slot="9501413049"
           ></ins>
         </div>
-        {/* Ad Initialization script for this specific container */}
+        
+        {/* Safe Initialization for AdSense */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(adsbygoogle = window.adsbygoogle || []).push({});`,
+            __html: `(window.adsbygoogle = window.adsbygoogle || []).push({});`,
           }}
         />
       </section>
 
-      {/* Feature Showcase */}
+      {/* Feature Showcase - Responsive Grid */}
       <section className="max-w-7xl mx-auto px-6 py-16 border-t border-zinc-900">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
@@ -56,7 +57,7 @@ export default async function Home() {
             { title: "Fair Odds", desc: "Transparent chances for every pack." },
             { title: "Instant Trade", desc: "Swap your items with other players." }
           ].map((feature, i) => (
-            <div key={i} className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800">
+            <div key={i} className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 transition-colors">
               <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
               <p className="text-zinc-400">{feature.desc}</p>
             </div>
