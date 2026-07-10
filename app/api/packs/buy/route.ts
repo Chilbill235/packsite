@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { rollItem } from "@/lib/openingEngine";
 
+// Utility type to extract the transaction client type
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -15,11 +18,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Pack ID is required" }, { status: 400 });
     }
 
-    // email is guaranteed to exist after the earlier check
-    // @ts-ignore
-    const email = session.user!.email;
+    const email = session.user.email;
 
-    return await prisma.$transaction(async (tx) => {
+    // Pass the typed TransactionClient to the callback
+    return await prisma.$transaction(async (tx: TransactionClient) => {
       const pack = await tx.pack.findUnique({ where: { id: packId }, include: { items: true } });
       const user = await tx.user.findUnique({ where: { email } });
 
@@ -37,7 +39,12 @@ export async function POST(req: Request) {
       await tx.inventory.create({ data: { userId: user.id, itemId: wonItem.id } });
       await tx.opening.create({ data: { userId: user.id, packId, itemId: wonItem.id } });
 
-      return NextResponse.json({ success: true, wonItem, item: wonItem, newBalance: updatedUser.balance });
+      return NextResponse.json({ 
+        success: true, 
+        wonItem, 
+        item: wonItem, 
+        newBalance: updatedUser.balance 
+      });
     });
   } catch (error) {
     console.error("BUY_PACK_ERROR", error);
