@@ -53,7 +53,7 @@ export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModal
             className="adsbygoogle"
             style={{ display: "block" }}
             data-ad-client="ca-pub-1167000799645777"
-            data-ad-slot="YOUR_AD_SLOT_ID"
+            data-ad-slot="9699378693"
             data-ad-format="auto"
             data-full-width-responsive="true"
           ></ins>
