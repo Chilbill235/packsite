@@ -1,127 +1,85 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Script from "next/script";
 
 type WatchAdModalProps = {
   open: boolean;
-  duration?: number;
   onFinished: () => void;
   onClose: () => void;
 };
 
-export default function WatchAdModal({
-  open,
-  duration = 30,
-  onFinished,
-  onClose,
-}: WatchAdModalProps) {
-  const [secondsLeft, setSecondsLeft] = useState(duration);
-  const [progress, setProgress] = useState(100);
+export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModalProps) {
+  const [isDone, setIsDone] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(15);
 
+  // Reset state when modal opens
   useEffect(() => {
-    if (!open) return;
+    if (open) {
+      setIsDone(false);
+      setTimeLeft(15);
+    }
+  }, [open]);
 
-    setSecondsLeft(duration);
-    setProgress(100);
+  // Timer logic
+  useEffect(() => {
+    if (!open || isDone) return;
 
-    const interval = setInterval(() => {
-      setSecondsLeft((prev) => {
-        const next = prev - 1;
-
-        setProgress((next / duration) * 100);
-
-        if (next <= 0) {
-          clearInterval(interval);
-
-          setTimeout(() => {
-            onFinished();
-          }, 500);
-
-          return 0;
-        }
-
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [open, duration, onFinished]);
+    if (timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsDone(true);
+      onFinished();
+    }
+  }, [open, timeLeft, isDone, onFinished]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-700 p-8 shadow-2xl">
-
-        <h2 className="text-3xl font-black text-center text-white">
-          🎬 Rewarded Ad
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative">
+        
+        <h2 className="text-2xl font-black text-white text-center mb-2">
+          {isDone ? "Reward Ready!" : "Support Us"}
         </h2>
-
-        <p className="text-center text-zinc-400 mt-3">
-          Your reward will be added when the ad finishes.
+        <p className="text-zinc-400 text-center text-sm mb-6">
+          {isDone ? "Your reward is ready to be collected." : "Please view the ad to earn your coins."}
         </p>
 
-        {/* Fake Ad */}
-        <div className="mt-8 rounded-2xl overflow-hidden border border-zinc-700 bg-zinc-800">
-
-          <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
-
-            <div className="text-center px-6">
-
-              <div className="text-6xl mb-4">
-                📦
-              </div>
-
-              <h3 className="text-2xl font-bold">
-                Amazing Pack Sale!
-              </h3>
-
-              <p className="text-zinc-400 mt-2">
-                Unlock legendary drops today.
-              </p>
-
-            </div>
-
-          </div>
-
+        {/* Ad Container */}
+        <div className="bg-black min-h-[250px] flex items-center justify-center rounded-2xl overflow-hidden border border-zinc-800 mb-6">
+          <ins
+            className="adsbygoogle"
+            style={{ display: "block" }}
+            data-ad-client="ca-pub-1167000799645777"
+            data-ad-slot="YOUR_AD_SLOT_ID"
+            data-ad-format="auto"
+            data-full-width-responsive="true"
+          ></ins>
         </div>
 
-        <div className="mt-6">
+        {/* Action Button */}
+        <button
+          disabled={!isDone}
+          onClick={onClose}
+          className={`w-full py-4 rounded-2xl font-bold transition-all duration-300 ${
+            isDone 
+              ? "bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_20px_rgba(245,158,11,0.3)]" 
+              : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+          }`}
+        >
+          {isDone ? "Collect Reward" : `Wait ${timeLeft}s`}
+        </button>
 
-          <div className="flex justify-between mb-2 text-sm text-zinc-400">
-            <span>Advertisement</span>
-            <span>{secondsLeft}s</span>
-          </div>
-
-          <div className="w-full h-3 rounded-full bg-zinc-800 overflow-hidden">
-            <div
-              className="h-full bg-amber-400 transition-all duration-1000"
-              style={{
-                width: `${progress}%`,
-              }}
-            />
-          </div>
-
-        </div>
-
-        <div className="mt-8 flex justify-center">
-
-          <button
-            disabled={secondsLeft > 0}
-            onClick={onClose}
-            className={`px-8 py-3 rounded-xl font-bold transition ${
-              secondsLeft > 0
-                ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                : "bg-amber-500 hover:bg-amber-400 text-black"
-            }`}
-          >
-            {secondsLeft > 0
-              ? `Please wait... ${secondsLeft}s`
-              : "Continue"}
-          </button>
-
-        </div>
-
+        {/* Initialize AdSense */}
+        <Script
+          id="adsbygoogle-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(adsbygoogle = window.adsbygoogle || []).push({});`,
+          }}
+        />
       </div>
     </div>
   );
