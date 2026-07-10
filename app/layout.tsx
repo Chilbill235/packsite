@@ -11,6 +11,9 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  
+  // Initialize user as null. 
+  // If no session exists, the Navbar will automatically receive null.
   let user = null;
 
   if (session?.user?.email) {
@@ -18,15 +21,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       where: { email: session.user.email },
       select: { username: true, email: true, balance: true }
     });
-    if (dbUser) user = { name: dbUser.username, email: dbUser.email, balance: dbUser.balance };
+    
+    if (dbUser) {
+      user = { 
+        name: dbUser.username, 
+        email: dbUser.email, 
+        balance: dbUser.balance 
+      };
+    }
   }
 
   return (
     <html lang="en">
-      <head>
-        <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
-      </head>
       <body className="bg-black text-zinc-100 antialiased">
+        {/* If user is null, Navbar renders login/register buttons */}
         <Navbar user={user} />
         <main>{children}</main>
       </body>
