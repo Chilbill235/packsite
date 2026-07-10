@@ -2,9 +2,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Navbar from "@/components/Navbar";
 import "./globals.css";
-import { Metadata } from "next"; // Import Metadata type
+import { Metadata } from "next";
+import Script from "next/script"; // 1. Import Script
 
-// Define the site title and description here
 export const metadata: Metadata = {
   title: "PackSite",
   description: "Pick and open your packs!",
@@ -30,6 +30,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en">
+      <head>
+        {/* 2. Add the AdSense script here in the head */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Navbar user={user} />
         <main className="flex-grow">
