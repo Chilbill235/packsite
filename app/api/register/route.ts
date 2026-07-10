@@ -10,17 +10,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Check if user exists
+    if (password.length < 6) {
+      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    }
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return NextResponse.json({ error: "User already exists" }, { status: 400 });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         username,
         email,
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ message: "User created successfully" }, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("REGISTRATION_ERROR:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
