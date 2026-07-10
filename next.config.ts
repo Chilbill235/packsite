@@ -1,17 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Ensure images from Google AdSense can be rendered
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "pagead2.googlesyndication.com",
-      },
-    ],
-  },
-
-  // Configure Security Headers to allow AdSense
   async headers() {
     return [
       {
@@ -24,6 +13,7 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://tpc.googlesyndication.com; " +
               "style-src 'self' 'unsafe-inline' https://googleads.g.doubleclick.net; " +
               "img-src 'self' https://pagead2.googlesyndication.com https://adservice.google.com https://googleads.g.doubleclick.net data:; " +
+              "connect-src 'self' https://pagead2.googlesyndication.com https://ep1.adtrafficquality.google.com https://googleads.g.doubleclick.net; " +
               "frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com;",
           },
         ],
