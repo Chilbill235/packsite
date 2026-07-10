@@ -32,13 +32,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <head>
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
-        {/* Fixed: Added self-closing slash /> */}
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Navbar user={user} />
         <main className="flex-grow">
           {children}
         </main>
+        {/* AdSense Script - Placed at the end of body for best performance */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
