@@ -3,13 +3,14 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
+import { Prisma } from "@prisma/client";
 
 export async function openPack(packId: string) {
   const session = await auth();
   const email = session?.user?.email;
   if (!email) throw new Error("Unauthorized");
 
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const user = await tx.user.findUnique({ where: { email } });
     const pack = await tx.pack.findUnique({ where: { id: packId }, include: { items: true } });
 
@@ -47,7 +48,7 @@ export async function sellItem(inventoryId: string) {
 
   if (!inventory) throw new Error("Item not found in your inventory");
 
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.inventory.delete({ where: { id: inventoryId } });
     const updatedUser = await tx.user.update({
       where: { id: inventory.userId },
