@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Script from "next/script";
 
 type WatchAdModalProps = {
@@ -10,34 +10,37 @@ type WatchAdModalProps = {
 };
 
 export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModalProps) {
+  const [isSdkLoaded, setIsSdkLoaded] = useState(false);
+
+  // Initialize the player only when the modal is open AND the SDK is ready
   useEffect(() => {
-    // Only initialize if the modal is open and the SDK is loaded
-    if (!open || typeof window === "undefined" || !(window as any).initializeAndOpenPlayer) return;
+    if (open && isSdkLoaded && (window as any).initializeAndOpenPlayer) {
+      const options = {
+        apiKey: "6c5dc649-a3f2-4fd5-907f-9a9d7d6f5422",
+        injectionElementId: "applixir_vanishing_ad",
+        adStatusCallbackFn: (status: string) => {
+          if (status === "ad-watched") {
+            onFinished();
+            onClose();
+          } else if (status === "ad-closed") {
+            onClose();
+          }
+        },
+      };
 
-    const options = {
-  apiKey: "6c5dc649-a3f2-4fd5-907f-9a9d7d6f5422",
-  injectionElementId: "applixir_vanishing_ad", // This MUST match the id of your div
-  adStatusCallbackFn: (status: string) => {
-    if (status === "ad-watched") {
-      onFinished();
-      onClose();
-    } else if (status === "ad-closed") {
-      onClose();
+      (window as any).initializeAndOpenPlayer(options);
     }
-  },
-};
-
-    (window as any).initializeAndOpenPlayer(options);
-  }, [open, onFinished, onClose]);
+  }, [open, isSdkLoaded, onFinished, onClose]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-      {/* Load the AppLixir SDK */}
+      {/* 1. Use onLoad to trigger the state update when the SDK is ready */}
       <Script 
         src="https://cdn.applixir.com/applixir.app.v6.1.0.js" 
-        strategy="afterInteractive" 
+        strategy="afterInteractive"
+        onLoad={() => setIsSdkLoaded(true)}
       />
 
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative">
@@ -46,7 +49,7 @@ export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModal
           Thank you for supporting our creators by viewing this message.
         </p>
         
-        {/* AppLixir container where the ad will render */}
+        {/* 2. Container must exist before initializeAndOpenPlayer is called */}
         <div id="applixir_vanishing_ad" className="min-h-[250px] w-full flex items-center justify-center rounded-2xl bg-black border border-zinc-800 mb-6">
         </div>
 
