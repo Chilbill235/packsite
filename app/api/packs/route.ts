@@ -7,8 +7,12 @@ export async function GET() {
       include: { items: true },
     });
     return NextResponse.json(packs);
-  } catch (error) {
+  } catch (error: any) {
     console.error("PACKS_FETCH_ERROR", error);
-    return NextResponse.json({ error: "Failed to fetch packs" }, { status: 500 });
+    // Return the actual error message to the browser console for easier debugging
+    return NextResponse.json({ 
+      error: "Failed to fetch packs", 
+      details: error.message 
+    }, { status: 500 });
   }
 }
