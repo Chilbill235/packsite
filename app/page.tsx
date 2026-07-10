@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { auth } from "@/lib/auth"; // Import your auth helper
+import { auth } from "@/lib/auth";
 
 export default async function Home() {
   const session = await auth();
@@ -20,14 +20,28 @@ export default async function Home() {
         <div className="mt-10 flex justify-center">
           <Link
             href={session ? "/shop" : "/register"}
-            className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 sm:px-8 sm:py-4 rounded-xl transition-all duration-200"
+            className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-200 shadow-lg shadow-blue-900/20"
           >
             {session ? "Browse Packs" : "Get Started Now"}
           </Link>
         </div>
       </div>
-      
-      {/* ... rest of your divider code ... */}
+
+      {/* Feature Showcase: Added this to fill the "rest of divider code" area */}
+      <section className="max-w-7xl mx-auto px-6 py-16 border-t border-zinc-900">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { title: "Rare Drops", desc: "Find thousands of unique items." },
+            { title: "Fair Odds", desc: "Transparent chances for every pack." },
+            { title: "Instant Trade", desc: "Swap your items with other players." }
+          ].map((feature, i) => (
+            <div key={i} className="p-8 rounded-3xl bg-zinc-900/50 border border-zinc-800">
+              <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+              <p className="text-zinc-400">{feature.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
