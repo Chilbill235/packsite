@@ -31,10 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <head>
-        {/* AdSense Verification Meta Tag */}
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://ep1.adtrafficquality.google;">
-        {/* AdSense Initialization Script */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
