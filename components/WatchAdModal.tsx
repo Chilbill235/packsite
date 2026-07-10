@@ -15,18 +15,20 @@ export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModal
   // Initialize the player only when the modal is open AND the SDK is ready
   useEffect(() => {
     if (open && isSdkLoaded && (window as any).initializeAndOpenPlayer) {
-      const options = {
-        apiKey: "6c5dc649-a3f2-4fd5-907f-9a9d7d6f5422",
-        injectionElementId: "applixir_vanishing_ad",
-        adStatusCallbackFn: (status: string) => {
-          if (status === "ad-watched") {
-            onFinished();
-            onClose();
-          } else if (status === "ad-closed") {
-            onClose();
-          }
-        },
-      };
+      // Inside your WatchAdModal.tsx
+const options = {
+  apiKey: "6c5dc649-a3f2-4fd5-907f-9a9d7d6f5422",
+  injectionElementId: "applixir_vanishing_ad",
+  adStatusCallbackFn: (status: any) => {
+    // Correct way to check for completion in v6 SDK:
+    if (status.type === "complete") {
+      onFinished();
+      onClose();
+    } else if (status.type === "skipped" || status.type === "manuallyEnded") {
+      onClose();
+    }
+  },
+};
 
       (window as any).initializeAndOpenPlayer(options);
     }
