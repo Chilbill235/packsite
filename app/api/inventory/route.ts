@@ -4,14 +4,21 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const user = await prisma.user.findUnique({ 
+    where: { email: session.user.email } 
+  });
+  
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
 
   const inventory = await prisma.inventory.findMany({
     where: { userId: user.id },
-    include: { item: true } // This ensures record.item.name exists
+    include: { item: true }
   });
 
   return NextResponse.json({ inventory });
