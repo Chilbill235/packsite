@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// Utility type to extract the transaction client type directly from the prisma instance
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -13,13 +16,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: TransactionClient) => {
       // 1. Get the user using the extracted email
       const user = await tx.user.findUnique({ 
         where: { email: email } 
       });
 
       if (!user) {
+        // Note: Returning a NextResponse inside a transaction callback
+        // will resolve the transaction and return this response.
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
 
