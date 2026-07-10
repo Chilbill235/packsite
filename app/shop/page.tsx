@@ -116,7 +116,9 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-black text-white p-8">
       {/* Google AdSense Script */}
-      <Script
+      <!-- Add https://*.adtrafficquality.google to the connect-src directive -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.google.com https://*.gstatic.com https://*.googlesyndication.com https://*.google-analytics.com https://*.doubleclick.net https://*.adtrafficquality.google;">
+       <Script
         async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
         crossOrigin="anonymous"
