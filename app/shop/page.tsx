@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Script from "next/script";
 import type { Item } from "@prisma/client";
 import ErrorDialog from "@/components/ErrorDialog";
 import WatchAdModal from "@/components/WatchAdModal";
@@ -30,21 +31,12 @@ export default function ShopPage() {
     async function loadShopData() {
       try {
         const [userRes, packRes] = await Promise.all([
-          fetch("/api/user/profile", {
-            credentials: "include",
-          }),
-          fetch("/api/packs", {
-            credentials: "include",
-          }),
+          fetch("/api/user/profile", { credentials: "include" }),
+          fetch("/api/packs", { credentials: "include" }),
         ]);
 
-        if (userRes.ok) {
-          setUser(await userRes.json());
-        }
-
-        if (packRes.ok) {
-          setPacks(await packRes.json());
-        }
+        if (userRes.ok) setUser(await userRes.json());
+        if (packRes.ok) setPacks(await packRes.json());
       } catch (err) {
         console.error(err);
       } finally {
@@ -56,32 +48,21 @@ export default function ShopPage() {
   }, []);
 
   const updateBalance = (newBalance: number) => {
-    setUser((prev) =>
-      prev
-        ? {
-            ...prev,
-            balance: newBalance,
-          }
-        : {
-            balance: newBalance,
-          }
-    );
+    setUser((prev) => ({
+      ...prev,
+      balance: newBalance,
+    }));
 
     document.dispatchEvent(
-      new CustomEvent("balanceChanged", {
-        detail: newBalance,
-      })
+      new CustomEvent("balanceChanged", { detail: newBalance })
     );
   };
 
-  // Opens the fake rewarded ad
   const handleWatchAd = () => {
     if (Date.now() < adCooldownEnd) return;
-
     setWatchingAd(true);
   };
 
-  // Called when the countdown finishes
   const rewardUser = async () => {
     try {
       const res = await fetch("/api/user/add-coins", {
@@ -90,18 +71,12 @@ export default function ShopPage() {
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Unable to claim reward");
-      }
+      if (!res.ok) throw new Error(data.error || "Unable to claim reward");
 
       updateBalance(data.newBalance);
-
       setAdCooldownEnd(Date.now() + 30000);
     } catch (err: any) {
-      setErrorDialog({
-        message: err.message,
-      });
+      setErrorDialog({ message: err.message });
     } finally {
       setWatchingAd(false);
     }
@@ -112,19 +87,12 @@ export default function ShopPage() {
       const res = await fetch("/api/packs/open", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          packId: pack.id,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId: pack.id }),
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to open pack");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to open pack");
 
       updateBalance(data.newBalance);
 
@@ -132,11 +100,8 @@ export default function ShopPage() {
         setRolledItem(data.wonItem);
         setIsRevealing(true);
       }
-
     } catch (err: any) {
-      setErrorDialog({
-        message: err.message,
-      });
+      setErrorDialog({ message: err.message });
     }
   };
 
@@ -150,6 +115,13 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
+      {/* Google AdSense Script */}
+      <Script
+        async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
+        crossOrigin="anonymous"
+        strategy="afterInteractive"
+      />
 
       {errorDialog && (
         <ErrorDialog
@@ -165,58 +137,40 @@ export default function ShopPage() {
       />
 
       <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-8 border-b border-zinc-900">
-
         <div>
-          <h1 className="text-5xl font-black">
-            Pick A Pack
-          </h1>
-
+          <h1 className="text-5xl font-black">Pick A Pack</h1>
           <p className="mt-2 text-zinc-400">
             Balance: {user?.balance ?? 0} Coins
           </p>
         </div>
 
         <div className="flex gap-4">
-
           <button
             onClick={handleWatchAd}
             disabled={Date.now() < adCooldownEnd}
             className="bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-5 py-2.5 rounded-full font-bold transition"
           >
-            {Date.now() < adCooldownEnd
-              ? "Cooldown..."
-              : "Watch Ad (+500)"}
+            {Date.now() < adCooldownEnd ? "Cooldown..." : "Watch Ad (+500)"}
           </button>
 
           <button
             onClick={() => setIsFastOpen(!isFastOpen)}
             className={`px-5 py-2.5 rounded-full font-bold transition ${
-              isFastOpen
-                ? "bg-amber-500 text-black"
-                : "bg-zinc-800 hover:bg-zinc-700"
+              isFastOpen ? "bg-amber-500 text-black" : "bg-zinc-800 hover:bg-zinc-700"
             }`}
           >
-            {isFastOpen
-              ? "⚡ Fast Mode (1.2x)"
-              : "⚡ Standard Mode"}
+            {isFastOpen ? "⚡ Fast Mode (1.2x)" : "⚡ Standard Mode"}
           </button>
-
         </div>
-
       </header>
 
       <div className="max-w-7xl mx-auto grid grid-cols-4 gap-6">
-
         {packs.map((pack) => (
           <div
             key={pack.id}
             className="bg-zinc-900 p-6 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition"
           >
-
-            <h2 className="text-lg font-bold mb-2">
-              {pack.name}
-            </h2>
-
+            <h2 className="text-lg font-bold mb-2">{pack.name}</h2>
             <button
               onClick={() => handleOpenPack(pack)}
               className="w-full bg-white hover:bg-zinc-200 text-black font-black py-3 rounded-2xl transition"
@@ -226,10 +180,8 @@ export default function ShopPage() {
                 : pack.price}{" "}
               COINS
             </button>
-
           </div>
         ))}
-
       </div>
 
       {isRevealing && rolledItem && (
@@ -244,11 +196,7 @@ export default function ShopPage() {
             <p className="text-zinc-500 uppercase tracking-widest text-sm mb-4">
               You Won!
             </p>
-
-            <p className="text-3xl font-black mb-8">
-              {rolledItem.name}
-            </p>
-
+            <p className="text-3xl font-black mb-8">{rolledItem.name}</p>
             <button
               onClick={() => setIsRevealing(false)}
               className="bg-amber-500 hover:bg-amber-400 text-black px-8 py-3 rounded-xl font-bold"
