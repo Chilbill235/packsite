@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Script from "next/script";
 
 type WatchAdModalProps = {
@@ -10,29 +10,16 @@ type WatchAdModalProps = {
 };
 
 export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModalProps) {
-  const [isDone, setIsDone] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(15);
-
-  // Reset state when modal opens
+  // We use a passive timer just to grant the reward automatically after 15s
   useEffect(() => {
-    if (open) {
-      setIsDone(false);
-      setTimeLeft(15);
-    }
-  }, [open]);
-
-  // Timer logic
-  useEffect(() => {
-    if (!open || isDone) return;
-
-    if (timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setIsDone(true);
+    if (!open) return;
+    
+    const timer = setTimeout(() => {
       onFinished();
-    }
-  }, [open, timeLeft, isDone, onFinished]);
+    }, 15000);
+    
+    return () => clearTimeout(timer);
+  }, [open, onFinished]);
 
   if (!open) return null;
 
@@ -41,17 +28,17 @@ export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModal
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative">
         
         <h2 className="text-2xl font-black text-white text-center mb-2">
-          {isDone ? "Reward Ready!" : "Support Us"}
+          Support Us
         </h2>
         <p className="text-zinc-400 text-center text-sm mb-6">
-          {isDone ? "Your reward is ready to be collected." : "Please view the ad to earn your coins."}
+          Thank you for supporting our creators by viewing this message.
         </p>
 
-        {/* Ad Container */}
-        <div className="bg-black min-h-[250px] flex items-center justify-center rounded-2xl overflow-hidden border border-zinc-800 mb-6">
+        {/* Ad Container with explicit dimensions to stop console errors */}
+        <div className="bg-black min-h-[250px] w-full flex items-center justify-center rounded-2xl overflow-hidden border border-zinc-800 mb-6">
           <ins
             className="adsbygoogle"
-            style={{ display: "block" }}
+            style={{ display: "block", minHeight: "250px", width: "100%" }}
             data-ad-client="ca-pub-1167000799645777"
             data-ad-slot="9699378693"
             data-ad-format="auto"
@@ -59,17 +46,12 @@ export default function WatchAdModal({ open, onFinished, onClose }: WatchAdModal
           ></ins>
         </div>
 
-        {/* Action Button */}
+        {/* Closing the modal is always allowed, no forced waiting */}
         <button
-          disabled={!isDone}
           onClick={onClose}
-          className={`w-full py-4 rounded-2xl font-bold transition-all duration-300 ${
-            isDone 
-              ? "bg-amber-500 hover:bg-amber-400 text-black shadow-[0_0_20px_rgba(245,158,11,0.3)]" 
-              : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-          }`}
+          className="w-full py-4 rounded-2xl font-bold bg-zinc-800 hover:bg-zinc-700 text-white transition-all"
         >
-          {isDone ? "Collect Reward" : `Wait ${timeLeft}s`}
+          Close
         </button>
 
         {/* Initialize AdSense */}
