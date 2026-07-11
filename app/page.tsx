@@ -2,14 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-// Use relative path to avoid build errors with Turbopack
 import { RewardedAdService } from "../lib/adService";
 
 export default function Home() {
   const session = false;
   const adService = useRef<RewardedAdService | null>(null);
 
-  // Initialize the ad service when the component mounts
   useEffect(() => {
     adService.current = new RewardedAdService();
     adService.current.init();
@@ -30,7 +28,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Ad Section - Triggering your Reward Ad Service */}
+      {/* Ad Section */}
       <section className="max-w-5xl mx-auto px-6 py-8">
         <div 
           className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center items-center min-h-[250px] cursor-pointer hover:bg-zinc-800 transition"
