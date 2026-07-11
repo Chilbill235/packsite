@@ -34,16 +34,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
-        <Script 
-          async 
-          src="https://securepubads.g.doubleclick.net/tag/js/gpt.js" 
-          strategy="beforeInteractive" 
-        />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Navbar user={user} />
         <main className="flex-grow">{children}</main>
         
+        {/* Standard AdSense Loader */}
         <Script
           async 
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
