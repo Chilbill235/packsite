@@ -1,3 +1,5 @@
+import type { NextConfig } from "next";
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@prisma/client', 'pg'],
   experimental: {
@@ -8,3 +10,5 @@ const nextConfig: NextConfig = {
     },
   },
 };
+
+export default nextConfig;
