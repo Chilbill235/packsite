@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
-import { RewardedAdService } from "@/lib/adService";
+// Ensure this path is correct based on your project structure
+import { RewardedAdService } from "@/lib/adService"; 
 import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 
@@ -15,15 +16,17 @@ export default function ShopPage() {
   const [isFastOpen, setIsFastOpen] = useState(false);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   
-  // Use a ref to store the ad service instance
   const adService = useRef<RewardedAdService | null>(null);
-
   const FAST_MODE_MULTIPLIER = 1.2;
 
   useEffect(() => {
-    // Initialize the Ad Service
-    adService.current = new RewardedAdService();
-    adService.current.init();
+    // Wrap initialization in a try-catch to prevent build/runtime errors if the service is missing
+    try {
+      adService.current = new RewardedAdService();
+      adService.current.init();
+    } catch (e) {
+      console.warn("RewardedAdService could not be initialized.");
+    }
 
     async function loadShopData() {
       try {
@@ -40,7 +43,7 @@ export default function ShopPage() {
   }, []);
 
   const updateBalance = (newBalance: number) => {
-    setUser((prev) => ({ ...prev!, balance: newBalance }));
+    setUser((prev) => (prev ? { ...prev, balance: newBalance } : { balance: newBalance }));
     document.dispatchEvent(new CustomEvent("balanceChanged", { detail: newBalance }));
   };
 
@@ -68,14 +71,12 @@ export default function ShopPage() {
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
 
-      {/* Header */}
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 pb-8 border-b border-zinc-900">
         <div>
           <h1 className="text-4xl md:text-5xl font-black">Pick A Pack</h1>
           <p className="mt-2 text-zinc-400 font-medium">Balance: {user?.balance ?? 0} Coins</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          {/* New Ad Button using the GAM Service */}
           <button 
             onClick={() => adService.current?.showAd()} 
             className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold transition text-sm"
@@ -88,7 +89,6 @@ export default function ShopPage() {
         </div>
       </header>
 
-      {/* Pack Grid */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {packs.map((pack) => (
           <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition">
@@ -100,7 +100,6 @@ export default function ShopPage() {
         ))}
       </div>
 
-      {/* Reveal Modal */}
       {isRevealing && rolledItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4" onClick={() => setIsRevealing(false)}>
           <div className="bg-zinc-900 rounded-3xl p-10 text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
