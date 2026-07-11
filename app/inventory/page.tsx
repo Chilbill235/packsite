@@ -71,10 +71,6 @@ export default function InventoryPage() {
   return (
     <>
       {/* External Scripts */}
-      <Script
-        src="https://pl30304856.effectivecpmnetwork.com/e6/3c/95/e63c95109748168f9e2cf8111202d490.js"
-        strategy="afterInteractive"
-      />
 
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} onRetry={errorDialog.onRetry} />}
