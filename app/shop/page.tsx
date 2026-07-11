@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
-import WatchAdModal from "@/components/WatchAdModal";
+import { RewardedAdService } from "@/lib/adService";
 import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 
@@ -13,13 +13,18 @@ export default function ShopPage() {
   const [isRevealing, setIsRevealing] = useState(false);
   const [rolledItem, setRolledItem] = useState<Item | null>(null);
   const [isFastOpen, setIsFastOpen] = useState(false);
-  const [adCooldownEnd, setAdCooldownEnd] = useState(0);
-  const [watchingAd, setWatchingAd] = useState(false);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
+  
+  // Use a ref to store the ad service instance
+  const adService = useRef<RewardedAdService | null>(null);
 
   const FAST_MODE_MULTIPLIER = 1.2;
 
   useEffect(() => {
+    // Initialize the Ad Service
+    adService.current = new RewardedAdService();
+    adService.current.init();
+
     async function loadShopData() {
       try {
         const [userRes, packRes] = await Promise.all([
@@ -37,17 +42,6 @@ export default function ShopPage() {
   const updateBalance = (newBalance: number) => {
     setUser((prev) => ({ ...prev!, balance: newBalance }));
     document.dispatchEvent(new CustomEvent("balanceChanged", { detail: newBalance }));
-  };
-
-  const rewardUser = async () => {
-    try {
-      const res = await fetch("/api/user/add-coins", { method: "POST", credentials: "include" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Unable to claim reward");
-      updateBalance(data.newBalance);
-      setAdCooldownEnd(Date.now() + 30000);
-    } catch (err: any) { setErrorDialog({ message: err.message }); }
-    finally { setWatchingAd(false); }
   };
 
   const handleOpenPack = async (pack: PackWithItems) => {
@@ -73,7 +67,6 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
-      <WatchAdModal open={watchingAd} onFinished={rewardUser} onClose={() => setWatchingAd(false)} />
 
       {/* Header */}
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 pb-8 border-b border-zinc-900">
@@ -82,8 +75,12 @@ export default function ShopPage() {
           <p className="mt-2 text-zinc-400 font-medium">Balance: {user?.balance ?? 0} Coins</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => setWatchingAd(true)} disabled={Date.now() < adCooldownEnd} className="bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-full font-bold transition text-sm">
-            {Date.now() < adCooldownEnd ? "Cooldown..." : "Watch Ad (+500)"}
+          {/* New Ad Button using the GAM Service */}
+          <button 
+            onClick={() => adService.current?.showAd()} 
+            className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold transition text-sm"
+          >
+            Watch Ad for Coins
           </button>
           <button onClick={() => setIsFastOpen(!isFastOpen)} className={`px-5 py-2.5 rounded-full font-bold transition text-sm ${isFastOpen ? "bg-amber-500 text-black" : "bg-zinc-800 hover:bg-zinc-700"}`}>
             {isFastOpen ? "⚡ Fast Mode (1.2x)" : "⚡ Standard Mode"}
