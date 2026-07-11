@@ -9,7 +9,6 @@ import type { InventoryWithItem } from "@/types";
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryWithItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{message:string, type?:"success"|"error"}|null>(null);
   const [errorDialog, setErrorDialog] = useState<{message:string, onRetry?: () => void}|null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
@@ -23,7 +22,7 @@ export default function InventoryPage() {
         if (!res.ok) throw new Error(data.error || "Failed to load inventory");
         setInventory(data.inventory || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load inventory");
+        setErrorDialog({ message: "Failed to load inventory" });
       } finally {
         setLoading(false);
       }
@@ -71,7 +70,7 @@ export default function InventoryPage() {
 
   return (
     <>
-      {/* Adsterra script integration */}
+      {/* External Scripts */}
       <Script
         src="https://pl30304856.effectivecpmnetwork.com/e6/3c/95/e63c95109748168f9e2cf8111202d490.js"
         strategy="afterInteractive"
@@ -81,6 +80,11 @@ export default function InventoryPage() {
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} onRetry={errorDialog.onRetry} />}
       
       <main className="max-w-7xl mx-auto px-6 py-12">
+        {/* Flush Ad Container */}
+        <div className="mb-10 w-full overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900/30 p-2">
+          <AdUnit />
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
           <div>
             <h1 className="text-5xl font-black tracking-tight text-white">Your Inventory</h1>
@@ -127,5 +131,27 @@ export default function InventoryPage() {
         )}
       </main>
     </>
+  );
+}
+
+function AdUnit() {
+  useEffect(() => {
+    try {
+      // @ts-ignore
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      console.error("AdSense Error:", e);
+    }
+  }, []);
+
+  return (
+    <ins
+      className="adsbygoogle"
+      style={{ display: "block", textAlign: "center" }}
+      data-ad-client="ca-pub-1167000799645777"
+      data-ad-slot="9501413049"
+      data-ad-format="auto"
+      data-full-width-responsive="true"
+    ></ins>
   );
 }
