@@ -1,12 +1,19 @@
-"use client"; // Required to use useEffect
-import { useEffect } from "react";
+"use client";
+
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-// Note: You cannot use the 'auth()' function here since this is a Client Component.
-// Pass the session data via props or use a client-side hook if needed.
+// Use relative path to avoid build errors with Turbopack
+import { RewardedAdService } from "../lib/adService";
 
 export default function Home() {
-  // Simple check for simulation (Replace with your actual session handling)
-  const session = false; 
+  const session = false;
+  const adService = useRef<RewardedAdService | null>(null);
+
+  // Initialize the ad service when the component mounts
+  useEffect(() => {
+    adService.current = new RewardedAdService();
+    adService.current.init();
+  }, []);
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-black text-white selection:bg-blue-500 selection:text-white">
@@ -23,34 +30,15 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Ad Section */}
+      {/* Ad Section - Triggering your Reward Ad Service */}
       <section className="max-w-5xl mx-auto px-6 py-8">
-        <div className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center overflow-hidden min-h-[250px]">
-          <AdUnit />
+        <div 
+          className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center items-center min-h-[250px] cursor-pointer hover:bg-zinc-800 transition"
+          onClick={() => adService.current?.showAd()}
+        >
+          <p className="text-zinc-500 font-medium">Click here to watch an ad and support us</p>
         </div>
       </section>
     </div>
-  );
-}
-
-function AdUnit() {
-  useEffect(() => {
-    try {
-      // @ts-ignore
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-    } catch (e) {
-      console.error("AdSense Error:", e);
-    }
-  }, []);
-
-  return (
-    <ins
-      className="adsbygoogle"
-      style={{ display: "block", width: "100%" }}
-      data-ad-format="fluid"
-      data-ad-layout-key="-ef+6k-36-a8+uh"
-      data-ad-client="ca-pub-1167000799645777"
-      data-ad-slot="9501413049"
-    ></ins>
   );
 }
