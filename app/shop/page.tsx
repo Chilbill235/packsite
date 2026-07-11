@@ -75,7 +75,6 @@ export default function ShopPage() {
           <p className="mt-2 text-zinc-400 font-medium">Balance: {user?.balance ?? 0} Coins</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          {/* New Ad Button using the GAM Service */}
           <button 
             onClick={() => adService.current?.showAd()} 
             className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold transition text-sm"
