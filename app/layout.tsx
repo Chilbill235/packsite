@@ -2,6 +2,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import Navbar from "@/components/Navbar";
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css";
 import { Metadata } from "next";
 import Script from "next/script";
