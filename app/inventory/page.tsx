@@ -76,8 +76,6 @@ export default function InventoryPage() {
         src="https://pl30304856.effectivecpmnetwork.com/e6/3c/95/e63c95109748168f9e2cf8111202d490.js"
         strategy="afterInteractive"
       />
-      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
-     crossorigin="anonymous"></script>
 
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} onRetry={errorDialog.onRetry} />}
