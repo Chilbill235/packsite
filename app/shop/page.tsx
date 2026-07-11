@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
 // Ensure this path matches the file location shown in your screenshot
-import { RewardedAdService } from "@/lib/adService"; 
+import { RewardedAdService } from "../../lib/adService"; 
 import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 
