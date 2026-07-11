@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Script from "next/script";
 import Notification from "@/components/Notification";
 import ErrorDialog from "@/components/ErrorDialog";
 import type { InventoryWithItem } from "@/types";
@@ -70,13 +69,11 @@ export default function InventoryPage() {
 
   return (
     <>
-      {/* External Scripts */}
-
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} onRetry={errorDialog.onRetry} />}
       
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* Flush Ad Container */}
+        {/* Ad Unit remains functional using AdSense loader from layout */}
         <div className="mb-10 w-full overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900/30 p-2">
           <AdUnit />
         </div>
