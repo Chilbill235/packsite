@@ -24,35 +24,38 @@ export default function ShopPage() {
 
     const handleFocus = async () => {
       const clickedAt = sessionStorage.getItem("ad_clicked_at");
+      console.log("Window focus detected. Stored time:", clickedAt, "Is waiting:", isWaitingForReward);
       
       if (clickedAt && isWaitingForReward) {
         const timePassed = Date.now() - parseInt(clickedAt);
+        console.log("Time passed since click (ms):", timePassed);
         
         if (timePassed > 10000) {
           sessionStorage.removeItem("ad_clicked_at");
           setIsWaitingForReward(false);
           
           try {
-            // FIXED: Path updated to /api/user/add-coins to match your folder structure
             const res = await fetch("/api/user/add-coins", {
               method: "POST",
               headers: { "Content-Type": "application/json" }
             });
 
+            console.log("API response status:", res.status);
+            
             if (res.ok) {
               const data = await res.json();
+              console.log("Success! New balance:", data.newBalance);
               updateBalance(data.newBalance);
               alert("Coins awarded!");
             } else {
-              // Handle non-JSON error responses (like 404s) without crashing
-              console.error("API Error Status:", res.status);
-              if (res.status === 429) alert("Cooldown active: Please wait 30 seconds.");
-              else if (res.status === 401) alert("Please log in to claim rewards.");
-              else alert("Failed to award coins. Please try again.");
+              const errorText = await res.text();
+              console.error("API Error Response:", errorText);
             }
           } catch (err) {
-            console.error("Fetch failed:", err);
+            console.error("Fetch error:", err);
           }
+        } else {
+          alert("Please wait at least 10 seconds before returning.");
         }
       }
     };
