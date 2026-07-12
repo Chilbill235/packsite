@@ -32,27 +32,39 @@ export default function ShopPage() {
   }, []);
 
   const subscribeToPush = async () => {
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return notify("❌ Permission denied.");
-      
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      });
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return notify("❌ Permission denied.");
 
-      // Added credentials: "include" to send session cookies
-      await fetch("/api/user/subscribe", {
-        method: "POST",
-        body: JSON.stringify(sub),
-        headers: { "Content-Type": "application/json" },
-        credentials: "include" 
-      });
-      
-      notify("✅ Notifications enabled!");
-    } catch (err) { console.error(err); }
-  };
+    const reg = await navigator.serviceWorker.ready;
+    
+    // 1. Check for an existing subscription
+    const existingSub = await reg.pushManager.getSubscription();
+    
+    // 2. If it exists, unsubscribe it first
+    if (existingSub) {
+      await existingSub.unsubscribe();
+    }
+
+    // 3. Now subscribe with the current key
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    });
+
+    await fetch("/api/user/subscribe", {
+      method: "POST",
+      body: JSON.stringify(sub),
+      headers: { "Content-Type": "application/json" },
+      credentials: "include"
+    });
+    
+    notify("✅ Notifications enabled!");
+  } catch (err) { 
+    console.error("Subscription error:", err);
+    notify("❌ Failed to enable notifications.");
+  }
+};
 
   useEffect(() => {
     const handleFocus = async () => {
