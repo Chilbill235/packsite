@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
-// Ensure this path matches the file location shown in your screenshot
+import { RewardedAdService } from "@/lib/adService";
 import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 
@@ -19,7 +19,7 @@ export default function ShopPage() {
   const FAST_MODE_MULTIPLIER = 1.2;
 
   useEffect(() => {
-    // Check if window is defined to ensure this is client-side
+    // Initialize Ad Service on client-side only
     if (typeof window !== "undefined") {
       try {
         adService.current = new RewardedAdService();
@@ -37,8 +37,11 @@ export default function ShopPage() {
         ]);
         if (userRes.ok) setUser(await userRes.json());
         if (packRes.ok) setPacks(await packRes.json());
-      } catch (err) { console.error(err); } 
-      finally { setLoading(false); }
+      } catch (err) { 
+        console.error(err); 
+      } finally { 
+        setLoading(false); 
+      }
     }
     loadShopData();
   }, []);
@@ -63,7 +66,9 @@ export default function ShopPage() {
         setRolledItem(data.wonItem);
         setIsRevealing(true);
       }
-    } catch (err: any) { setErrorDialog({ message: err.message }); }
+    } catch (err: any) { 
+      setErrorDialog({ message: err.message }); 
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;

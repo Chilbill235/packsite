@@ -1,3 +1,4 @@
+// lib/adService.ts
 export class RewardedAdService {
   private isInitialized = false;
 
@@ -5,11 +6,13 @@ export class RewardedAdService {
 
   init() {
     if (typeof window === "undefined" || this.isInitialized) return;
+
     const script = document.createElement("script");
     script.src = "YOUR_AD_NETWORK_SCRIPT_URL_HERE";
     script.async = true;
     script.onload = () => {
       this.isInitialized = true;
+      console.log("Ad Service: Content Locker Loaded");
     };
     document.body.appendChild(script);
   }
@@ -17,6 +20,8 @@ export class RewardedAdService {
   showAd() {
     if (typeof (window as any).show_content_locker === "function") {
       (window as any).show_content_locker();
+    } else {
+      console.warn("Ad Service: Content locker function not found.");
     }
   }
 }
