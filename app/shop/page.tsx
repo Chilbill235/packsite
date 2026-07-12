@@ -33,21 +33,22 @@ export default function ShopPage() {
           setIsWaitingForReward(false);
           
           try {
-            const res = await fetch("/api/user/award-coins", {
+            // FIXED: Path updated to /api/user/add-coins to match your folder structure
+            const res = await fetch("/api/user/add-coins", {
               method: "POST",
               headers: { "Content-Type": "application/json" }
             });
 
-            const text = await res.text();
-            
             if (res.ok) {
-              const data = JSON.parse(text);
+              const data = await res.json();
               updateBalance(data.newBalance);
               alert("Coins awarded!");
             } else {
-              console.error("API Error Response:", text);
+              // Handle non-JSON error responses (like 404s) without crashing
+              console.error("API Error Status:", res.status);
               if (res.status === 429) alert("Cooldown active: Please wait 30 seconds.");
               else if (res.status === 401) alert("Please log in to claim rewards.");
+              else alert("Failed to award coins. Please try again.");
             }
           } catch (err) {
             console.error("Fetch failed:", err);
