@@ -1,22 +1,18 @@
+// app/api/user/subscribe/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/auth"; // Ensure this imports from your main auth file
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
   const session = await auth();
-  
-  // LOGGING: This will appear in your Vercel Dashboard -> Logs
-  console.log("DEBUG - Session object:", JSON.stringify(session));
 
+  // Validate that the session and the user ID exist
   if (!session?.user?.id) {
-    return NextResponse.json({ 
-      error: "Unauthorized", 
-      details: "No session found" 
-    }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const subscription = await req.json();
-  
+
   try {
     await prisma.subscription.create({
       data: {
@@ -24,10 +20,9 @@ export async function POST(req: Request) {
         data: subscription,
       }
     });
-
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Subscription error:", error);
-    return NextResponse.json({ error: "Failed to save subscription" }, { status: 500 });
+    console.error("Subscription save error:", error);
+    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
   }
 }
