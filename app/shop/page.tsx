@@ -15,47 +15,51 @@ export default function ShopPage() {
   const [isFastOpen, setIsFastOpen] = useState(false);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [isWaitingForReward, setIsWaitingForReward] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
   
   const adService = useRef<RewardedAdService | null>(null);
   const FAST_MODE_MULTIPLIER = 1.2;
+
+  // Helper to trigger notifications
+  const notify = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 4000);
+  };
 
   useEffect(() => {
     adService.current = new RewardedAdService();
 
     const handleFocus = async () => {
       const clickedAt = sessionStorage.getItem("ad_clicked_at");
-      console.log("Window focus detected. Stored time:", clickedAt, "Is waiting:", isWaitingForReward);
       
       if (clickedAt && isWaitingForReward) {
         const timePassed = Date.now() - parseInt(clickedAt);
-        console.log("Time passed since click (ms):", timePassed);
         
-        if (timePassed > 10000) {
-          sessionStorage.removeItem("ad_clicked_at");
-          setIsWaitingForReward(false);
-          
-          try {
-            const res = await fetch("/api/user/add-coins", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" }
-            });
+        if (timePassed < 10000) {
+          notify("⚠️ Please stay on the ad page for at least 10 seconds!");
+          return;
+        }
 
-            console.log("API response status:", res.status);
-            
-            if (res.ok) {
-              const data = await res.json();
-              console.log("Success! New balance:", data.newBalance);
-              updateBalance(data.newBalance);
-              alert("Coins awarded!");
-            } else {
-              const errorText = await res.text();
-              console.error("API Error Response:", errorText);
-            }
-          } catch (err) {
-            console.error("Fetch error:", err);
+        sessionStorage.removeItem("ad_clicked_at");
+        setIsWaitingForReward(false);
+        
+        try {
+          const res = await fetch("/api/user/add-coins", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            updateBalance(data.newBalance);
+            notify("✅ Success! 500 coins added to your balance.");
+          } else if (res.status === 429) {
+            notify("⏳ Cooldown active. Please wait 30 seconds between ads.");
+          } else {
+            notify("❌ Failed to claim rewards. Please try again.");
           }
-        } else {
-          alert("Please wait at least 10 seconds before returning.");
+        } catch (err) {
+          console.error("Fetch error:", err);
         }
       }
     };
@@ -96,6 +100,8 @@ export default function ShopPage() {
       if (!isFastOpen) {
         setRolledItem(data.wonItem);
         setIsRevealing(true);
+      } else {
+        notify(`🎉 Opened ${pack.name} and won ${data.wonItem.name}!`);
       }
     } catch (err: any) { setErrorDialog({ message: err.message }); }
   };
@@ -104,6 +110,13 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
+      {/* Notification Banner */}
+      {notification && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 border border-zinc-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+          {notification}
+        </div>
+      )}
+
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
 
       <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 pb-8 border-b border-zinc-900">
