@@ -1,27 +1,8 @@
 // lib/adService.ts
 export class RewardedAdService {
-  private isInitialized = false;
-
-  constructor() {}
-
-  init() {
-    if (typeof window === "undefined" || this.isInitialized) return;
-
-    const script = document.createElement("script");
-    script.src = "YOUR_AD_NETWORK_SCRIPT_URL_HERE";
-    script.async = true;
-    script.onload = () => {
-      this.isInitialized = true;
-      console.log("Ad Service: Content Locker Loaded");
-    };
-    document.body.appendChild(script);
-  }
-
   showAd() {
-    if (typeof (window as any).show_content_locker === "function") {
-      (window as any).show_content_locker();
-    } else {
-      console.warn("Ad Service: Content locker function not found.");
-    }
+    // If Monetag provided a specific trigger function, call it here.
+    // Otherwise, this script usually handles ads automatically.
+    console.log("Ad Service: Triggering ad...");
   }
 }
