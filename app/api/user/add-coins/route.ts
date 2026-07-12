@@ -1,27 +1,39 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-// Force a direct import to ensure the singleton is correctly referenced
-import { prisma } from "@/lib/prisma"; 
+import { prisma } from "@/lib/prisma";
 import webpush from 'web-push';
+
+webpush.setVapidDetails(
+  process.env.VAPID_SUBJECT!,
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+  process.env.VAPID_PRIVATE_KEY!
+);
 
 export async function POST() {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Safety check: if prisma is undefined, the import failed or circular dep exists
-  if (!prisma) {
-    console.error("Prisma client is undefined in add-coins/route.ts");
-    return NextResponse.json({ error: "Database not initialized" }, { status: 500 });
-  }
-
-  // Use the verified prisma client
   const updatedUser = await prisma.user.update({
     where: { email: session.user.email },
     data: { balance: { increment: 500 } }
   });
 
+  // Find all subscriptions for this user
   const subscriptions = await prisma.subscription.findMany({ 
     where: { user: { email: session.user.email } } 
   });
-  
-  // ... rest of your code
+
+  // Trigger push notifications
+  if (subscriptions.length > 0) {
+    await Promise.all(
+      subscriptions.map(sub => 
+        webpush.sendNotification(sub.data as any, JSON.stringify({
+          title: "Coins Claimed!",
+          body: "You just received 500 coins."
+        })).catch(err => console.error("Push failed:", err))
+      )
+    );
+  }
+
+  return NextResponse.json({ newBalance: updatedUser.balance });
+} // <--- THIS IS THE CLOSING BRACE THAT WAS LIKELY MISSING
