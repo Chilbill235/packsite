@@ -22,14 +22,12 @@ export default function ShopPage() {
   useEffect(() => {
     adService.current = new RewardedAdService();
 
-    // Reward Logic: Listen for user returning to tab
     const handleFocus = async () => {
       const clickedAt = sessionStorage.getItem("ad_clicked_at");
       
       if (clickedAt && isWaitingForReward) {
         const timePassed = Date.now() - parseInt(clickedAt);
         
-        // If they return after 10 seconds, award them
         if (timePassed > 10000) {
           sessionStorage.removeItem("ad_clicked_at");
           setIsWaitingForReward(false);
@@ -37,16 +35,22 @@ export default function ShopPage() {
           try {
             const res = await fetch("/api/user/award-coins", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ amount: 10 }) 
+              headers: { "Content-Type": "application/json" }
             });
-            const data = await res.json();
+
+            const text = await res.text();
+            
             if (res.ok) {
+              const data = JSON.parse(text);
               updateBalance(data.newBalance);
               alert("Coins awarded!");
+            } else {
+              console.error("API Error Response:", text);
+              if (res.status === 429) alert("Cooldown active: Please wait 30 seconds.");
+              else if (res.status === 401) alert("Please log in to claim rewards.");
             }
           } catch (err) {
-            console.error("Failed to award coins", err);
+            console.error("Fetch failed:", err);
           }
         }
       }
@@ -124,10 +128,7 @@ export default function ShopPage() {
         {packs.map((pack) => (
           <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition">
             <h2 className="text-lg font-bold mb-4">{pack.name}</h2>
-            <button 
-              onClick={() => handleOpenPack(pack)} 
-              className="w-full bg-white hover:bg-zinc-200 text-black font-black py-3 rounded-2xl transition text-sm uppercase tracking-wide"
-            >
+            <button onClick={() => handleOpenPack(pack)} className="w-full bg-white hover:bg-zinc-200 text-black font-black py-3 rounded-2xl transition text-sm uppercase tracking-wide">
               {isFastOpen ? Math.ceil(pack.price * FAST_MODE_MULTIPLIER) : pack.price} Coins
             </button>
           </div>
