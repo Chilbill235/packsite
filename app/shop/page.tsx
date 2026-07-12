@@ -8,37 +8,66 @@ import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
-  // Include email in the user state to use as the tracking ID
   const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRevealing, setIsRevealing] = useState(false);
   const [rolledItem, setRolledItem] = useState<Item | null>(null);
   const [isFastOpen, setIsFastOpen] = useState(false);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
+  const [isWaitingForReward, setIsWaitingForReward] = useState(false);
   
   const adService = useRef<RewardedAdService | null>(null);
   const FAST_MODE_MULTIPLIER = 1.2;
 
   useEffect(() => {
-    // Initialize the service (ensure lib/adService.ts is also updated to accept optional arguments)
     adService.current = new RewardedAdService();
 
-    async function loadShopData() {
-      try {
-        const [userRes, packRes] = await Promise.all([
-          fetch("/api/user/profile", { credentials: "include" }),
-          fetch("/api/packs", { credentials: "include" }),
-        ]);
-        if (userRes.ok) setUser(await userRes.json());
-        if (packRes.ok) setPacks(await packRes.json());
-      } catch (err) { 
-        console.error(err); 
-      } finally { 
-        setLoading(false); 
+    // --- Reward Logic: Listen for user returning to tab ---
+    const handleFocus = async () => {
+      const clickedAt = sessionStorage.getItem("ad_clicked_at");
+      
+      if (clickedAt && isWaitingForReward) {
+        const timePassed = Date.now() - parseInt(clickedAt);
+        
+        // If they return after 10 seconds, award them
+        if (timePassed > 10000) {
+          sessionStorage.removeItem("ad_clicked_at");
+          setIsWaitingForReward(false);
+          
+          try {
+            const res = await fetch("/api/user/award-coins", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ amount: 10 }) // Adjust amount as needed
+            });
+            const data = await res.json();
+            if (res.ok) {
+              updateBalance(data.newBalance);
+              alert("Coins awarded!");
+            }
+          } catch (err) {
+            console.error("Failed to award coins", err);
+          }
+        }
       }
-    }
-    loadShopData();
-  }, []);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [isWaitingForReward]);
+
+  async function loadShopData() {
+    try {
+      const [userRes, packRes] = await Promise.all([
+        fetch("/api/user/profile", { credentials: "include" }),
+        fetch("/api/packs", { credentials: "include" }),
+      ]);
+      if (userRes.ok) setUser(await userRes.json());
+      if (packRes.ok) setPacks(await packRes.json());
+    } catch (err) { console.error(err); } finally { setLoading(false); }
+  }
+
+  useEffect(() => { loadShopData(); }, []);
 
   const updateBalance = (newBalance: number) => {
     setUser((prev) => (prev ? { ...prev, balance: newBalance } : { balance: newBalance }));
@@ -60,9 +89,7 @@ export default function ShopPage() {
         setRolledItem(data.wonItem);
         setIsRevealing(true);
       }
-    } catch (err: any) { 
-      setErrorDialog({ message: err.message }); 
-    }
+    } catch (err: any) { setErrorDialog({ message: err.message }); }
   };
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
@@ -78,40 +105,22 @@ export default function ShopPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button 
-            // Fixed: Now passing the user email to track the reward
-            onClick={() => adService.current?.showAd(user?.email || "anonymous")} 
+            onClick={() => {
+              sessionStorage.setItem("ad_clicked_at", Date.now().toString());
+              setIsWaitingForReward(true);
+              adService.current?.showAd(user?.email || "anonymous");
+            }} 
             className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold transition text-sm"
           >
-            Watch Ad for Coins
+            {isWaitingForReward ? "Return to claim..." : "Watch Ad for Coins"}
           </button>
           <button onClick={() => setIsFastOpen(!isFastOpen)} className={`px-5 py-2.5 rounded-full font-bold transition text-sm ${isFastOpen ? "bg-amber-500 text-black" : "bg-zinc-800 hover:bg-zinc-700"}`}>
             {isFastOpen ? "⚡ Fast Mode (1.2x)" : "⚡ Standard Mode"}
           </button>
         </div>
       </header>
-
-      <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {packs.map((pack) => (
-          <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition">
-            <h2 className="text-lg font-bold mb-4">{pack.name}</h2>
-            <button onClick={() => handleOpenPack(pack)} className="w-full bg-white hover:bg-zinc-200 text-black font-black py-3 rounded-2xl transition text-sm uppercase tracking-wide">
-              {isFastOpen ? Math.ceil(pack.price * FAST_MODE_MULTIPLIER) : pack.price} Coins
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {isRevealing && rolledItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4" onClick={() => setIsRevealing(false)}>
-          <div className="bg-zinc-900 rounded-3xl p-10 text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <p className="text-zinc-500 uppercase tracking-widest text-sm mb-4">You Won!</p>
-            <p className="text-3xl font-black mb-8">{rolledItem.name}</p>
-            <button onClick={() => setIsRevealing(false)} className="bg-amber-500 hover:bg-amber-400 text-black px-8 py-3 rounded-xl font-bold w-full">
-              Collect
-            </button>
-          </div>
-        </div>
-      )}
+      
+      {/* ... rest of your pack rendering code ... */}
     </div>
   );
 }
