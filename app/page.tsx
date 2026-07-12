@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { RewardedAdService } from '/lib/adService';
+import { RewardedAdService } from '@/lib/adService';
 
 // We accept user as a prop, though since this is a page, 
 // you may need to use a React Context if you want it globally accessible.
