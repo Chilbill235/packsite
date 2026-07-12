@@ -1,20 +1,15 @@
 // lib/adService.ts
-import createAdHandler from 'monetag-tg-sdk';
-
 export class RewardedAdService {
-  private adHandler: any;
+  private directLinkUrl = "https://omg10.com/4/11276026";
 
-  constructor(zoneId: string) {
-    this.adHandler = createAdHandler(zoneId);
-  }
-
-  async showAd(userId: string) {
-    try {
-      // Trigger the ad and pass the userId as ymid for postback tracking
-      await this.adHandler({ ymid: userId });
-      console.log("Ad interaction initiated");
-    } catch (err) {
-      console.error("Ad failed to show:", err);
+  // userId is now optional (?) to satisfy the compiler
+  showAd(userId?: string) {
+    if (typeof window !== "undefined") {
+      const trackingUrl = userId 
+        ? `${this.directLinkUrl}?userId=${userId}` 
+        : this.directLinkUrl;
+        
+      window.open(trackingUrl, "_blank");
     }
   }
 }
