@@ -22,7 +22,7 @@ export default function ShopPage() {
   useEffect(() => {
     adService.current = new RewardedAdService();
 
-    // --- Reward Logic: Listen for user returning to tab ---
+    // Reward Logic: Listen for user returning to tab
     const handleFocus = async () => {
       const clickedAt = sessionStorage.getItem("ad_clicked_at");
       
@@ -38,7 +38,7 @@ export default function ShopPage() {
             const res = await fetch("/api/user/award-coins", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ amount: 10 }) // Adjust amount as needed
+              body: JSON.stringify({ amount: 10 }) 
             });
             const data = await res.json();
             if (res.ok) {
@@ -119,8 +119,32 @@ export default function ShopPage() {
           </button>
         </div>
       </header>
-      
-      {/* ... rest of your pack rendering code ... */}
+
+      <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {packs.map((pack) => (
+          <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition">
+            <h2 className="text-lg font-bold mb-4">{pack.name}</h2>
+            <button 
+              onClick={() => handleOpenPack(pack)} 
+              className="w-full bg-white hover:bg-zinc-200 text-black font-black py-3 rounded-2xl transition text-sm uppercase tracking-wide"
+            >
+              {isFastOpen ? Math.ceil(pack.price * FAST_MODE_MULTIPLIER) : pack.price} Coins
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {isRevealing && rolledItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4" onClick={() => setIsRevealing(false)}>
+          <div className="bg-zinc-900 rounded-3xl p-10 text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <p className="text-zinc-500 uppercase tracking-widest text-sm mb-4">You Won!</p>
+            <p className="text-3xl font-black mb-8">{rolledItem.name}</p>
+            <button onClick={() => setIsRevealing(false)} className="bg-amber-500 hover:bg-amber-400 text-black px-8 py-3 rounded-xl font-bold w-full">
+              Collect
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
