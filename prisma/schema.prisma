@@ -78,6 +78,13 @@ model Inventory {
   user      User     @relation(fields: [userId], references: [id])
 }
 
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  data      Json     // Stores the endpoint and keys from the browser
+  user      User     @relation(fields: [userId], references: [id])
+}
+
 model Opening {
   id        String   @id @default(cuid())
   userId    String

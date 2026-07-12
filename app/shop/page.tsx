@@ -20,50 +20,53 @@ export default function ShopPage() {
   const adService = useRef<RewardedAdService | null>(null);
   const FAST_MODE_MULTIPLIER = 1.2;
 
-  // Helper to trigger notifications
   const notify = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 4000);
   };
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw1.js').catch(console.error);
     adService.current = new RewardedAdService();
+    loadShopData();
+  }, []);
 
+  const subscribeToPush = async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return notify("❌ Permission denied.");
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      });
+      await fetch("/api/user/subscribe", {
+        method: "POST",
+        body: JSON.stringify(sub),
+        headers: { "Content-Type": "application/json" }
+      });
+      notify("✅ Notifications enabled!");
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => {
     const handleFocus = async () => {
       const clickedAt = sessionStorage.getItem("ad_clicked_at");
-      
       if (clickedAt && isWaitingForReward) {
-        const timePassed = Date.now() - parseInt(clickedAt);
-        
-        if (timePassed < 10000) {
-          notify("⚠️ Please stay on the ad page for at least 10 seconds!");
+        if (Date.now() - parseInt(clickedAt) < 10000) {
+          notify("⚠️ Stay on the ad page for 10 seconds!");
           return;
         }
-
         sessionStorage.removeItem("ad_clicked_at");
         setIsWaitingForReward(false);
-        
-        try {
-          const res = await fetch("/api/user/add-coins", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" }
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            updateBalance(data.newBalance);
-            notify("✅ Success! 500 coins added to your balance.");
-          } else if (res.status === 429) {
-            notify("⏳ Cooldown active. Please wait 30 seconds between ads.");
-          } else {
-            notify("❌ Failed to claim rewards. Please try again.");
-          }
-        } catch (err) {
-          console.error("Fetch error:", err);
+        const res = await fetch("/api/user/add-coins", { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+          notify("✅ Success! 500 coins added.");
         }
       }
     };
-
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [isWaitingForReward]);
@@ -71,98 +74,69 @@ export default function ShopPage() {
   async function loadShopData() {
     try {
       const [userRes, packRes] = await Promise.all([
-        fetch("/api/user/profile", { credentials: "include" }),
-        fetch("/api/packs", { credentials: "include" }),
+        fetch("/api/user/profile"), fetch("/api/packs")
       ]);
       if (userRes.ok) setUser(await userRes.json());
       if (packRes.ok) setPacks(await packRes.json());
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
-  useEffect(() => { loadShopData(); }, []);
-
-  const updateBalance = (newBalance: number) => {
-    setUser((prev) => (prev ? { ...prev, balance: newBalance } : { balance: newBalance }));
-    document.dispatchEvent(new CustomEvent("balanceChanged", { detail: newBalance }));
-  };
-
   const handleOpenPack = async (pack: PackWithItems) => {
     try {
-      const res = await fetch("/api/packs/open", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packId: pack.id }),
+      const res = await fetch("/api/packs/open", { 
+        method: "POST", 
+        body: JSON.stringify({ packId: pack.id }), 
+        headers: {"Content-Type": "application/json"} 
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to open pack");
-      updateBalance(data.newBalance);
-      if (!isFastOpen) {
-        setRolledItem(data.wonItem);
-        setIsRevealing(true);
-      } else {
-        notify(`🎉 Opened ${pack.name} and won ${data.wonItem.name}!`);
-      }
+      if (!res.ok) throw new Error(data.error);
+      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+      if (!isFastOpen) { setRolledItem(data.wonItem); setIsRevealing(true); }
+      else notify(`🎉 Won ${data.wonItem.name}!`);
     } catch (err: any) { setErrorDialog({ message: err.message }); }
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+  if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 md:p-8">
-      {/* Notification Banner */}
+    <div className="min-h-screen bg-black text-white p-8">
       {notification && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 border border-zinc-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 border border-zinc-700 px-6 py-3 rounded-full shadow-2xl">
           {notification}
         </div>
       )}
-
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
-
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12 pb-8 border-b border-zinc-900">
+      
+      <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-8 border-b border-zinc-900">
         <div>
-          <h1 className="text-4xl md:text-5xl font-black">Pick A Pack</h1>
-          <p className="mt-2 text-zinc-400 font-medium">Balance: {user?.balance ?? 0} Coins</p>
+          <h1 className="text-4xl font-black">Pick A Pack</h1>
+          <p className="text-zinc-400">Balance: {user?.balance ?? 0} Coins</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-3">
+          <button onClick={subscribeToPush} className="bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-full text-sm font-bold">Enable Notifications</button>
           <button 
             onClick={() => {
               sessionStorage.setItem("ad_clicked_at", Date.now().toString());
               setIsWaitingForReward(true);
               adService.current?.showAd(user?.email || "anonymous");
             }} 
-            className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold transition text-sm"
+            className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold text-sm"
           >
             {isWaitingForReward ? "Return to claim..." : "Watch Ad for Coins"}
-          </button>
-          <button onClick={() => setIsFastOpen(!isFastOpen)} className={`px-5 py-2.5 rounded-full font-bold transition text-sm ${isFastOpen ? "bg-amber-500 text-black" : "bg-zinc-800 hover:bg-zinc-700"}`}>
-            {isFastOpen ? "⚡ Fast Mode (1.2x)" : "⚡ Standard Mode"}
           </button>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-4 gap-6">
         {packs.map((pack) => (
-          <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800 hover:border-zinc-700 transition">
-            <h2 className="text-lg font-bold mb-4">{pack.name}</h2>
-            <button onClick={() => handleOpenPack(pack)} className="w-full bg-white hover:bg-zinc-200 text-black font-black py-3 rounded-2xl transition text-sm uppercase tracking-wide">
+          <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800">
+            <h2 className="font-bold mb-4">{pack.name}</h2>
+            <button onClick={() => handleOpenPack(pack)} className="w-full bg-white text-black font-black py-3 rounded-2xl text-sm uppercase">
               {isFastOpen ? Math.ceil(pack.price * FAST_MODE_MULTIPLIER) : pack.price} Coins
             </button>
           </div>
         ))}
       </div>
-
-      {isRevealing && rolledItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4" onClick={() => setIsRevealing(false)}>
-          <div className="bg-zinc-900 rounded-3xl p-10 text-center max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
-            <p className="text-zinc-500 uppercase tracking-widest text-sm mb-4">You Won!</p>
-            <p className="text-3xl font-black mb-8">{rolledItem.name}</p>
-            <button onClick={() => setIsRevealing(false)} className="bg-amber-500 hover:bg-amber-400 text-black px-8 py-3 rounded-xl font-bold w-full">
-              Collect
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
