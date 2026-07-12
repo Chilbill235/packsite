@@ -8,7 +8,8 @@ import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
-  const [user, setUser] = useState<{ balance: number } | null>(null);
+  // Include email in the user state to use as the tracking ID
+  const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRevealing, setIsRevealing] = useState(false);
   const [rolledItem, setRolledItem] = useState<Item | null>(null);
@@ -19,7 +20,7 @@ export default function ShopPage() {
   const FAST_MODE_MULTIPLIER = 1.2;
 
   useEffect(() => {
-    // Service initialized without .init()
+    // Initialize the service (ensure lib/adService.ts is also updated to accept optional arguments)
     adService.current = new RewardedAdService();
 
     async function loadShopData() {
@@ -77,7 +78,8 @@ export default function ShopPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button 
-            onClick={() => adService.current?.showAd()} 
+            // Fixed: Now passing the user email to track the reward
+            onClick={() => adService.current?.showAd(user?.email || "anonymous")} 
             className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold transition text-sm"
           >
             Watch Ad for Coins
