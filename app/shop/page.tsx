@@ -35,16 +35,21 @@ export default function ShopPage() {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') return notify("❌ Permission denied.");
+      
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
       });
+
+      // Added credentials: "include" to send session cookies
       await fetch("/api/user/subscribe", {
         method: "POST",
         body: JSON.stringify(sub),
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
+        credentials: "include" 
       });
+      
       notify("✅ Notifications enabled!");
     } catch (err) { console.error(err); }
   };
