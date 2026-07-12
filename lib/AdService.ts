@@ -1,15 +1,22 @@
-"use client"; // Required because you are using window/document
-import { useEffect, useRef } from "react";
-import { RewardedAdService } from "@/lib/adService";
+export class RewardedAdService {
+  private isInitialized = false;
 
-export default function Page() {
-  const adService = useRef<RewardedAdService | null>(null);
+  constructor() {}
 
-  useEffect(() => {
-    // Instantiate only on client
-    adService.current = new RewardedAdService();
-    adService.current.init();
-  }, []);
+  init() {
+    if (typeof window === "undefined" || this.isInitialized) return;
+    const script = document.createElement("script");
+    script.src = "YOUR_AD_NETWORK_SCRIPT_URL_HERE";
+    script.async = true;
+    script.onload = () => {
+      this.isInitialized = true;
+    };
+    document.body.appendChild(script);
+  }
 
-  return <button onClick={() => adService.current?.showAd()}>Show Ad</button>;
+  showAd() {
+    if (typeof (window as any).show_content_locker === "function") {
+      (window as any).show_content_locker();
+    }
+  }
 }
