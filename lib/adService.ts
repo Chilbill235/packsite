@@ -1,11 +1,11 @@
 // lib/adService.ts
 export class RewardedAdService {
+  private directLinkUrl = "https://omg10.com/4/11276026";
+
   showAd() {
-    // If you need to trigger a Monetag locker manually:
-    if (typeof (window as any).show_monetag_locker === "function") {
-      (window as any).show_monetag_locker();
-    } else {
-      console.log("Ad Service: Monetag is handling ads automatically.");
+    if (typeof window !== "undefined") {
+      // Open the Direct Link in a new tab
+      window.open(this.directLinkUrl, "_blank");
     }
   }
 }
