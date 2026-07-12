@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import webpush from 'web-push';
 
+// Ensure your environment variables are set correctly
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT!,
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
@@ -11,14 +12,17 @@ webpush.setVapidDetails(
 
 export async function POST() {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  // Update user balance
   const updatedUser = await prisma.user.update({
     where: { email: session.user.email },
     data: { balance: { increment: 500 } }
   });
 
-  // Find all subscriptions for this user
+  // Find all subscriptions
   const subscriptions = await prisma.subscription.findMany({ 
     where: { user: { email: session.user.email } } 
   });
@@ -36,4 +40,4 @@ export async function POST() {
   }
 
   return NextResponse.json({ newBalance: updatedUser.balance });
-} // <--- THIS IS THE CLOSING BRACE THAT WAS LIKELY MISSING
+}
