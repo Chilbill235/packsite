@@ -3,16 +3,13 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { RewardedAdService } from '@/lib/adService';
-import { Analytics } from "@vercel/analytics/next"
 
-// We accept user as a prop, though since this is a page, 
-// you may need to use a React Context if you want it globally accessible.
 export default function Home({ user }: { user?: any }) {
   const adService = useRef<RewardedAdService | null>(null);
 
   useEffect(() => {
+    // Service initialized without .init()
     adService.current = new RewardedAdService();
-    adService.current.init();
   }, []);
 
   return (
