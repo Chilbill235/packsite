@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
-import { RewardedAdService } from "@/lib/adService";
 import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 
