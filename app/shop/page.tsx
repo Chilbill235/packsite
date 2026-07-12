@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
-import { RewardedAdService } from '../../lib/adService';
+import { RewardedAdService } from '@/lib/adService';
 import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 
@@ -19,15 +19,8 @@ export default function ShopPage() {
   const FAST_MODE_MULTIPLIER = 1.2;
 
   useEffect(() => {
-    // Initialize Ad Service on client-side only
-    if (typeof window !== "undefined") {
-      try {
-        adService.current = new RewardedAdService();
-        adService.current.init();
-      } catch (e) {
-        console.warn("RewardedAdService could not be initialized.");
-      }
-    }
+    // Service initialized without .init()
+    adService.current = new RewardedAdService();
 
     async function loadShopData() {
       try {
