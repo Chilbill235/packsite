@@ -39,6 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Navbar user={user} />
         <main className="flex-grow">{children}</main>
+        <Analytics />
         
         {/* Standard AdSense Loader */}
         <Script
