@@ -6,13 +6,6 @@ import Link from "next/link";
 // We accept user as a prop, though since this is a page, 
 // you may need to use a React Context if you want it globally accessible.
 export default function Home({ user }: { user?: any }) {
-  const adService = useRef<RewardedAdService | null>(null);
-
-  useEffect(() => {
-    adService.current = new RewardedAdService();
-    adService.current.init();
-  }, []);
-
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-black text-white selection:bg-blue-500 selection:text-white">
       {/* Hero Section */}
@@ -32,7 +25,6 @@ export default function Home({ user }: { user?: any }) {
       <section className="max-w-5xl mx-auto px-6 py-8">
         <div 
           className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center items-center min-h-[250px] cursor-pointer hover:bg-zinc-800 transition"
-          onClick={() => adService.current?.showAd()}
         >
           <div className="text-center">
             <p className="text-zinc-300 font-medium text-lg">Support the developer</p>
