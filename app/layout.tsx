@@ -35,6 +35,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
+        {/* Monetag meta tag added below */}
+        <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Navbar user={user} />
