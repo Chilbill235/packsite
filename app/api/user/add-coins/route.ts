@@ -10,41 +10,43 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Add this check to debug missing keys
-    if (!process.env.VAPID_SUBJECT || !process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
-      throw new Error("Missing VAPID environment variables");
-    }
-
-    webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT,
-      process.env.VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
-
+    // Update user balance first - this is the core requirement
     const updatedUser = await prisma.user.update({
       where: { email: session.user.email },
       data: { balance: { increment: 500 } }
     });
 
-    const subscriptions = await prisma.subscription.findMany({ 
-      where: { user: { email: session.user.email } } 
-    });
+    // Optional: Only attempt push if keys are actually present
+    if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+      try {
+        webpush.setVapidDetails(
+          process.env.VAPID_SUBJECT,
+          process.env.VAPID_PUBLIC_KEY,
+          process.env.VAPID_PRIVATE_KEY
+        );
 
-    if (subscriptions.length > 0) {
-      await Promise.all(
-        subscriptions.map(sub => 
-          webpush.sendNotification(sub.data as any, JSON.stringify({
-            title: "Coins Claimed!",
-            body: "You just received 500 coins."
-          })).catch(err => console.error("Push failed:", err))
-        )
-      );
+        const subscriptions = await prisma.subscription.findMany({ 
+          where: { user: { email: session.user.email } } 
+        });
+
+        if (subscriptions.length > 0) {
+          await Promise.all(
+            subscriptions.map(sub => 
+              webpush.sendNotification(sub.data as any, JSON.stringify({
+                title: "Coins Claimed!",
+                body: "You just received 500 coins."
+              })).catch(err => console.error("Push failed:", err))
+            )
+          );
+        }
+      } catch (pushErr) {
+        console.error("Non-fatal push notification error:", pushErr);
+      }
     }
 
     return NextResponse.json({ newBalance: updatedUser.balance });
   } catch (error) {
     console.error("API Error in /add-coins:", error);
-    // Return the actual error message to help you debug
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

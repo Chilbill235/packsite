@@ -13,25 +13,169 @@ export default function Home({ user }: { user?: { name: string; email?: string; 
   }, []);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-black text-white selection:bg-blue-500 selection:text-white">
-      {/* Hero Section */}
-      <div className="max-w-5xl mx-auto px-6 py-24 text-center">
-        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tight bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent">
-          {user ? `Welcome back, ${user.name}` : "Open Amazing Packs"}
+    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-gray-950 to-black text-white">
+      {/* Header with CTA */}
+      <header className="max-w-7xl mx-auto px-6 py-12 text-center">
+        <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
+          {user ? `Welcome back, ${user.name}!` : "Welcome to PackSite"}
         </h1>
-        
-        <div className="mt-10 flex justify-center">
-          <Link href={user ? "/shop" : "/register"} className="bg-blue-600 px-8 py-4 rounded-xl font-semibold transition hover:bg-blue-700">
-            {user ? "Browse Packs" : "Get Started Now"}
+        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-open">
+          Open mystery packs, collect rare items, and build your ultimate collection!
+        </p>
+        {!user ? (
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/login" className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-semibold rounded-lg transition-transform hover:scale-[1.02]">
+              Sign In
+            </Link>
+            <Link href="/register" className="flex-1 px-6 py-3 border border-gray-600 hover:border-amber-300 hover:bg-gray-800 text-gray-200 font-medium rounded-lg transition-transform hover:scale-[1.02]">
+              Create Account
+            </Link>
+          </div>
+        ) : (
+          <Link href="/shop" className="inline-block px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-transform hover:scale-[1.02]">
+            Browse Packs →
           </Link>
-        </div>
-      </div>
+        )}
+      </header>
 
-      {/* Ad Section */}
-      <section className="max-w-5xl mx-auto px-6 py-8">
-        <div 
-          className="p-4 border border-zinc-800 rounded-2xl bg-zinc-900/30 flex justify-center items-center min-h-[250px] cursor-pointer hover:bg-zinc-800 transition"
-          onClick={() => adService.current?.showAd()}
+      {/* Stats Section */}
+      {user && (
+        <section className="py-16">
+          <div className="max-w-7xl mx-auto px-6 grid gap-8 md:grid-cols-3 text-center">
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-2xl text-amber-400">💰</span>
+              </div>
+              <h3 className="font-semibold text-amber-300 mb-2">Your Balance</h3>
+              <p className="text-3xl font-bold text-white" id="user-balance">
+                Loading...
+              </p>
+            </div>
+
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-2xl text-green-400">📦</span>
+              </div>
+              <h3 className="font-semibold text-green-300 mb-2">Total Packs Opened</h3>
+              <p className="text-3xl font-bold text-white" id="total-opened">
+                --
+              </p>
+            </div>
+
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-2xl text-blue-400">🏆</span>
+              </div>
+              <h3 className="font-semibold text-blue-300 mb-2">Rarest Item</h3>
+              <p className="text-2xl font-bold text-white" id="rarest-item">
+                None yet
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Featured Packs Section */}
+      <section className="py-16 bg-gray-900/50">
+        <div className="max-w-7xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center mb-12">
+            Featured Packs
+          </h2>
+
+          <div id="featured-packs" className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-amber-300/50 transition-colors">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-3xl text-amber-400">📦</span>
+              </div>
+              <h3 className="text-xl font-bold text-center mb-3">The Starter Pack</h3>
+              <p className="text-gray-400 text-center mb-4">
+                Perfect for beginners - common items with decent value
+              </p>
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-lg font-bold text-amber-300">50 Coins</span>
+                <button
+                  onClick={() => {
+                    // This would normally open the pack, but for demo we'll just navigate
+                    window.location.href = '/shop';
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-transform hover:scale-[1.02]"
+                >
+                  Open
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-amber-300/50 transition-colors">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-3xl text-amber-400">📦</span>
+              </div>
+              <h3 className="text-xl font-bold text-center mb-3">The Treasure Chest</h3>
+              <p className="text-gray-400 text-center mb-4">
+                Rare finds await - higher chance of valuable items
+              </p>
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-lg font-bold text-amber-300">200 Coins</span>
+                <button
+                  onClick={() => {
+                    window.location.href = '/shop';
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-transform hover:scale-[1.02]"
+                >
+                  Open
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700 hover:border-amber-300/50 transition-colors">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-3xl text-amber-400">📦</span>
+              </div>
+              <h3 className="text-xl font-bold text-center mb-3">The Legendary Vault</h3>
+              <p className="text-gray-400 text-center mb-4">
+                Extremely rare items - life changing pulls possible
+              </p>
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-lg font-bold text-amber-300">1000 Coins</span>
+                <button
+                  onClick={() => {
+                    window.location.href = '/shop';
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium transition-transform hover:scale-[1.02]"
+                >
+                  Open
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action */}
+      {user && (
+        <section className="py-16 text-center">
+          <h2 className="text-3xl font-bold mb-8 bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
+            Ready to start your collection?
+          </h2>
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-open">
+            Join thousands of collectors and discover what treasures await in each pack!
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/shop" className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-transform hover:scale-[1.02]">
+              Visit Shop →
+            </Link>
+            <div onClick={() => adService.current?.showAd(user?.email || "anonymous")}
+                 className="flex-1 px-6 py-3 border border-gray-600 hover:border-amber-300 hover:bg-gray-800 text-gray-200 font-semibold rounded-lg hover:shadow-md transition-all cursor-pointer">
+              Watch Ad for 500 Coins
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Ad Section (moved to bottom) */}
+      <section className="mb-12">
+        <div
+          className="max-w-5xl mx-auto px-6 py-8"
+          onClick={() => adService.current?.showAd(user?.email || "anonymous")}
         >
           <div className="text-center">
             <p className="text-zinc-300 font-medium text-lg">Support the developer</p>
