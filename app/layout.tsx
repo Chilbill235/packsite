@@ -3,7 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Metadata } from "next";
 import Script from "next/script";
-import Providers from "./providers";
+import Providers from "@/app/providers";
 
 export const metadata: Metadata = {
   title: "PackSite",

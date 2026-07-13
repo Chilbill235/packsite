@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const ALL_ITEMS = [
+  // --- COMMON ---
   { name: "Plastic Spork", rarity: "COMMON", value: 1, chance: 5000 },
   { name: "Paperclip", rarity: "COMMON", value: 2, chance: 5000 },
   { name: "Used Napkin", rarity: "COMMON", value: 0.5, chance: 5000 },
@@ -20,6 +21,13 @@ const ALL_ITEMS = [
   { name: "Sticky Note", rarity: "COMMON", value: 1, chance: 5000 },
   { name: "Broken Match", rarity: "COMMON", value: 0.5, chance: 5000 },
   { name: "Elastic Band", rarity: "COMMON", value: 1, chance: 5000 },
+  { name: "Rusty Paperclip", rarity: "COMMON", value: 0.1, chance: 5000 },
+  { name: "Used Eraser", rarity: "COMMON", value: 0.5, chance: 5000 },
+  { name: "Dusty Marble", rarity: "COMMON", value: 1, chance: 5000 },
+  { name: "Bent Spoon", rarity: "COMMON", value: 1, chance: 5000 },
+  { name: "Old Keychain", rarity: "COMMON", value: 2, chance: 5000 },
+
+  // --- RARE ---
   { name: "Silver Dagger", rarity: "RARE", value: 150, chance: 800 },
   { name: "Gold Plated Mouse", rarity: "RARE", value: 250, chance: 800 },
   { name: "Mechanical Switch", rarity: "RARE", value: 100, chance: 800 },
@@ -31,20 +39,29 @@ const ALL_ITEMS = [
   { name: "Retro Console", rarity: "RARE", value: 400, chance: 800 },
   { name: "Crystal Prism", rarity: "RARE", value: 200, chance: 800 },
   { name: "Top-Tier GPU", rarity: "RARE", value: 800, chance: 800 },
-  { name: "Silk Tie", rarity: "RARE", value: 250, chance: 800 },
-  { name: "Bluetooth Speaker", rarity: "RARE", value: 300, chance: 800 },
-  { name: "Limited Hoodie", rarity: "RARE", value: 500, chance: 800 },
-  { name: "Carbon Fiber Pen", rarity: "RARE", value: 200, chance: 800 },
+  { name: "Mechanical Keyboard", rarity: "RARE", value: 300, chance: 800 },
+  { name: "Signed Baseball", rarity: "RARE", value: 400, chance: 800 },
+  { name: "Drone", rarity: "RARE", value: 650, chance: 800 },
+  { name: "VR Headset", rarity: "RARE", value: 700, chance: 800 },
+
+  // --- LEGENDARY ---
   { name: "Golden Crown", rarity: "LEGENDARY", value: 5000, chance: 50 },
   { name: "Diamond Ring", rarity: "LEGENDARY", value: 7500, chance: 50 },
   { name: "Master Clock", rarity: "LEGENDARY", value: 9000, chance: 50 },
   { name: "Luxury Supercar", rarity: "LEGENDARY", value: 15000, chance: 50 },
   { name: "Private Island Key", rarity: "LEGENDARY", value: 20000, chance: 50 },
+  { name: "Pro Sports Team Share", rarity: "LEGENDARY", value: 25000, chance: 50 },
+  { name: "Penthouse Suite Key", rarity: "LEGENDARY", value: 30000, chance: 50 },
+  { name: "Superyacht Blueprint", rarity: "LEGENDARY", value: 45000, chance: 50 },
   { name: "Ancient Relic", rarity: "LEGENDARY", value: 12000, chance: 50 },
   { name: "Space Station Slot", rarity: "LEGENDARY", value: 18000, chance: 50 },
-  { name: "Signed Jersey", rarity: "LEGENDARY", value: 4000, chance: 50 },
-  { name: "Platinum Credit Card", rarity: "LEGENDARY", value: 6000, chance: 50 },
-  { name: "Founders NFT", rarity: "LEGENDARY", value: 10000, chance: 50 }
+
+  // --- MYTHIC (Chase Tier) ---
+  { name: "Galaxy Core", rarity: "MYTHIC", value: 100000, chance: 5 },
+  { name: "Time Machine Prototype", rarity: "MYTHIC", value: 250000, chance: 3 },
+  { name: "Small Star Fragment", rarity: "MYTHIC", value: 500000, chance: 2 },
+  { name: "Alien Artifact", rarity: "MYTHIC", value: 750000, chance: 1 },
+  { name: "Interdimensional Portal", rarity: "MYTHIC", value: 1000000, chance: 1 }
 ];
 
 async function main() {
@@ -57,7 +74,7 @@ async function main() {
     const packId = uuidv4();
     await client.query(
       'INSERT INTO "Pack" (id, name, description, price, image, category) VALUES ($1, $2, $3, $4, $5, $6)',
-      [packId, 'The Mega Vault', 'A legendary collection of 40 unique items.', 500, 'VAULT_GOLD', 'POPULAR']
+      [packId, 'The Mega Vault', 'A massive collection of 40+ unique items, including Mythic tier rewards.', 500, 'VAULT_GOLD', 'POPULAR']
     );
 
     for (const item of ALL_ITEMS) {
@@ -67,7 +84,7 @@ async function main() {
       );
     }
     await client.query('COMMIT');
-    console.log("✅ Seed complete!");
+    console.log(`✅ Seed complete! Added ${ALL_ITEMS.length} items.`);
   } catch (e) {
     await client.query('ROLLBACK');
     console.error(e);

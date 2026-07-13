@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -13,7 +13,23 @@ export default function Navbar() {
   const pathname = usePathname();
   const { data: user, status } = useSession();
   const isAuthenticated = status === "authenticated" && !!user;
-  const balance = user?.balance ?? 0;
+  const [balanceOverride, setBalanceOverride] = useState<number | null>(null);
+
+  // Reset balanceOverride when user changes (login/logout)
+  useEffect(() => {
+    setBalanceOverride(null);
+  }, [user?.email]);
+
+  const handleBalanceChange = (event: Event) => {
+    setBalanceOverride((event as CustomEvent<number>).detail);
+  };
+
+  useEffect(() => {
+    document.addEventListener("balanceChanged", handleBalanceChange);
+    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
+  }, []);
+
+  const balance = balanceOverride ?? user?.balance ?? 0;
 
   const navLinks = [
     { name: "Shop", href: "/shop" },

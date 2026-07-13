@@ -106,6 +106,16 @@ export default function ShopPage() {
     loadShopData();
   }, []);
 
+  // Listen for balance changes from other components (e.g., inventory sales)
+  useEffect(() => {
+    const handleBalanceChange = (event: Event) => {
+      const newBalance = (event as CustomEvent<number>).detail;
+      setUser(prev => prev ? {...prev, balance: newBalance} : null);
+    };
+    document.addEventListener("balanceChanged", handleBalanceChange);
+    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
