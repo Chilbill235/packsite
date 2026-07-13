@@ -31,22 +31,36 @@ export default function ShopPage() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
-  // Claim logic: Shared between the interval and the window focus event
+  // Push Notification Subscription
+  const subscribeToPush = async () => {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return notify("❌ Permission denied.");
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      });
+      await fetch("/api/user/subscribe", {
+        method: "POST",
+        body: JSON.stringify(sub),
+        headers: { "Content-Type": "application/json" }
+      });
+      notify("✅ Notifications enabled!");
+    } catch (err) { notify("❌ Failed to enable notifications."); }
+  };
+
   const handleClaimReward = async () => {
     sessionStorage.removeItem("ad_clicked_at");
     setIsWaitingForReward(false);
-    
     const res = await fetch("/api/user/add-coins", { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
       notify("🎉 Success! 500 coins added.");
-    } else {
-      notify("❌ Failed to claim reward.");
     }
   };
 
-  // Timer Effect
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isWaitingForReward) {
@@ -54,7 +68,6 @@ export default function ShopPage() {
         const clickedAt = parseInt(sessionStorage.getItem("ad_clicked_at") || "0");
         const elapsed = Date.now() - clickedAt;
         const remaining = Math.max(0, 10 - Math.floor(elapsed / 1000));
-        
         if (remaining > 0) {
           setNotification(`⏳ Keep this tab open: ${remaining}s remaining...`);
         } else {
@@ -64,22 +77,6 @@ export default function ShopPage() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isWaitingForReward]);
-
-  // Window Focus Effect
-  useEffect(() => {
-    const handleFocus = () => {
-      const clickedAt = sessionStorage.getItem("ad_clicked_at");
-      if (clickedAt && isWaitingForReward) {
-        if (Date.now() - parseInt(clickedAt) >= 10000) {
-          handleClaimReward();
-        } else {
-          notify("⚠️ Please stay on the page until the timer finishes!");
-        }
-      }
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
   }, [isWaitingForReward]);
 
   useEffect(() => {
@@ -106,28 +103,26 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-black text-white p-8">
-      {notification && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-blue-900 border border-blue-700 px-6 py-3 rounded-full shadow-2xl text-center animate-pulse">
-          {notification}
-        </div>
-      )}
-      {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
+      {notification && <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-blue-900 border border-blue-700 px-6 py-3 rounded-full shadow-2xl text-center animate-pulse">{notification}</div>}
       
       <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-8 border-b border-zinc-900">
-        <div>
-          <h1 className="text-4xl font-black">Pick A Pack</h1>
-          <p className="text-zinc-400">Balance: {user?.balance ?? 0} Coins</p>
+        <h1 className="text-4xl font-black">Pick A Pack</h1>
+        <div className="flex items-center gap-4">
+          <button onClick={subscribeToPush} className="text-xs text-zinc-500 hover:text-white">Enable Notifications</button>
+          <div className="bg-zinc-800 px-5 py-2.5 rounded-full font-bold text-sm">
+            {user?.balance ?? 0} COINS
+          </div>
+          <button 
+            onClick={() => {
+              sessionStorage.setItem("ad_clicked_at", Date.now().toString());
+              setIsWaitingForReward(true);
+              adService.current?.showAd(user?.email || "anonymous");
+            }} 
+            className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold text-sm"
+          >
+            Watch Ad for Coins
+          </button>
         </div>
-        <button 
-          onClick={() => {
-            sessionStorage.setItem("ad_clicked_at", Date.now().toString());
-            setIsWaitingForReward(true);
-            adService.current?.showAd(user?.email || "anonymous");
-          }} 
-          className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-full font-bold text-sm"
-        >
-          Watch Ad for Coins
-        </button>
       </header>
 
       <div className="max-w-7xl mx-auto grid grid-cols-4 gap-6">
