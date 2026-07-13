@@ -1,5 +1,5 @@
 self.addEventListener('push', function(event) {
-  let data = {};
+  let data = {}
   try {
     // Expecting a payload like: { title, body, url, tag }
     data = event.data ? event.data.json() : {};
@@ -9,9 +9,9 @@ self.addEventListener('push', function(event) {
 
   const options = {
     body: data.body || "Your reward is ready!",
-    icon: '/icon-192.png', // Ensure high-res icon
-    badge: '/apple-pay.png', // Monochromatic badge for status bar
-    image: data.image || '/promo-banner.png', // Large hero image
+    icon: '/images/cup.png', // Ensure high-res icon
+    badge: '/images/apple-pay.png', // Monochromatic badge for status bar
+    image: data.image || '/images/promo-banner.png', // Large hero image
     requireInteraction: true,
     dir: 'ltr',
     lang: 'en-US',
