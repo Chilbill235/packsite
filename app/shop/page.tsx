@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
-import Link from "next/link";
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
@@ -17,13 +16,34 @@ export default function ShopPage() {
 
   const adService = useRef<RewardedAdService | null>(null);
 
-  // Helper for toast notifications
   const notify = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // Initial load
+  async function registerPushSubscription() {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      
+      const registration = await navigator.serviceWorker.ready;
+      
+      // HARD-CODED KEY: This bypasses environment variable issues
+      const sub = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU"
+      });
+
+      await fetch('/api/user/subscribe', {
+        method: 'POST',
+        body: JSON.stringify(sub),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      console.log("Successfully subscribed to push notifications");
+    } catch (err) {
+      console.error("Push subscription failed:", err);
+    }
+  }
+
   async function loadShopData() {
     try {
       const [userRes, packRes] = await Promise.all([
@@ -32,39 +52,42 @@ export default function ShopPage() {
       ]);
       if (userRes.ok) setUser(await userRes.json());
       if (packRes.ok) setPacks(await packRes.json());
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); } 
+    finally { setLoading(false); }
   }
 
-  // Handle the reward claim after 10s
   const handleClaimReward = async () => {
     setIsWaiting(false);
     try {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       const data = await res.json();
-      
       if (res.ok) {
         setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
         window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
-        notify("🎉 500 coins added successfully!");
+        notify("🎉 500 coins added!");
       } else {
         throw new Error(data.error || "Failed to claim reward");
       }
     } catch (err) {
-      setErrorDialog({ message: err instanceof Error ? err.message : "Error claiming reward." });
+      setErrorDialog({ message: "Error claiming reward." });
     }
   };
 
-  // Countdown Logic
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw1.js').catch(console.error);
+    }
+    
+    adService.current = new RewardedAdService();
+    loadShopData();
+  }, []);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isWaiting) {
       setCountdown(10);
       interval = setInterval(() => {
-        setCountdown((prev) => {
+        setCountdown(prev => {
           if (prev <= 1) {
             clearInterval(interval);
             handleClaimReward();
@@ -77,62 +100,42 @@ export default function ShopPage() {
     return () => clearInterval(interval);
   }, [isWaiting]);
 
-  // Setup initial requirements
-  useEffect(() => {
-    adService.current = new RewardedAdService();
-    loadShopData();
-    if ('Notification' in window) Notification.requestPermission();
-  }, []);
-
-  // Sync balance if other components change it
-  useEffect(() => {
-    const handleBalanceChange = (event: Event) => {
-      const newBalance = (event as CustomEvent<number>).detail;
-      setUser(prev => prev ? { ...prev, balance: newBalance } : null);
-    };
-    window.addEventListener("balanceChanged", handleBalanceChange);
-    return () => window.removeEventListener("balanceChanged", handleBalanceChange);
-  }, []);
-
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-black text-white p-6">
-      {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-600 px-6 py-3 rounded-full shadow-lg animate-fade-in">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-600 px-6 py-3 rounded-full shadow-lg">
           {notification}
         </div>
       )}
 
       <div className="max-w-7xl mx-auto">
-        {/* Ad Watcher Section */}
         <div className="mb-12 text-center border border-gray-800 p-8 rounded-3xl bg-gray-900/30">
           <button 
-            onClick={() => { 
-              setIsWaiting(true); 
+            onClick={async () => { 
+              setIsWaiting(true);
+              // Register subscription when they start watching
+              await registerPushSubscription();
               adService.current?.showAd(user?.email || "anon"); 
             }}
             disabled={isWaiting}
-            className={`px-8 py-4 rounded-full font-bold transition-all ${isWaiting ? 'bg-gray-700 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
+            className={`px-8 py-4 rounded-full font-bold transition-all ${isWaiting ? 'bg-gray-700' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
           >
-            {isWaiting ? `Stay on page for ${countdown}s...` : "Watch Ad for 500 Coins"}
+            {isWaiting ? `Watching... (${countdown}s)` : "Watch Ad for 500 Coins"}
           </button>
         </div>
 
-        {/* User Balance */}
         {user && (
           <div className="text-2xl font-bold mb-10 text-center">
             Balance: <span className="text-amber-400">{user.balance.toLocaleString()}</span>
           </div>
         )}
 
-        {/* Pack Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {packs.map((pack) => (
             <div key={pack.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
               <h2 className="text-xl font-bold mb-2">{pack.name}</h2>
-              <p className="text-gray-400 text-sm mb-4">{pack.description}</p>
               <button
                 onClick={async () => {
                   const res = await fetch("/api/packs/open", { 
@@ -144,7 +147,7 @@ export default function ShopPage() {
                   if (res.ok) {
                     setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
                     window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
-                    notify(`🎉 You won: ${data.wonItem.name}`);
+                    notify(`🎉 Won: ${data.wonItem.name}`);
                   }
                 }}
                 className="w-full bg-amber-600 py-2 rounded-lg font-bold"
@@ -155,7 +158,6 @@ export default function ShopPage() {
           ))}
         </div>
       </div>
-      
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
   );

@@ -8,6 +8,8 @@ import Providers from "@/app/providers";
 export const metadata: Metadata = {
   title: "PackSite",
   description: "Pick and open your packs!",
+  // Adding manifest link here is the Next.js way to handle metadata
+  manifest: "/manifest.json", 
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -16,8 +18,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
-        {/* Monetag site verification tag */}
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
+        {/* Manifest link is handled via metadata object above, 
+            but this is a fallback for manual configuration */}
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Providers>

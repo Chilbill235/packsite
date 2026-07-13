@@ -1,0 +1,6 @@
+{
+  "name": "PackSite",
+  "short_name": "PackSite",
+  "start_url": "/",
+  "display": "standalone"
+}
