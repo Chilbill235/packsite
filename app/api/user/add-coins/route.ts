@@ -10,38 +10,39 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Update user balance first - this is the core requirement
+    // 1. Update balance
     const updatedUser = await prisma.user.update({
       where: { email: session.user.email },
       data: { balance: { increment: 500 } }
     });
 
-    // Optional: Only attempt push if keys are actually present
-    if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-      try {
-        webpush.setVapidDetails(
-          process.env.VAPID_SUBJECT,
-          process.env.VAPID_PUBLIC_KEY,
-          process.env.VAPID_PRIVATE_KEY
-        );
+    // 2. Trigger push notifications
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-        const subscriptions = await prisma.subscription.findMany({ 
-          where: { user: { email: session.user.email } } 
-        });
+    if (publicKey && privateKey) {
+      webpush.setVapidDetails('mailto:admin@packsite.com', publicKey, privateKey);
 
-        if (subscriptions.length > 0) {
-          await Promise.all(
-            subscriptions.map(sub => 
-              webpush.sendNotification(sub.data as any, JSON.stringify({
-                title: "Coins Claimed!",
-                body: "You just received 500 coins."
-              })).catch(err => console.error("Push failed:", err))
-            )
-          );
-        }
-      } catch (pushErr) {
-        console.error("Non-fatal push notification error:", pushErr);
-      }
+      const subscriptions = await prisma.subscription.findMany({ 
+        where: { user: { email: session.user.email } } 
+      });
+
+      await Promise.all(
+        subscriptions.map(async (sub) => {
+          try {
+            await webpush.sendNotification(sub.data as any, JSON.stringify({
+              title: "Coins Claimed! 💎",
+              body: "You just received 500 coins.",
+              url: "/shop"
+            }));
+          } catch (err: any) {
+            // Automatically remove expired subscriptions
+            if (err.statusCode === 410) {
+              await prisma.subscription.delete({ where: { id: sub.id } });
+            }
+          }
+        })
+      );
     }
 
     return NextResponse.json({ newBalance: updatedUser.balance });

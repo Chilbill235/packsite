@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-}
+  }
 
 model Account {
   id                String  @id @default(cuid())
@@ -43,7 +43,8 @@ model User {
   inventory     Inventory[]
   openings      Opening[]
   sessions      Session[]
-  subscriptions Subscription[] // This is the missing piece
+  // RELATION FIX: Changed to allow multiple subscriptions per user (e.g., multiple devices)
+  subscriptions Subscription[] 
 }
 
 model Pack {
@@ -81,9 +82,12 @@ model Inventory {
 
 model Subscription {
   id     String @id @default(cuid())
-  userId String @unique // Prevents multiple subs per user
-  data   Json
+  // REMOVED @unique to allow one user to have subscriptions on multiple devices
+  userId String 
+  data   Json   
   user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model Opening {
@@ -97,7 +101,6 @@ model Opening {
   pack Pack @relation(fields: [packId], references: [id])
   user User @relation(fields: [userId], references: [id])
 
-  // Add these for performance:
   @@index([userId])
   @@index([packId])
 }
