@@ -1,24 +1,41 @@
-GNU AFFERO GENERAL PUBLIC LICENSE
-                       Version 3, 19 November 2007
+================================================================================
+PACKSITE PROPRIETARY PROTECTION & AGPL-3.0 LICENSE
+================================================================================
 
- Copyright (C) 2007, 2026 Free Software Foundation, Inc. <https://fsf.org/>
- Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
+1. AGPL-3.0 BASE: This project is licensed under the GNU Affero General Public 
+License, version 3 (AGPL-3.0). You are permitted to modify and distribute this 
+software provided that you comply with the copyleft requirements of the AGPL-3.0.
 
-                            Preamble
+2. PROHIBITED CONDUCT (THE "STRICT TERMS"):
+   A. MALICIOUS MODIFICATIONS: Any modification, obfuscation, or distribution 
+      of this Software that contains malicious code, backdoors, spyware, or 
+      logic designed to compromise user data, accounts, or system security is 
+      strictly prohibited.
+   B. UNAUTHORIZED USE: You shall not use this Software to facilitate, enable, 
+      or participate in any illegal activities, including but not limited to 
+      fraud, phishing, or unauthorized financial transactions.
+   C. REVERSE ENGINEERING: You shall not reverse engineer, decompile, or 
+      disassemble this software for the purpose of identifying proprietary 
+      security protocols or to circumvent the protections established herein.
 
- The GNU Affero General Public License is a free, copyleft license for software and other kinds of works, designed to ensure that the community has the right to share and modify versions of the program.
+3. INDEMNIFICATION & LIABILITY:
+   A. INDEMNITY: By interacting with, downloading, or modifying this Software, 
+      the User agrees to defend, indemnify, and hold the Copyright Holder 
+      harmless from all claims, losses, liabilities, and damages (including 
+      reasonable attorney fees) resulting from the User's breach of these terms 
+      or the User's modification of the Software for malicious purposes.
+   B. NO WARRANTY: The Software is provided "AS IS." The Copyright Holder 
+      expressly disclaims all warranties, including implied warranties of 
+      merchantability, fitness for a particular purpose, or non-infringement.
 
- This license, unlike the ordinary GPL, is designed to ensure that, in cases where a modified version is used over a network, the users of that service are given the opportunity to receive the source code of the version they are interacting with.
+4. JURISDICTION & REMEDIES:
+   A. GOVERNING LAW: This agreement is governed by the laws of the jurisdiction 
+      of the Copyright Holder.
+   B. INJUNCTIVE RELIEF: The User acknowledges that any breach of these terms 
+      may cause irreparable harm to the Copyright Holder, entitling the 
+      Copyright Holder to seek immediate injunctive relief in addition to any 
+      other legal remedies available under the law.
 
- [TERMS AND CONDITIONS]
- 
- 1. Definitions.
- "This License" refers to version 3 of the GNU Affero General Public License.
- 
- 2. Source Code Availability.
- Any user who makes a modified version of this software available as a service over a network must provide the users of that service with access to the source code of the modified version under the same license terms.
- 
- 3. No Warranty.
- THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- 
- [Full legal text: https://www.gnu.org/licenses/agpl-3.0.txt]
+================================================================================
+[For the full legal text of the AGPL-3.0, see: https://www.gnu.org/licenses/agpl-3.0.txt]
+================================================================================
