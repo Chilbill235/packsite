@@ -462,29 +462,29 @@ export default function InventoryPage() {
 
       {/* Mobile Footer Actions */}
       <div className="lg:hidden bg-black/50 backdrop-blur-sm border-t border-gray-800/50 px-4 py-4">
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => {
-              // Sell all
-              if (inventory.length > 0) {
-                if (window.confirm('Sell all items?')) {
-                  handleSellAll();
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => {
+                if (inventory.length > 0) {
+                  if (window.confirm('Sell all items?')) {
+                    handleSellAll();
+                  }
+                } else {
+                  alert("Your inventory is empty!");
                 }
-              } else {
-                alert("Your inventory is empty!");
-              }
-            }}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-md hover:shadow-md transition-all"
-          >
-            Sell All
-          </button>
-          <button
-            onClick={() => {
-              window.location.href = '/shop';
-            }}
-            className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-3 rounded-md hover:shadow-md transition-all"
-          >
-            Open Packs
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 rounded-md hover:shadow-md transition-all"
+            >
+              Sell All
+            </button>
+            <button
+              onClick={() => {
+                window.location.href = '/shop';
+              }}
+              className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-3 rounded-md hover:shadow-md transition-all"
+            >
+              Open Packs
+            </button>
           </div>
         </div>
       </div>
