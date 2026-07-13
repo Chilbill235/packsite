@@ -82,12 +82,9 @@ model Inventory {
 
 model Subscription {
   id     String @id @default(cuid())
-  // REMOVED @unique to allow one user to have subscriptions on multiple devices
-  userId String 
+  userId String @unique  // <--- This @unique is required for the 'where' lookup
   data   Json   
   user   User   @relation(fields: [userId], references: [id])
-
-  @@index([userId])
 }
 
 model Opening {
