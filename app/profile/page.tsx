@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Notification from "@/components/Notification";
 import ErrorDialog from "@/components/ErrorDialog";
 import Balance from "@/components/Balance";
@@ -25,6 +25,32 @@ export default function ProfilePage() {
   const [errorDialog, setErrorDialog] = useState<{ message: string; onRetry?: () => void } | null>(null);
   const [sellingId, setSellingId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<"overview" | "inventory" | "activity">("overview");
+
+  // Moved handleSell outside of useEffect so it is accessible in the JSX
+  const handleSell = useCallback(async (inventoryId: string) => {
+    setSellingId(inventoryId);
+    try {
+      const res = await fetch(`/api/inventory/${inventoryId}/sell`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to sell item");
+
+      setInventory((prev) => prev.filter((i) => i.id !== inventoryId));
+      setUser((prev) => (prev ? { ...prev, balance: data.newBalance } : null));
+
+      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+      setNotification({ message: "Item sold successfully!", type: "success" });
+    } catch (err) {
+      setErrorDialog({
+        message: err instanceof Error ? err.message : "Failed to sell item",
+        onRetry: () => {
+          setErrorDialog(null);
+          handleSell(inventoryId);
+        },
+      });
+    } finally {
+      setSellingId(null);
+    }
+  }, []);
 
   useEffect(() => {
     async function loadProfile() {
@@ -63,33 +89,6 @@ export default function ProfilePage() {
       }
     }
 
-    const handleSell = async (inventoryId: string) => {
-      setSellingId(inventoryId);
-      try {
-        const res = await fetch(`/api/inventory/${inventoryId}/sell`, { method: "POST" });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to sell item");
-
-        // Update local state
-        setInventory(prev => prev.filter(i => i.id !== inventoryId));
-
-        // Update user balance from the response
-        setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-
-        // Dispatch balance change event for other components
-        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
-
-        setNotification({ message: "Item sold successfully!", type: "success" });
-      } catch (err) {
-        setErrorDialog({
-          message: err instanceof Error ? err.message : "Failed to sell item",
-          onRetry: () => { setErrorDialog(null); handleSell(inventoryId); }
-        });
-      } finally {
-        setSellingId(null);
-      }
-    };
-
     loadProfile();
     loadInventory();
     loadOpenings();
@@ -98,7 +97,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const handleBalanceChange = (event: Event) => {
       const newBalance = (event as CustomEvent<number>).detail;
-      setUser(prev => prev ? {...prev, balance: newBalance} : null);
+      setUser((prev) => (prev ? { ...prev, balance: newBalance } : null));
     };
     document.addEventListener("balanceChanged", handleBalanceChange);
     return () => document.removeEventListener("balanceChanged", handleBalanceChange);
@@ -135,14 +134,12 @@ export default function ProfilePage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Tab Selection */}
         <div className="flex space-x-2 mb-8">
           {(["overview", "inventory", "activity"] as const).map((t) => (
             <button key={t} onClick={() => setTabs(t)} className={`px-4 py-2 rounded-lg capitalize ${tabs === t ? "bg-amber-600/30 text-amber-300 border-b-2 border-amber-400" : "text-gray-400"}`}>{t}</button>
           ))}
         </div>
 
-        {/* Overview Tab */}
         {tabs === "overview" && (
           <div className="space-y-8">
             <div className="grid gap-6 md:grid-cols-3">
@@ -158,7 +155,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Inventory Tab */}
         {tabs === "inventory" && (
           <div className="grid gap-6 md:grid-cols-3">
             {inventory.map((item, index) => (
@@ -178,7 +174,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Activity Tab */}
         {tabs === "activity" && (
           <div className="space-y-4">
             {openings.map((opening, index) => (
