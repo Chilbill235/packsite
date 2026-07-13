@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Notification from "@/components/Notification";
 import ErrorDialog from "@/components/ErrorDialog";
-import { Balance } from "@/components/Balance";
+import Balance from "@/components/Balance";
 
 type ProfileUser = {
   name: string;
