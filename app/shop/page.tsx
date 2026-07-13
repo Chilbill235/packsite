@@ -63,7 +63,7 @@ export default function ShopPage() {
       const data = await res.json();
       if (res.ok) {
         setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
-        window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         notify("🎉 500 coins added!");
       } else {
         throw new Error(data.error || "Failed to claim reward");
@@ -146,7 +146,7 @@ export default function ShopPage() {
                   const data = await res.json();
                   if (res.ok) {
                     setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-                    window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+                    document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
                     notify(`🎉 Won: ${data.wonItem.name}`);
                   }
                 }}

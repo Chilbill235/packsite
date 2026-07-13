@@ -2,34 +2,37 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { Menu, X } from "lucide-react"; // Corrected icon imports
+import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
+import { Menu, X } from "lucide-react";
 import Balance from "./Balance";
-import { useSession } from "next-auth/react";
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated" && !!session?.user;
-  const [balanceOverride, setBalanceOverride] = useState<number | null>(null);
 
-  // Reset balanceOverride when user changes (login/logout)
+  // Local state to manage balance updates in real-time
+  const [balance, setBalance] = useState<number>(0);
+
+  // Sync balance with session initially
   useEffect(() => {
-    setBalanceOverride(null);
-  }, [session?.user?.id]);
+    if (session?.user?.balance !== undefined) {
+      setBalance(Number(session.user.balance));
+    }
+  }, [session?.user?.balance]);
 
-  const handleBalanceChange = (event: Event) => {
-    setBalanceOverride((event as CustomEvent<number>).detail);
-  };
-
+  // Listen for global balance updates from other components
   useEffect(() => {
+    const handleBalanceChange = (event: Event) => {
+      const customEvent = event as CustomEvent<number>;
+      setBalance(customEvent.detail);
+    };
+
     document.addEventListener("balanceChanged", handleBalanceChange);
     return () => document.removeEventListener("balanceChanged", handleBalanceChange);
   }, []);
-
-  const balance = balanceOverride ?? session?.user?.balance ?? 0;
 
   const navLinks = [
     { name: "Shop", href: "/shop" },
@@ -47,7 +50,7 @@ export default function Navbar() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-400 md:hidden"
-            aria-label="Open menu"
+            aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
           </button>
@@ -70,7 +73,7 @@ export default function Navbar() {
             <>
               <Balance amount={balance} className="text-sm" />
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
                 className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-200 transition-colors"
               >
                 <span className="sr-only">Logout</span>
@@ -113,7 +116,7 @@ export default function Navbar() {
                   <Balance amount={balance} className="w-full" />
                 </div>
                 <button
-                  onClick={() => { signOut({ callbackUrl: "/login" }); setMobileMenuOpen(false); }}
+                  onClick={() => { signOut({ callbackUrl: `${window.location.origin}/login` }); setMobileMenuOpen(false); }}
                   className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-200 hover:bg-red-900/20"
                 >
                   Logout
