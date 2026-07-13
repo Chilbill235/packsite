@@ -10,83 +10,16 @@ export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
   const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRevealing, setIsRevealing] = useState(false);
-  const [rolledItem, setRolledItem] = useState<Item | null>(null);
-  const [isFastOpen, setIsFastOpen] = useState(false);
-  const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [isWaitingForReward, setIsWaitingForReward] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   
   const adService = useRef<RewardedAdService | null>(null);
-  const FAST_MODE_MULTIPLIER = 1.2;
 
-  const notify = (msg: string) => {
+  const notify = (msg: string, duration = 4000) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 4000);
+    if (duration > 0) setTimeout(() => setNotification(null), duration);
   };
-
-  useEffect(() => {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw1.js').catch(console.error);
-    adService.current = new RewardedAdService();
-    loadShopData();
-  }, []);
-
-  const subscribeToPush = async () => {
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return notify("❌ Permission denied.");
-
-    const reg = await navigator.serviceWorker.ready;
-    
-    // 1. Check for an existing subscription
-    const existingSub = await reg.pushManager.getSubscription();
-    
-    // 2. If it exists, unsubscribe it first
-    if (existingSub) {
-      await existingSub.unsubscribe();
-    }
-
-    // 3. Now subscribe with the current key
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-    });
-
-    await fetch("/api/user/subscribe", {
-      method: "POST",
-      body: JSON.stringify(sub),
-      headers: { "Content-Type": "application/json" },
-      credentials: "include"
-    });
-    
-    notify("✅ Notifications enabled!");
-  } catch (err) { 
-    console.error("Subscription error:", err);
-    notify("❌ Failed to enable notifications.");
-  }
-};
-
-  useEffect(() => {
-    const handleFocus = async () => {
-      const clickedAt = sessionStorage.getItem("ad_clicked_at");
-      if (clickedAt && isWaitingForReward) {
-        if (Date.now() - parseInt(clickedAt) < 10000) {
-          notify("⚠️ Stay on the ad page for 10 seconds!");
-          return;
-        }
-        sessionStorage.removeItem("ad_clicked_at");
-        setIsWaitingForReward(false);
-        const res = await fetch("/api/user/add-coins", { method: "POST" });
-        if (res.ok) {
-          const data = await res.json();
-          setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-          notify("✅ Success! 500 coins added.");
-        }
-      }
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [isWaitingForReward]);
 
   async function loadShopData() {
     try {
@@ -98,6 +31,63 @@ export default function ShopPage() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
+  // Claim logic: Shared between the interval and the window focus event
+  const handleClaimReward = async () => {
+    sessionStorage.removeItem("ad_clicked_at");
+    setIsWaitingForReward(false);
+    
+    const res = await fetch("/api/user/add-coins", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+      notify("🎉 Success! 500 coins added.");
+    } else {
+      notify("❌ Failed to claim reward.");
+    }
+  };
+
+  // Timer Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isWaitingForReward) {
+      interval = setInterval(() => {
+        const clickedAt = parseInt(sessionStorage.getItem("ad_clicked_at") || "0");
+        const elapsed = Date.now() - clickedAt;
+        const remaining = Math.max(0, 10 - Math.floor(elapsed / 1000));
+        
+        if (remaining > 0) {
+          setNotification(`⏳ Keep this tab open: ${remaining}s remaining...`);
+        } else {
+          clearInterval(interval);
+          handleClaimReward();
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isWaitingForReward]);
+
+  // Window Focus Effect
+  useEffect(() => {
+    const handleFocus = () => {
+      const clickedAt = sessionStorage.getItem("ad_clicked_at");
+      if (clickedAt && isWaitingForReward) {
+        if (Date.now() - parseInt(clickedAt) >= 10000) {
+          handleClaimReward();
+        } else {
+          notify("⚠️ Please stay on the page until the timer finishes!");
+        }
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [isWaitingForReward]);
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw1.js').catch(console.error);
+    adService.current = new RewardedAdService();
+    loadShopData();
+  }, []);
+
   const handleOpenPack = async (pack: PackWithItems) => {
     try {
       const res = await fetch("/api/packs/open", { 
@@ -107,9 +97,8 @@ export default function ShopPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-      if (!isFastOpen) { setRolledItem(data.wonItem); setIsRevealing(true); }
-      else notify(`🎉 Won ${data.wonItem.name}!`);
+      await loadShopData();
+      notify(`🎉 Won ${data.wonItem.name}!`);
     } catch (err: any) { setErrorDialog({ message: err.message }); }
   };
 
@@ -118,7 +107,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-black text-white p-8">
       {notification && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 border border-zinc-700 px-6 py-3 rounded-full shadow-2xl">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-blue-900 border border-blue-700 px-6 py-3 rounded-full shadow-2xl text-center animate-pulse">
           {notification}
         </div>
       )}
@@ -129,19 +118,16 @@ export default function ShopPage() {
           <h1 className="text-4xl font-black">Pick A Pack</h1>
           <p className="text-zinc-400">Balance: {user?.balance ?? 0} Coins</p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={subscribeToPush} className="bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-full text-sm font-bold">Enable Notifications</button>
-          <button 
-            onClick={() => {
-              sessionStorage.setItem("ad_clicked_at", Date.now().toString());
-              setIsWaitingForReward(true);
-              adService.current?.showAd(user?.email || "anonymous");
-            }} 
-            className="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-full font-bold text-sm"
-          >
-            {isWaitingForReward ? "Return to claim..." : "Watch Ad for Coins"}
-          </button>
-        </div>
+        <button 
+          onClick={() => {
+            sessionStorage.setItem("ad_clicked_at", Date.now().toString());
+            setIsWaitingForReward(true);
+            adService.current?.showAd(user?.email || "anonymous");
+          }} 
+          className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-full font-bold text-sm"
+        >
+          Watch Ad for Coins
+        </button>
       </header>
 
       <div className="max-w-7xl mx-auto grid grid-cols-4 gap-6">
@@ -149,7 +135,7 @@ export default function ShopPage() {
           <div key={pack.id} className="bg-zinc-900 p-5 rounded-3xl border border-zinc-800">
             <h2 className="font-bold mb-4">{pack.name}</h2>
             <button onClick={() => handleOpenPack(pack)} className="w-full bg-white text-black font-black py-3 rounded-2xl text-sm uppercase">
-              {isFastOpen ? Math.ceil(pack.price * FAST_MODE_MULTIPLIER) : pack.price} Coins
+              {pack.price} Coins
             </button>
           </div>
         ))}
