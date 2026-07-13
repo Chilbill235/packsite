@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { RewardedAdService } from '@/lib/adService';
 
-export default function Home({ user }: { user?: any }) {
+export default function Home({ user }: { user?: { name: string; email?: string; id?: string } }) {
   const adService = useRef<RewardedAdService | null>(null);
 
   useEffect(() => {
