@@ -11,7 +11,7 @@ self.addEventListener('push', function(event) {
     body: data.body || "Your reward is ready!",
     icon: '/images/cup.png', // Ensure high-res icon
     badge: '/images/apple-pay.png', // Monochromatic badge for status bar
-    image: data.image || '/images/promo-banner.png', // Large hero image
+    image: data.image || '/images/banner.png', // Large hero image
     requireInteraction: true,
     dir: 'ltr',
     lang: 'en-US',
