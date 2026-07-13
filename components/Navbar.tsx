@@ -11,14 +11,14 @@ import { useSession } from "next-auth/react";
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { data: user, status } = useSession();
-  const isAuthenticated = status === "authenticated" && !!user;
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === "authenticated" && !!session?.user;
   const [balanceOverride, setBalanceOverride] = useState<number | null>(null);
 
   // Reset balanceOverride when user changes (login/logout)
   useEffect(() => {
     setBalanceOverride(null);
-  }, [user?.email]);
+  }, [session?.user?.id]);
 
   const handleBalanceChange = (event: Event) => {
     setBalanceOverride((event as CustomEvent<number>).detail);
@@ -29,7 +29,7 @@ export default function Navbar() {
     return () => document.removeEventListener("balanceChanged", handleBalanceChange);
   }, []);
 
-  const balance = balanceOverride ?? user?.balance ?? 0;
+  const balance = balanceOverride ?? session?.user?.balance ?? 0;
 
   const navLinks = [
     { name: "Shop", href: "/shop" },

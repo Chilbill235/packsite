@@ -1,11 +1,12 @@
 import { Pool } from "pg";
 import "dotenv/config";
 import { v4 as uuidv4 } from "uuid";
+import type { Item } from "@prisma/client";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const generateLootPool = () => {
-  const items = [];
+const generateLootPool = (): { name: string; rarity: string; value: number; chance: number }[] => {
+  const items: { name: string; rarity: string; value: number; chance: number }[] = [];
   const tiers = [
     { name: "COMMON", qty: 30, baseVal: 5, chance: 5000 },
     { name: "UNCOMMON", qty: 30, baseVal: 50, chance: 2500 },
@@ -29,7 +30,7 @@ const generateLootPool = () => {
 };
 
 async function main() {
-  const lootPool = generateLootPool();
+  const lootPool: { name: string; rarity: string; value: number; chance: number }[] = generateLootPool();
   console.log(`Seeding ${lootPool.length} items to database...`);
   
   const client = await pool.connect();
