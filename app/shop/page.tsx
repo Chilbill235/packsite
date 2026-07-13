@@ -31,11 +31,12 @@ export default function ShopPage() {
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }
 
-  // Push Notification Subscription
-  const subscribeToPush = async () => {
+  // Automatic Push Subscription Logic
+  const autoSubscribe = async () => {
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return notify("❌ Permission denied.");
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        await Notification.requestPermission();
+      }
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -46,8 +47,7 @@ export default function ShopPage() {
         body: JSON.stringify(sub),
         headers: { "Content-Type": "application/json" }
       });
-      notify("✅ Notifications enabled!");
-    } catch (err) { notify("❌ Failed to enable notifications."); }
+    } catch (err) { console.error("Auto-sub failed", err); }
   };
 
   const handleClaimReward = async () => {
@@ -108,12 +108,14 @@ export default function ShopPage() {
       <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 pb-8 border-b border-zinc-900">
         <h1 className="text-4xl font-black">Pick A Pack</h1>
         <div className="flex items-center gap-4">
-          <button onClick={subscribeToPush} className="text-xs text-zinc-500 hover:text-white">Enable Notifications</button>
           <div className="bg-zinc-800 px-5 py-2.5 rounded-full font-bold text-sm">
             {user?.balance ?? 0} COINS
           </div>
           <button 
-            onClick={() => {
+            onClick={async () => {
+              // 1. Attempt automatic subscription
+              await autoSubscribe();
+              // 2. Start ad flow
               sessionStorage.setItem("ad_clicked_at", Date.now().toString());
               setIsWaitingForReward(true);
               adService.current?.showAd(user?.email || "anonymous");
