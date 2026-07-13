@@ -10,21 +10,22 @@ export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
   const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isWaitingForReward, setIsWaitingForReward] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [countdown, setCountdown] = useState(10);
   const [notification, setNotification] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
-  const [countdown, setCountdown] = useState(10); // seconds remaining
 
   const adService = useRef<RewardedAdService | null>(null);
 
-  const notify = (msg: string, duration = 4000) => {
+  // Helper for toast notifications
+  const notify = (msg: string) => {
     setNotification(msg);
-    if (duration > 0) setTimeout(() => setNotification(null), duration);
+    setTimeout(() => setNotification(null), 3000);
   };
 
+  // Initial load
   async function loadShopData() {
     try {
-      setLoading(true);
       const [userRes, packRes] = await Promise.all([
         fetch("/api/user/profile"),
         fetch("/api/packs")
@@ -33,239 +34,129 @@ export default function ShopPage() {
       if (packRes.ok) setPacks(await packRes.json());
     } catch (err) {
       console.error(err);
-      notify("Failed to load shop data. Please try again.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
+  // Handle the reward claim after 10s
   const handleClaimReward = async () => {
-    sessionStorage.removeItem("ad_clicked_at");
-    setIsWaitingForReward(false);
-    setCountdown(10); // reset countdown
-
-    const res = await fetch("/api/user/add-coins", { method: "POST" });
-    if (res.ok) {
-      const data = await res.json();
-      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-
-      // DISPATCH EVENT: Updates Navbar globally
-      window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
-
-      notify("🎉 Success! 500 coins added.");
-    }
-  };
-
-  const handleOpenPack = async (pack: PackWithItems) => {
+    setIsWaiting(false);
     try {
-      const res = await fetch("/api/packs/open", {
-        method: "POST",
-        body: JSON.stringify({ packId: pack.id }),
-        headers: {"Content-Type": "application/json"}
-      });
+      const res = await fetch("/api/user/add-coins", { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-
-      // Update state and broadcast new balance to Navbar
-      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-      window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
-
-      notify(`🎉 Won ${data.wonItem.name}!`);
+      
+      if (res.ok) {
+        setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
+        window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+        notify("🎉 500 coins added successfully!");
+      } else {
+        throw new Error(data.error || "Failed to claim reward");
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
-      setErrorDialog({ message: errorMessage });
+      setErrorDialog({ message: err instanceof Error ? err.message : "Error claiming reward." });
     }
   };
 
+  // Countdown Logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isWaitingForReward) {
+    if (isWaiting) {
+      setCountdown(10);
       interval = setInterval(() => {
-        const clickedAt = parseInt(sessionStorage.getItem("ad_clicked_at") || "0");
-        const elapsed = Date.now() - clickedAt;
-        const remaining = Math.max(0, 10 - Math.floor(elapsed / 1000));
-
-        setCountdown(remaining); // update countdown state
-
-        if (remaining > 0) {
-          setNotification(`⏳ Keep this tab open: ${remaining}s remaining...`);
-        } else {
-          clearInterval(interval);
-          handleClaimReward();
-        }
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            handleClaimReward();
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     }
-    return () => {
-      clearInterval(interval);
-    };
-  }, [isWaitingForReward]);
+    return () => clearInterval(interval);
+  }, [isWaiting]);
 
+  // Setup initial requirements
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw1.js').catch(console.error);
-    }
     adService.current = new RewardedAdService();
     loadShopData();
+    if ('Notification' in window) Notification.requestPermission();
   }, []);
 
-  // Listen for balance changes from other components (e.g., inventory sales)
+  // Sync balance if other components change it
   useEffect(() => {
     const handleBalanceChange = (event: Event) => {
       const newBalance = (event as CustomEvent<number>).detail;
-      setUser(prev => prev ? {...prev, balance: newBalance} : null);
+      setUser(prev => prev ? { ...prev, balance: newBalance } : null);
     };
-    document.addEventListener("balanceChanged", handleBalanceChange);
-    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
+    window.addEventListener("balanceChanged", handleBalanceChange);
+    return () => window.removeEventListener("balanceChanged", handleBalanceChange);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin h-8 w-8 border-4 border-amber-300 border-t-transparent rounded-full mx-auto"></div>
-          <p>Loading shop...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-black text-white min-h-[calc(100vh-4rem)]">
-      {/* Notification Toast */}
+    <div className="min-h-screen bg-black text-white p-6">
+      {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-amber-900 border border-amber-700 px-6 py-3 rounded-xl shadow-2xl backdrop-blur-sm">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-600 px-6 py-3 rounded-full shadow-lg animate-fade-in">
           {notification}
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        {/* Page Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent mb-4">
-            Pack Shop
-          </h1>
-          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Discover exciting mystery packs filled with rare and valuable items!
-          </p>
-        </div>
-
-        {/* Ad Reward Section - Enhanced */}
-        <div className="mb-12 text-center">
-          <div
-            onClick={() => {
-              sessionStorage.setItem("ad_clicked_at", Date.now().toString());
-              setIsWaitingForReward(true);
-              setCountdown(10); // start countdown
-              adService.current?.showAd(user?.email || "anonymous");
+      <div className="max-w-7xl mx-auto">
+        {/* Ad Watcher Section */}
+        <div className="mb-12 text-center border border-gray-800 p-8 rounded-3xl bg-gray-900/30">
+          <button 
+            onClick={() => { 
+              setIsWaiting(true); 
+              adService.current?.showAd(user?.email || "anon"); 
             }}
-            className="inline-block bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-bold py-4 px-8 rounded-2xl shadow-lg hover:shadow-xl transform transition-transform hover:scale-[1.02] flex items-center space-x-3"
+            disabled={isWaiting}
+            className={`px-8 py-4 rounded-full font-bold transition-all ${isWaiting ? 'bg-gray-700 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
           >
-            <span className="text-2xl">🎬</span>
-            <span>
-              Watch Ad for 500 Coins
-              {!isWaitingForReward && (
-                <span className="ml-2 animate-pulse text-amber-300">→</span>
-              )}
-            </span>
-          </div>
-          {isWaitingForReward && (
-            <div className="mt-4 text-sm text-amber-400">
-              Waiting for ad completion... <span id="ad-countdown">{countdown}</span>s remaining
-            </div>
-          )}
+            {isWaiting ? `Stay on page for ${countdown}s...` : "Watch Ad for 500 Coins"}
+          </button>
         </div>
 
-        {/* User Balance Display */}
+        {/* User Balance */}
         {user && (
-          <div className="mb-10 text-center bg-gray-900/50 rounded-xl p-4 border border-gray-800">
-            <span className="text-2xl text-amber-400">💰</span>
-            <span className="ml-3 text-2xl font-bold">{user.balance.toLocaleString()}</span> coins
+          <div className="text-2xl font-bold mb-10 text-center">
+            Balance: <span className="text-amber-400">{user.balance.toLocaleString()}</span>
           </div>
         )}
 
-        {/* Packs Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* Pack Grid */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {packs.map((pack) => (
-            <div
-              key={pack.id}
-              className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-amber-300/50 transition-all hover:shadow-xl transform hover:-translate-y-1"
-            >
-              {/* Pack Image */}
-              <div className="aspect-w-16 aspect-h-9 mb-4 rounded-xl overflow-hidden border border-gray-700">
-                {pack.image ? (
-                  <img
-                    src={pack.image}
-                    alt={pack.name}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-gray-800">
-                    <span className="text-5xl text-gray-600">📦</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Pack Info */}
-              <div className="text-center">
-                <h2 className="text-xl font-bold text-white mb-2 truncate">{pack.name}</h2>
-                <p className="text-gray-400 mb-4 line-clamp-2">{pack.description}</p>
-
-                {/* Item Preview */}
-                <div className="flex justify-center mb-4 space-x-2">
-                  {pack.items.slice(0, 3).map((item, index) => (
-                    <div key={index} className={`flex items-center justify-center w-10 h-10 rounded-full bg-gray-800 border-2 border-gray-700`}>
-                      {item.rarity === 'legendary' ? '👑' : item.rarity === 'rare' ? '💎' : '📦'}
-                    </div>
-                  ))}
-                  {pack.items.length > 3 && (
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-800 border-2 border-gray-700">
-                      +{pack.items.length - 3}
-                    </div>
-                  )}
-                </div>
-
-                {/* Price Button */}
-                <button
-                  onClick={() => handleOpenPack(pack)}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center space-x-2"
-                  disabled={isWaitingForReward}
-                >
-                  <span className="text-amber-300">💰</span>
-                  <span>{pack.price.toLocaleString()}</span>
-                  <span className="text-amber-300">coins</span>
-                </button>
-              </div>
-
-              {/* Rarity Badge - Top Right */}
-              <div className="absolute top-3 right-3">
-                <span className="text-xs font-bold text-white px-2 py-0.5 rounded"
-                  className={pack.items.some(item => item.rarity === 'legendary') ? 'bg-emerald-900/50 text-emerald-400' :
-                           pack.items.some(item => item.rarity === 'rare') ? 'bg-amber-900/50 text-amber-400' :
-                           'bg-gray-900/50 text-gray-400'}
-                >
-                  {pack.items.some(item => item.rarity === 'legendary') ? 'Legendary' :
-                   pack.items.some(item => item.rarity === 'rare') ? 'Rare' : 'Common'}
-                </span>
-              </div>
+            <div key={pack.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+              <h2 className="text-xl font-bold mb-2">{pack.name}</h2>
+              <p className="text-gray-400 text-sm mb-4">{pack.description}</p>
+              <button
+                onClick={async () => {
+                  const res = await fetch("/api/packs/open", { 
+                    method: "POST", 
+                    body: JSON.stringify({ packId: pack.id }),
+                    headers: {"Content-Type": "application/json"}
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+                    window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+                    notify(`🎉 You won: ${data.wonItem.name}`);
+                  }
+                }}
+                className="w-full bg-amber-600 py-2 rounded-lg font-bold"
+              >
+                {pack.price.toLocaleString()} Coins
+              </button>
             </div>
           ))}
         </div>
-
-        {/* Call to Action for Empty State */}
-        {packs.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">No packs available at the moment.</p>
-            <Link
-              href="/"
-              className="mt-6 inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-md hover:shadow-md"
-            >
-              Return to Home
-            </Link>
-          </div>
-        )}
-
-        {/* Error Dialog */}
-        {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
       </div>
+      
+      {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
   );
 }
