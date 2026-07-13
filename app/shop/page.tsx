@@ -5,6 +5,14 @@ import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
 
+// Helper: Converts the VAPID string to the required Uint8Array format
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
   const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
@@ -23,22 +31,34 @@ export default function ShopPage() {
 
   async function registerPushSubscription() {
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.warn("Push messaging not supported");
+        return;
+      }
+
+      // 1. Request Permission
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.warn("Permission denied for notifications");
+        return;
+      }
       
       const registration = await navigator.serviceWorker.ready;
       
-      // HARD-CODED KEY: This bypasses environment variable issues
+      // 2. Subscribe with properly converted key
+      const vapidKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU"
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
       });
 
+      // 3. Send to server
       await fetch('/api/user/subscribe', {
         method: 'POST',
         body: JSON.stringify(sub),
         headers: { 'Content-Type': 'application/json' }
       });
-      console.log("Successfully subscribed to push notifications");
+      console.log("Successfully subscribed");
     } catch (err) {
       console.error("Push subscription failed:", err);
     }
@@ -77,7 +97,6 @@ export default function ShopPage() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw1.js').catch(console.error);
     }
-    
     adService.current = new RewardedAdService();
     loadShopData();
   }, []);
@@ -115,7 +134,6 @@ export default function ShopPage() {
           <button 
             onClick={async () => { 
               setIsWaiting(true);
-              // Register subscription when they start watching
               await registerPushSubscription();
               adService.current?.showAd(user?.email || "anon"); 
             }}
