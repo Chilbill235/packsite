@@ -80,10 +80,10 @@ model Inventory {
 }
 
 model Subscription {
-  id        String   @id @default(cuid())
-  userId    String
-  data      Json     // Stores the endpoint and keys from the browser
-  user      User     @relation(fields: [userId], references: [id])
+  id     String @id @default(cuid())
+  userId String @unique // Prevents multiple subs per user
+  data   Json
+  user   User   @relation(fields: [userId], references: [id])
 }
 
 model Opening {
@@ -92,7 +92,12 @@ model Opening {
   packId    String
   itemId    String
   createdAt DateTime @default(now())
-  item      Item     @relation(fields: [itemId], references: [id])
-  pack      Pack     @relation(fields: [packId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+
+  item Item @relation(fields: [itemId], references: [id])
+  pack Pack @relation(fields: [packId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  // Add these for performance:
+  @@index([userId])
+  @@index([packId])
 }

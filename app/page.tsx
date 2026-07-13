@@ -8,136 +8,93 @@ import { RewardedAdService } from '@/lib/adService';
 export default function Home() {
   const { data: session, status } = useSession();
   const user = session?.user;
-  const adService = useRef<RewardedAdService | null>(null);
   const [balance, setBalance] = useState(0);
   const [totalOpened, setTotalOpened] = useState(0);
-  const [rarestItem, setRarestItem] = useState({ name: "None yet", value: 0 });
-
-  useEffect(() => {
-    adService.current = new RewardedAdService();
-  }, []);
+  const [rarestItem, setRarestItem] = useState({ name: "None yet" });
 
   const isAuthenticated = status === "authenticated" && !!user;
 
+  // Sync state logic
   useEffect(() => {
-    if (user && typeof (user as any).balance === 'number') {
-      setBalance((user as any).balance);
-    } else {
-      setBalance(0);
-    }
+    if (user && typeof (user as any).balance === 'number') setBalance((user as any).balance);
   }, [user]);
 
-  useEffect(() => {
-    const handleBalanceChange = (event: Event) => {
-      setBalance((event as CustomEvent<number>).detail);
-    };
-    document.addEventListener("balanceChanged", handleBalanceChange);
-    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
-  }, []);
-
+  // Fetch stats logic
   useEffect(() => {
     if (isAuthenticated) {
       const fetchStats = async () => {
         try {
-          const [invRes, openRes] = await Promise.all([
-            fetch("/api/inventory"),
-            fetch("/api/openings")
-          ]);
+          const [invRes, openRes] = await Promise.all([fetch("/api/inventory"), fetch("/api/openings")]);
           const invData = await invRes.json();
           const openData = await openRes.json();
-
           setTotalOpened(openData.openings?.length || 0);
-
+          
           const items = invData.inventory || [];
-          let maxRarityValue = 0;
-          let rarestName = "None yet";
-          const rarityValues: Record<string, number> = { common: 1, rare: 2, legendary: 3 };
-          for (const inv of items) {
-            const rarity = inv.item?.rarity?.toLowerCase() || "common";
-            const value = rarityValues[rarity] || 0;
-            if (value > maxRarityValue) {
-              maxRarityValue = value;
-              rarestName = inv.item?.name || "Unknown";
-            }
-          }
-          setRarestItem({ name: rarestName, value: maxRarityValue });
-        } catch (err) {
-          console.error("Failed to load stats:", err);
-        }
+          const rarest = items.length > 0 ? items.reduce((prev: any, curr: any) => 
+            (curr.item?.rarity === 'legendary' ? curr : prev), items[0]) : null;
+          setRarestItem({ name: rarest?.item?.name || "None yet" });
+        } catch (err) { console.error(err); }
       };
       fetchStats();
     }
   }, [isAuthenticated]);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-gray-950 to-black text-white">
-      <header className="max-w-7xl mx-auto px-6 py-12 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
-          {isAuthenticated ? `Welcome back, ${user!.name}!` : "Welcome to PackSite"}
+    <main className="min-h-screen bg-black text-white selection:bg-amber-500/30">
+      {/* Hero Section */}
+      <header className="relative py-24 px-6 text-center overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-900/20 via-black to-black -z-10" />
+        <h1 className="text-6xl md:text-7xl font-extrabold mb-6 tracking-tight">
+          {isAuthenticated ? `Welcome back, ${user!.name}` : "PackSite"}
         </h1>
-        <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-          Open mystery packs, collect rare items, and build your ultimate collection!
+        <p className="text-xl text-gray-400 mb-10 max-w-xl mx-auto">
+          Collect rare items, open mystery packs, and climb the leaderboard.
         </p>
-        {!isAuthenticated ? (
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/login" className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-semibold rounded-lg transition-transform hover:scale-[1.02]">
-              Sign In
-            </Link>
-            <Link href="/register" className="flex-1 px-6 py-3 border border-gray-600 hover:border-amber-300 hover:bg-gray-800 text-gray-200 font-medium rounded-lg transition-transform hover:scale-[1.02]">
-              Create Account
-            </Link>
-          </div>
-        ) : (
-          <Link href="/shop" className="inline-block px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-transform hover:scale-[1.02]">
+        
+        {isAuthenticated ? (
+          <Link href="/shop" className="px-8 py-4 bg-white text-black font-bold rounded-full hover:bg-amber-400 transition-colors">
             Browse Packs →
           </Link>
+        ) : (
+          <div className="flex gap-4 justify-center">
+            <Link href="/login" className="px-8 py-3 bg-amber-600 rounded-full font-bold hover:bg-amber-500">Sign In</Link>
+          </div>
         )}
       </header>
 
+      {/* Stats & Trademark Section */}
       {isAuthenticated && (
-        <section className="py-16">
-          <div className="max-w-7xl mx-auto px-6 grid gap-8 md:grid-cols-3 text-center">
-            {/* Stats Cards */}
-            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <div className="flex items-center justify-center mb-4"><span className="text-2xl text-amber-400">💰</span></div>
-              <h3 className="font-semibold text-amber-300 mb-2">Your Balance</h3>
-              <p className="text-3xl font-bold text-white">{typeof balance === 'number' ? balance.toLocaleString() : '0'}</p>
+        <section className="py-12 px-6">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+              {[
+                { label: "Balance", val: balance.toLocaleString(), icon: "💰", color: "text-amber-400" },
+                { label: "Opened", val: totalOpened.toString(), icon: "📦", color: "text-green-400" },
+                { label: "Rarest", val: rarestItem.name, icon: "🏆", color: "text-blue-400" }
+              ].map((item, i) => (
+                <div key={i} className="bg-gray-900/50 border border-gray-800 p-8 rounded-3xl backdrop-blur text-center hover:border-gray-600 transition-all">
+                  <div className="text-3xl mb-3">{item.icon}</div>
+                  <div className="text-gray-500 text-xs uppercase tracking-widest font-bold mb-1">{item.label}</div>
+                  <div className={`text-2xl font-bold ${item.color}`}>{item.val}</div>
+                </div>
+              ))}
             </div>
-            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <div className="flex items-center justify-center mb-4"><span className="text-2xl text-green-400">📦</span></div>
-              <h3 className="font-semibold text-green-300 mb-2">Total Packs Opened</h3>
-              <p className="text-3xl font-bold text-white">{totalOpened}</p>
-            </div>
-            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <div className="flex items-center justify-center mb-4"><span className="text-2xl text-blue-400">🏆</span></div>
-              <h3 className="font-semibold text-blue-300 mb-2">Rarest Item</h3>
-              <p className="text-2xl font-bold text-white">{rarestItem.name} {rarestItem.value > 0 ? `(${rarestItem.value.toLocaleString()} coins)` : ""}</p>
-            </div>
-          </div>
 
-          {/* Trademark Section (Added back directly under stats) */}
-          <div className="mt-8 text-center opacity-60">
-            <p className="text-xs text-gray-500 font-bold tracking-widest uppercase">PackSite™ Official Collector Platform</p>
+            {/* Premium Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-900"></div></div>
+              <div className="relative flex justify-center">
+                <span className="bg-black px-4 text-[10px] text-gray-700 font-bold tracking-[0.3em] uppercase">PackSite™ Official Platform</span>
+              </div>
+            </div>
           </div>
         </section>
       )}
 
-      {/* Featured Packs Section */}
-      <section className="py-16 bg-gray-900/50">
-        <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-12">Featured Packs</h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-             {/* ... (Keep your existing featured pack cards here) ... */}
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900/50 text-gray-400 py-8">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p>&copy; {new Date().getFullYear()} PackSite. All rights reserved.</p>
-        </div>
+      {/* Simple Footer */}
+      <footer className="py-12 text-center text-gray-600 text-sm">
+        &copy; {new Date().getFullYear()} PackSite. All rights reserved.
       </footer>
-    </div>
+    </main>
   );
 }
