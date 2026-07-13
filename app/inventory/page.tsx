@@ -14,7 +14,7 @@ export default function InventoryPage() {
   const [isSellingAll, setIsSellingAll] = useState(false);
   const [filter, setFilter] = useState<"all" | "common" | "rare" | "legendary">("all");
   const [sortBy, setSortBy] = useState<"value" | "name" | "date">("value");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   async function loadInventory() {
     try {

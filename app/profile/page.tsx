@@ -23,6 +23,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type?: "success" | "error" } | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string; onRetry?: () => void } | null>(null);
+  const [sellingId, setSellingId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<"overview" | "inventory" | "activity">("overview");
 
   useEffect(() => {
@@ -61,6 +62,33 @@ export default function ProfilePage() {
         console.error("Failed to load opening history:", err);
       }
     }
+
+    const handleSell = async (inventoryId: string) => {
+      setSellingId(inventoryId);
+      try {
+        const res = await fetch(`/api/inventory/${inventoryId}/sell`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to sell item");
+
+        // Update local state
+        setInventory(prev => prev.filter(i => i.id !== inventoryId));
+
+        // Update user balance from the response
+        setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+
+        // Dispatch balance change event for other components
+        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+
+        setNotification({ message: "Item sold successfully!", type: "success" });
+      } catch (err) {
+        setErrorDialog({
+          message: err instanceof Error ? err.message : "Failed to sell item",
+          onRetry: () => { setErrorDialog(null); handleSell(inventoryId); }
+        });
+      } finally {
+        setSellingId(null);
+      }
+    };
 
     loadProfile();
     loadInventory();
@@ -144,7 +172,7 @@ export default function ProfilePage() {
                   {item.item?.rarity === 'legendary' ? '👑' : item.item?.rarity === 'rare' ? '💎' : '📦'}
                 </div>
                 <h3 className="font-semibold text-white">{item.item?.name || 'Unknown'}</h3>
-                <button className="w-full mt-4 bg-gray-800 hover:bg-amber-900 py-2 rounded">Sell</button>
+                <button onClick={() => handleSell(item.id)} className="w-full mt-4 bg-gray-800 hover:bg-amber-900 py-2 rounded">Sell</button>
               </div>
             ))}
           </div>

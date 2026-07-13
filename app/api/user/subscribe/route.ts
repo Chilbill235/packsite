@@ -9,12 +9,15 @@ export async function POST(req: Request) {
 
   const sub = await req.json();
   
-  // Store the subscription object so your other API can find it
-  await prisma.subscription.create({
-    data: {
-      userId: session.user.id, // Or use email
-      data: sub 
+  // Use upsert to avoid unique constraint violations
+  await prisma.subscription.upsert({
+    where: { userId: session.user.id },
+    update: { data: sub },
+    create: {
+      userId: session.user.id,
+      data: sub
     }
   });
+  
   return NextResponse.json({ success: true });
 }
