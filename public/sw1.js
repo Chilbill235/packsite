@@ -12,6 +12,7 @@ self.addEventListener('push', function(event) {
     icon: '/icon-192.png', // Ensure high-res icon
     badge: '/badge-72.png', // Monochromatic badge for status bar
     image: data.image || '/promo-banner.png', // Large hero image
+    requireInteraction: true,
     dir: 'ltr',
     lang: 'en-US',
     vibrate: [200, 100, 200], // Cool "pulse" vibration pattern
