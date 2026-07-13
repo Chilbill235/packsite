@@ -33,8 +33,9 @@ export default function RegisterPage() {
 
       // On success, redirect to login with the registered query parameter
       router.push("/login?registered=true");
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -83,7 +83,10 @@ export default function ShopPage() {
       // Update balance and refresh data
       await loadShopData(); 
       notify(`🎉 Won ${data.wonItem.name}!`);
-    } catch (err: any) { setErrorDialog({ message: err.message }); }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorDialog({ message: errorMessage });
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
