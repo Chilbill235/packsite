@@ -37,7 +37,7 @@ export default function ProfilePage() {
       setInventory((prev) => prev.filter((i) => i.id !== inventoryId));
       setUser((prev) => (prev ? { ...prev, balance: data.newBalance } : null));
 
-      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
       setNotification({ message: "Item sold successfully!", type: "success" });
     } catch (err) {
       setErrorDialog({
@@ -135,7 +135,7 @@ export default function ProfilePage() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex space-x-2 mb-8">
-          {(["overview", "inventory", "activity"] as const).map((t) => (
+          {(["overview", "activity"] as const).map((t) => (
             <button key={t} onClick={() => setTabs(t)} className={`px-4 py-2 rounded-lg capitalize ${tabs === t ? "bg-amber-600/30 text-amber-300 border-b-2 border-amber-400" : "text-gray-400"}`}>{t}</button>
           ))}
         </div>
@@ -155,15 +155,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {tabs === "inventory" && (
-          <div className="grid gap-6 md:grid-cols-3">
-            {inventory.map((item, index) => (
-              <div key={index} className="group relative bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-                <div className="absolute top-2 right-2">
-                  <span className={`text-xs font-bold text-white px-2 py-0.5 rounded ${getStatusColor(item.item?.rarity || '')}`}>
-                    {getStatusText(item.item?.rarity || '')}
-                  </span>
-                </div>
+>
                 <div className="h-16 w-16 bg-gray-800/50 rounded-xl mb-4 flex items-center justify-center text-3xl">
                   {item.item?.rarity === 'legendary' ? '👑' : item.item?.rarity === 'rare' ? '💎' : '📦'}
                 </div>

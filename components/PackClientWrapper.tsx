@@ -27,7 +27,7 @@ export default function PackClientWrapper({ pack }: PackClientWrapperProps) {
       const data = await res.json();
       if (res.ok) {
         setResult(data.wonItem);
-        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setNotification({message: "Pack opened successfully!", type: "success"});
       } else {
         setErrorDialog({message: data.error || "Failed to open pack", onRetry: handlePurchase});

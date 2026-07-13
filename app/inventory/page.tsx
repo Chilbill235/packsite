@@ -54,13 +54,13 @@ export default function InventoryPage() {
       let comparison = 0;
       switch (sortBy) {
         case "value":
-          comparison = (b.item?.value || 0) - (a.item?.value || 0);
+          comparison = (a.item?.value || 0) - (b.item?.value || 0);
           break;
         case "name":
           comparison = (a.item?.name || "").localeCompare(b.item?.name || "");
           break;
         case "date":
-          comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           break;
       }
       return sortOrder === "asc" ? comparison : -comparison;
@@ -74,7 +74,7 @@ export default function InventoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to sell item");
       setInventory(prev => prev.filter(i => i.id !== inventoryId));
-      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
       localStorage.setItem('userBalance', data.newBalance.toString());
       setNotification({ message: "Item sold successfully!", type: "success" });
     } catch (err) {
@@ -94,7 +94,7 @@ export default function InventoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to sell all items");
       setInventory([]);
-      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
       localStorage.setItem('userBalance', data.newBalance.toString());
       setNotification({ message: "All items sold successfully!", type: "success" });
     } catch (err) {
