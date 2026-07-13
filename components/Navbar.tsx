@@ -1,40 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react"; // Corrected icon imports
 import Balance from "./Balance";
+import { useSession } from "next-auth/react";
 
 interface NavbarProps {
-  user: {
-    name?: string | null;
-    email?: string | null;
-    balance: number;
-  } | null;
+  // user prop is no longer needed
 }
 
-export default function Navbar({ user }: NavbarProps) {
+export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const [balanceOverride, setBalanceOverride] = useState<number | null>(null);
+  const { data: user, status } = useSession();
+  const isAuthenticated = status === "authenticated" && !!user;
+  const balance = user?.balance ?? 0;
 
-  const balance = balanceOverride ?? user?.balance ?? 0;
-
-  useEffect(() => {
-    const handleBalanceChange = (event: Event) => {
-      setBalanceOverride((event as CustomEvent<number>).detail);
-    };
-    document.addEventListener("balanceChanged", handleBalanceChange);
-    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
-  }, []);
-
-  const navLinks = user ? [
+  const navLinks = [
     { name: "Shop", href: "/shop" },
     { name: "Inventory", href: "/inventory" },
     { name: "Profile", href: "/profile" },
-  ] : [];
+  ];
 
   return (
     <nav className="sticky top-0 z-50 bg-black/90 backdrop-blur-lg border-b border-white/10 px-4 py-3">
@@ -65,7 +54,7 @@ export default function Navbar({ user }: NavbarProps) {
         </div>
 
         <div className="flex items-center space-x-3">
-          {user ? (
+          {isAuthenticated ? (
             <>
               <Balance amount={balance} className="text-sm" />
               <button
@@ -106,7 +95,7 @@ export default function Navbar({ user }: NavbarProps) {
             ))}
           </div>
           <div className="px-4 pt-2 pb-4 space-y-1 sm:px-6 border-t border-gray-700">
-            {user ? (
+            {isAuthenticated ? (
               <>
                 <div className="mt-3">
                   <Balance amount={balance} className="w-full" />
