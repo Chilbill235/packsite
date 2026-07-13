@@ -44,41 +44,46 @@ export default function Home() {
       </header>
 
       {/* Stats Section */}
-      {isAuthenticated && (
-        <section className="py-16">
-          <div className="max-w-7xl mx-auto px-6 grid gap-8 md:grid-cols-3 text-center">
-            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <div className="flex items-center justify-center mb-4">
-                <span className="text-2xl text-amber-48
-</<div className"="div className="p-2">
-    <h3 class="font-semibold text-amber-300 mb-2">Your Balance</h3>
-    <p class="text-3xl font-bold text-white" id="user-balance">
-      Loading...
-    </p>
-  </div>
+        {isAuthenticated && (
+          <section className="py-16">
+            <div className="max-w-7xl mx-auto px-6 grid gap-8 md:grid-cols-3 text-center">
+              
+              {/* Balance Card */}
+              <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                <div className="flex items-center justify-center mb-4">
+                  <span className="text-2xl text-amber-400">💰</span>
+                </div>
+                <h3 className="font-semibold text-amber-300 mb-2">Your Balance</h3>
+                <p className="text-3xl font-bold text-white" id="user-balance">
+                  Loading...
+                </p>
+              </div>
 
-  <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-    <div className="flex items-center justify-center mb-4">
-      <span className="text-2xl text-green-400">📦</span>
-    </div>
-    <h3 class="font-semibold text-green-300 mb-2">Total Packs Opened</h3>
-    <p class="text-3xl font-bold text-white" id="total-opened">
-      --
-    </p>
-  </div>
+              {/* Total Packs Card */}
+              <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                <div className="flex items-center justify-center mb-4">
+                  <span className="text-2xl text-green-400">📦</span>
+                </div>
+                <h3 className="font-semibold text-green-300 mb-2">Total Packs Opened</h3>
+                <p className="text-3xl font-bold text-white" id="total-opened">
+                  --
+                </p>
+              </div>
 
-  <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-    <div className="flex items-center justify-center mb-4">
-      <span className="text-2xl text-blue-400">🏆</span>
-    </div>
-    <h3 class="font-semibold text-blue-300 mb-2">Rarest Item</h3>
-    <p class="text-2xl font-bold text-white" id="rarest-item">
-      None yet
-    </p>
-  </div>
-</div>
-</section>
-</div>
+              {/* Rarest Item Card */}
+              <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                <div className="flex items-center justify-center mb-4">
+                  <span className="text-2xl text-blue-400">🏆</span>
+                </div>
+                <h3 className="font-semibold text-blue-300 mb-2">Rarest Item</h3>
+                <p className="text-2xl font-bold text-white" id="rarest-item">
+                  None yet
+                </p>
+              </div>
+
+            </div>
+          </section>
+        )}
 
       {/* Featured Packs Section */}
       <section className="py-16 bg-gray-900/50">

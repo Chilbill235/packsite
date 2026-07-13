@@ -13,7 +13,7 @@ export default function ShopPage() {
   const [isWaitingForReward, setIsWaitingForReward] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
-  const [countdown, setCountdown] = useState(10);
+  const [countdown, setCountdown] = useState(10); // seconds remaining
 
   const adService = useRef<RewardedAdService | null>(null);
 
@@ -40,13 +40,16 @@ export default function ShopPage() {
   const handleClaimReward = async () => {
     sessionStorage.removeItem("ad_clicked_at");
     setIsWaitingForReward(false);
-    setCountdown(10);
+    setCountdown(10); // reset countdown
 
     const res = await fetch("/api/user/add-coins", { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+
+      // DISPATCH EVENT: Updates Navbar globally
       window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+
       notify("🎉 Success! 500 coins added.");
     }
   };
@@ -61,8 +64,10 @@ export default function ShopPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
+      // Update state and broadcast new balance to Navbar
       setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
       window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
+
       notify(`🎉 Won ${data.wonItem.name}!`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
@@ -77,18 +82,26 @@ export default function ShopPage() {
         const clickedAt = parseInt(sessionStorage.getItem("ad_clicked_at") || "0");
         const elapsed = Date.now() - clickedAt;
         const remaining = Math.max(0, 10 - Math.floor(elapsed / 1000));
-        setCountdown(remaining);
-        if (remaining <= 0) {
+
+        setCountdown(remaining); // update countdown state
+
+        if (remaining > 0) {
+          setNotification(`⏳ Keep this tab open: ${remaining}s remaining...`);
+        } else {
           clearInterval(interval);
           handleClaimReward();
         }
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [isWaitingForReward]);
 
   useEffect(() => {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw1.js').catch(console.error);
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw1.js').catch(console.error);
+    }
     adService.current = new RewardedAdService();
     loadShopData();
   }, []);
@@ -105,14 +118,17 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white min-h-[calc(100vh-4rem)]">
+      {/* Notification Toast */}
       {notification && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-amber-900/90 border border-amber-700 px-6 py-3 rounded-xl shadow-2xl text-center backdrop-blur-sm">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-amber-900 border border-amber-700 px-6 py-3 rounded-xl shadow-2xl backdrop-blur-sm">
           {notification}
         </div>
       )}
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-12">
+        {/* Page Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent mb-4">
             Pack Shop
@@ -122,25 +138,33 @@ export default function ShopPage() {
           </p>
         </div>
 
+        {/* Ad Reward Section - Enhanced */}
         <div className="mb-12 text-center">
           <div
             onClick={() => {
               sessionStorage.setItem("ad_clicked_at", Date.now().toString());
               setIsWaitingForReward(true);
+              setCountdown(10); // start countdown
               adService.current?.showAd(user?.email || "anonymous");
             }}
-            className="inline-block bg-gradient-to-r from-amber-500 to-orange-500 cursor-pointer text-white font-bold py-4 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] flex items-center space-x-3"
+            className="inline-block bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-bold py-4 px-8 rounded-2xl shadow-lg hover:shadow-xl transform transition-transform hover:scale-[1.02] flex items-center space-x-3"
           >
             <span className="text-2xl">🎬</span>
-            <span>Watch Ad for 500 Coins</span>
+            <span>
+              Watch Ad for 500 Coins
+              {!isWaitingForReward && (
+                <span className="ml-2 animate-pulse text-amber-300">→</span>
+              )}
+            </span>
           </div>
           {isWaitingForReward && (
             <div className="mt-4 text-sm text-amber-400">
-              Waiting for ad completion... {countdown}s remaining
+              Waiting for ad completion... <span id="ad-countdown">{countdown}</span>s remaining
             </div>
           )}
         </div>
 
+        {/* User Balance Display */}
         {user && (
           <div className="mb-10 text-center bg-gray-900/50 rounded-xl p-4 border border-gray-800">
             <span className="text-2xl text-amber-400">💰</span>
@@ -148,43 +172,88 @@ export default function ShopPage() {
           </div>
         )}
 
+        {/* Packs Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {packs.map((pack) => (
-            <div key={pack.id} className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-amber-300/50 transition-all hover:shadow-xl">
-              <div className="aspect-video mb-4 rounded-xl overflow-hidden border border-gray-700">
+            <div
+              key={pack.id}
+              className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-amber-300/50 transition-all hover:shadow-xl transform hover:-translate-y-1"
+            >
+              {/* Pack Image */}
+              <div className="aspect-w-16 aspect-h-9 mb-4 rounded-xl overflow-hidden border border-gray-700">
                 {pack.image ? (
-                  <img src={pack.image} alt={pack.name} className="w-full h-full object-cover" />
+                  <img
+                    src={pack.image}
+                    alt={pack.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
                 ) : (
-                  <div className="flex items-center justify-center h-full bg-gray-800 text-5xl">📦</div>
+                  <div className="flex items-center justify-center h-full bg-gray-800">
+                    <span className="text-5xl text-gray-600">📦</span>
+                  </div>
                 )}
               </div>
 
+              {/* Pack Info */}
               <div className="text-center">
                 <h2 className="text-xl font-bold text-white mb-2 truncate">{pack.name}</h2>
-                <p className="text-gray-400 mb-4 text-sm">{pack.description}</p>
+                <p className="text-gray-400 mb-4 line-clamp-2">{pack.description}</p>
 
+                {/* Item Preview */}
+                <div className="flex justify-center mb-4 space-x-2">
+                  {pack.items.slice(0, 3).map((item, index) => (
+                    <div key={index} className={`flex items-center justify-center w-10 h-10 rounded-full bg-gray-800 border-2 border-gray-700`}>
+                      {item.rarity === 'legendary' ? '👑' : item.rarity === 'rare' ? '💎' : '📦'}
+                    </div>
+                  ))}
+                  {pack.items.length > 3 && (
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-800 border-2 border-gray-700">
+                      +{pack.items.length - 3}
+                    </div>
+                  )}
+                </div>
+
+                {/* Price Button */}
                 <button
                   onClick={() => handleOpenPack(pack)}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg transition-transform hover:scale-[1.02]"
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center space-x-2"
                   disabled={isWaitingForReward}
                 >
-                  {pack.price.toLocaleString()} coins
+                  <span className="text-amber-300">💰</span>
+                  <span>{pack.price.toLocaleString()}</span>
+                  <span className="text-amber-300">coins</span>
                 </button>
               </div>
 
+              {/* Rarity Badge - Top Right */}
               <div className="absolute top-3 right-3">
-                <span className={`text-xs font-bold text-white px-2 py-0.5 rounded ${
-                  pack.items.some(i => i.rarity === 'legendary') ? 'bg-emerald-900/50 text-emerald-400' :
-                  pack.items.some(i => i.rarity === 'rare') ? 'bg-amber-900/50 text-amber-400' :
-                  'bg-gray-900/50 text-gray-400'
-                }`}>
-                  {pack.items.some(i => i.rarity === 'legendary') ? 'Legendary' : pack.items.some(i => i.rarity === 'rare') ? 'Rare' : 'Common'}
+                <span className="text-xs font-bold text-white px-2 py-0.5 rounded"
+                  className={pack.items.some(item => item.rarity === 'legendary') ? 'bg-emerald-900/50 text-emerald-400' :
+                           pack.items.some(item => item.rarity === 'rare') ? 'bg-amber-900/50 text-amber-400' :
+                           'bg-gray-900/50 text-gray-400'}
+                >
+                  {pack.items.some(item => item.rarity === 'legendary') ? 'Legendary' :
+                   pack.items.some(item => item.rarity === 'rare') ? 'Rare' : 'Common'}
                 </span>
               </div>
             </div>
           ))}
         </div>
 
+        {/* Call to Action for Empty State */}
+        {packs.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-400">No packs available at the moment.</p>
+            <Link
+              href="/"
+              className="mt-6 inline-block px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-md hover:shadow-md"
+            >
+              Return to Home
+            </Link>
+          </div>
+        )}
+
+        {/* Error Dialog */}
         {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
       </div>
     </div>

@@ -1,9 +1,9 @@
-// app/layout.tsx
 import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Metadata } from "next";
 import Script from "next/script";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "PackSite",
@@ -20,8 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-grow">{children}</main>
+        <Providers>
+          <Navbar />
+          <main className="flex-grow">{children}</main>
+        </Providers>
 
         {/* Vercel Analytics */}
         <Analytics />

@@ -8,10 +8,6 @@ import { Menu, X } from "lucide-react"; // Corrected icon imports
 import Balance from "./Balance";
 import { useSession } from "next-auth/react";
 
-interface NavbarProps {
-  // user prop is no longer needed
-}
-
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
