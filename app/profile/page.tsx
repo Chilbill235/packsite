@@ -92,8 +92,8 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gradient-to-b from-gray-950 to-black text-white">
       <header className="bg-black/50 backdrop-blur-sm border-b border-gray-800/50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2"><h1 className="text-3xl font-bold">Welcome back, {user?.name || 'Explorer'}!</h1></div>
-          <div className="flex items-center space-x-4"><span className="text-2xl">💰</span><div><p className="text-sm text-gray-400">Balance</p><p className="text-2xl font-bold text-amber-300">{user?.balance?.toLocaleString() || '0'}</p></div></div>
+          <div className="space-y-2"><h1 className="text-3xl font-bold">Welcome back, {user?.name || 'Explorer'}!</h1><p className="text-gray-400">Your collector's hub</p></div>
+          <div className="flex items-center space-x-4"><span className="text-2xl text-amber-400">💰</span><div><p className="text-sm font-medium text-gray-400">Balance</p><p className="text-2xl font-bold text-amber-300">{user?.balance?.toLocaleString() || '0'}</p></div></div>
         </div>
       </header>
 
@@ -105,10 +105,16 @@ export default function ProfilePage() {
         </div>
 
         {tabs === "overview" && (
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <h3 className="text-amber-300">Total Packs Opened</h3>
-              <p className="text-3xl font-bold">{openings.length}</p>
+          <div className="space-y-8">
+            <div className="grid gap-6 md:grid-cols-3">
+              <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                <h3 className="text-amber-300">Total Packs Opened</h3>
+                <p className="text-3xl font-bold">{openings.length}</p>
+              </div>
+              <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+                <h3 className="text-emerald-300">Rarest Item Value</h3>
+                <p className="text-3xl font-bold">{inventory.reduce((max, item) => Math.max(max, item.item?.value || 0), 0).toLocaleString()} coins</p>
+              </div>
             </div>
           </div>
         )}
@@ -148,6 +154,7 @@ export default function ProfilePage() {
           </div>
         )}
       </main>
+
       {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       {errorDialog && <ErrorDialog message={errorDialog.message} onRetry={errorDialog.onRetry} onClose={() => setErrorDialog(null)} />}
     </div>
