@@ -42,7 +42,7 @@ export default function InventoryPage() {
       localStorage.setItem('userBalance', newBalance.toString());
     };
     document.addEventListener("balanceChanged", handleBalanceChange);
-    return () => document.removeEventListener("balanceChanged", handleBalanceChange", handleBalanceChange);
+    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
   }, []);
 
   const filteredInventory = useMemo(() => {
