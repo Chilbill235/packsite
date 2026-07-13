@@ -1,21 +1,24 @@
-MIT License
+GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
 
-Copyright (c) 2026 Chilbill235
+ Copyright (C) 2007, 2026 Free Software Foundation, Inc. <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+                            Preamble
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+ The GNU Affero General Public License is a free, copyleft license for software and other kinds of works, designed to ensure that the community has the right to share and modify versions of the program.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+ This license, unlike the ordinary GPL, is designed to ensure that, in cases where a modified version is used over a network, the users of that service are given the opportunity to receive the source code of the version they are interacting with.
+
+ [TERMS AND CONDITIONS]
+ 
+ 1. Definitions.
+ "This License" refers to version 3 of the GNU Affero General Public License.
+ 
+ 2. Source Code Availability.
+ Any user who makes a modified version of this software available as a service over a network must provide the users of that service with access to the source code of the modified version under the same license terms.
+ 
+ 3. No Warranty.
+ THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ 
+ [Full legal text: https://www.gnu.org/licenses/agpl-3.0.txt]
