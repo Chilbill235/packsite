@@ -1,4 +1,3 @@
-// @/lib/auth.ts
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -27,33 +26,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!isPasswordValid) return null;
 
-        return { id: user.id, email: user.email, name: user.username };
+        // Return the user object including balance
+        return { 
+          id: user.id, 
+          email: user.email, 
+          name: user.username, 
+          balance: user.balance 
+        };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // If user is logged in, add id/balance to token
       if (user) {
         token.id = user.id;
+        token.balance = (user as any).balance;
       }
-      
-      // Fetch balance from the database and add it to the token
-      const dbUser = await prisma.user.findUnique({
-        where: { id: token.id as string },
-        select: { balance: true },
-      });
-      
-      if (dbUser) {
-        token.balance = dbUser.balance;
-      }
-      
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        // Attach balance from the token to the session object
-        (session.user as any).balance = token.balance;
+        session.user.balance = token.balance as number;
       }
       return session;
     },
