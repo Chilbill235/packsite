@@ -61,7 +61,10 @@ export default function ShopPage() {
       window.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance }));
       
       notify(`🎉 Won ${data.wonItem.name}!`);
-    } catch (err: any) { setErrorDialog({ message: err.message }); }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorDialog({ message: errorMessage });
+    }
   };
 
   useEffect(() => {

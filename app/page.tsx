@@ -8,7 +8,7 @@ export default function Home({ user }: { user?: { name: string; email?: string; 
   const adService = useRef<RewardedAdService | null>(null);
 
   useEffect(() => {
-    // Service initialized without .init()
+    // RewardedAdService initialized (no init() method required)
     adService.current = new RewardedAdService();
   }, []);
 
