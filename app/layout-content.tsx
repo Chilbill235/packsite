@@ -1,32 +1,34 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation"; // Add usePathname
+import { useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "@/app/providers";
 import InstallPrompt from "@/components/InstallPrompt";
 import Script from "next/script";
 
-// Replace with your actual auth check
+// Define the paths where the splash screen SHOULD show
+const APP_PATHS = ["/", "/dashboard", "/packs"]; 
+
+// Replace with your actual auth check logic
 const checkAuthStatus = () => {
-  // Example: return !!localStorage.getItem("user_token");
   return false; 
 };
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname(); // Get current route
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // 1. If we are already on login/register, don't show the splash
-    if (pathname === "/login" || pathname === "/register") {
+    // 1. If the current page is NOT in our APP_PATHS list, skip the splash
+    if (!APP_PATHS.includes(pathname)) {
       setLoading(false);
       return;
     }
 
-    // 2. Otherwise, run the splash timer
+    // 2. Otherwise, run the splash timer for app pages
     const timer = setTimeout(() => {
       const isAuthenticated = checkAuthStatus();
 
