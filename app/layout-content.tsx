@@ -22,7 +22,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
         // The container is fixed and takes up 100% of the viewport
         <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#000000] w-screen h-screen">
           <img 
-            src="/splash/apple-icon-180.png" 
+            src="/splash/apple-icon-512.png" 
             alt="Loading" 
             // Using max-w/max-h to keep it responsive but large
             className="w-48 h-48 md:w-64 md:h-64 animate-pulse object-contain" 
