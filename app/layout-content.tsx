@@ -22,7 +22,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
         // The container is fixed, takes up the full screen, and centers the logo
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#000000] w-full h-full">
           <img 
-            src="/splash/apple-icon-180.png" 
+            src="/splash/apple-splash-2048-2732.jpg" 
             alt="Loading" 
             // Increased size classes: w-64 h-64 (256px) or larger as needed
             className="w-64 h-64 animate-pulse object-contain" 
