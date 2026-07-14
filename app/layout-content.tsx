@@ -19,13 +19,13 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   return (
     <>
       {loading ? (
-        // The container is fixed and takes up 100% of the viewport
-        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#000000] w-screen h-screen">
+        // The container is fixed, takes up the full screen, and centers the logo
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#000000] w-full h-full">
           <img 
-            src="/splash/apple-icon-512.png" 
+            src="/splash/apple-icon-180.png" 
             alt="Loading" 
-            // Using max-w/max-h to keep it responsive but large
-            className="w-48 h-48 md:w-64 md:h-64 animate-pulse object-contain" 
+            // Increased size classes: w-64 h-64 (256px) or larger as needed
+            className="w-64 h-64 animate-pulse object-contain" 
           />
         </div>
       ) : (
@@ -39,8 +39,19 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
       )}
 
       <Analytics />
-      <Script src="https://quge5.com/88/tag.min.js" strategy="afterInteractive" data-zone="258926" data-cfasync="false" async />
-      <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777" crossOrigin="anonymous" strategy="afterInteractive" />
+      <Script 
+        src="https://quge5.com/88/tag.min.js" 
+        strategy="afterInteractive" 
+        data-zone="258926" 
+        data-cfasync="false" 
+        async 
+      />
+      <Script 
+        async 
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777" 
+        crossOrigin="anonymous" 
+        strategy="afterInteractive" 
+      />
     </>
   );
 }
