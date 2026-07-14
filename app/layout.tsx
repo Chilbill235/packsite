@@ -13,15 +13,18 @@ export const metadata: Metadata = {
     capable: true,
     title: "PackSite",
     statusBarStyle: "black-translucent",
+    // This tells iOS to show this image while the app is loading
+    startupImage: [
+      "/images/banner.png", 
+    ],
   },
   icons: {
-    apple: "/images/apple-touch-icon.png",
+    apple: "/images/icon.png",
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Added style={{ backgroundColor: '#000000' }} to eliminate white flashes
     <html lang="en" style={{ backgroundColor: '#000000' }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
@@ -29,11 +32,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
-        <Providers>
-          <InstallPrompt />
-          <Navbar />
-          <main className="flex-grow">{children}</main>
-        </Providers>
+        {/* Added a container with fade-in to smooth the transition from the splash screen */}
+        <div className="animate-in fade-in duration-500">
+          <Providers>
+            <InstallPrompt />
+            <Navbar />
+            <main className="flex-grow">{children}</main>
+          </Providers>
+        </div>
 
         <Analytics />
 
