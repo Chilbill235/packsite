@@ -1,40 +1,46 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "@/app/providers";
 import InstallPrompt from "@/components/InstallPrompt";
 import Script from "next/script";
-// Import your auth hook here. Example:
-// import { useAuth } from "@/context/AuthContext"; 
+
+// Assuming you use something like localStorage or a state-based auth
+// Replace `checkAuthStatus` with your actual authentication check
+const checkAuthStatus = () => {
+  // Example: return !!localStorage.getItem("user_token");
+  return false; 
+};
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  // const { user, loading: authLoading } = useAuth(); // Example usage
 
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      // 1. Logic to check if user is logged in
-      const isAuthenticated = false; // Replace with your actual auth check logic
+    // 1. Minimum display time for the splash animation
+    const timer = setTimeout(() => {
+      const isAuthenticated = checkAuthStatus();
 
       if (!isAuthenticated) {
-        // 2. Redirect if not logged in
+        // Redirecting without setting loading to false first 
+        // keeps the splash screen visible until the new page takes over
         router.push("/login");
       } else {
-        // 3. Stop showing the splash screen if logged in
+        // Smoothly fade out the splash
         setLoading(false);
       }
     }, 2000);
+
     return () => clearTimeout(timer);
   }, [router]);
 
   return (
     <>
       {loading ? (
-        <div className="fixed inset-0 z-[9999] w-screen h-screen bg-[#000000] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] w-screen h-screen bg-[#000000] flex items-center justify-center p-4 animate-in fade-out duration-700">
           <img 
             src="/splash/apple-splash-2048-2732.jpg" 
             alt="Loading" 
