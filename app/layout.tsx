@@ -4,19 +4,11 @@ import "./globals.css";
 import { Metadata } from "next";
 import Script from "next/script";
 import Providers from "@/app/providers";
-import InstallPrompt from "@/components/InstallPrompt"; // Ensure you create this file
+import InstallPrompt from "@/components/InstallPrompt";
 
 export const metadata: Metadata = {
   title: "PackSite",
   description: "Pick and open your packs!",
-  appleWebApp: {
-    capable: true,
-    title: "PackSite",
-    statusBarStyle: "black-translucent",
-  },
-  icons: {
-    apple: "/apple-touch-icon.png",
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,8 +16,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-        <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
-        <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Providers>

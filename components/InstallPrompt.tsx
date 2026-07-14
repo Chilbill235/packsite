@@ -2,52 +2,32 @@
 import { useEffect, useState } from "react";
 
 export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showButton, setShowButton] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Check if device is iOS
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    setIsIOS(isIOSDevice);
-
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowButton(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+    // Small delay to make the popup feel "native" rather than jarring
+    const timer = setTimeout(() => setShow(true), 2000);
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setShowButton(false);
-    }
-  };
-
-  // Show manual instructions for iOS
-  if (isIOS) {
-    return (
-      <div className="fixed bottom-20 left-4 right-4 bg-zinc-800 text-white p-4 rounded-xl text-center z-50 shadow-lg">
-        Tap the <b>Share</b> button 📤 and select <b>"Add to Home Screen"</b> to install!
-      </div>
-    );
-  }
-
-  // Show install button for Android/Desktop
-  if (!showButton) return null;
+  if (!show) return null;
 
   return (
-    <button 
-      onClick={handleInstallClick}
-      className="fixed bottom-20 left-4 right-4 bg-orange-500 text-white p-4 rounded-xl font-bold shadow-lg z-50"
-    >
-      Install PackSite App
-    </button>
+    <div className="fixed bottom-0 left-0 right-0 p-6 bg-zinc-900/90 backdrop-blur-xl border-t border-zinc-800 rounded-t-3xl z-[9999] shadow-2xl animate-in slide-in-from-bottom">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center font-bold text-xl">PS</div>
+        <div className="text-center">
+          <h3 className="font-bold text-lg">Install PackSite</h3>
+          <p className="text-zinc-400 text-sm">
+            {isIOS 
+              ? 'Tap "Share" 📤 and "Add to Home Screen"' 
+              : 'Add to your home screen for instant access'}
+          </p>
+        </div>
+        <button onClick={() => setShow(false)} className="text-zinc-500 text-xs mt-2">Dismiss</button>
+      </div>
+    </div>
   );
 }
