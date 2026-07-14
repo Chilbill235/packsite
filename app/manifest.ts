@@ -12,7 +12,7 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     icons: [
       {
-        src: '/apple-touch-icon.png', // Using the file from your screenshot
+        src: '/apple-touch-icon.png', // Ensure this file is in your /public folder
         sizes: '240x240',
         type: 'image/png',
         purpose: 'maskable',
