@@ -11,7 +11,7 @@
   "categories": ["games", "entertainment"],
   "icons": [
     {
-      "src": "/apple-touch-icon.png",
+      "src": "/images/apple-touch-icon.png",
       "sizes": "240x240",
       "type": "image/png",
       "purpose": "any maskable"
