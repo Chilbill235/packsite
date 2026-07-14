@@ -9,7 +9,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 import Script from "next/script";
 
 // Define the paths where the splash screen SHOULD show
-const APP_PATHS = ["/", "/dashboard", "/packs"]; 
+const APP_PATHS = ["/", "/profile", "/shop"]; 
 
 // Replace with your actual auth check logic
 const checkAuthStatus = () => {
