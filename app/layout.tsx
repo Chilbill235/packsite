@@ -8,20 +8,28 @@ import Providers from "@/app/providers";
 export const metadata: Metadata = {
   title: "PackSite",
   description: "Pick and open your packs!",
-  // Adding manifest link here is the Next.js way to handle metadata
-  manifest: "/manifest.json", 
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "PackSite",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
-        {/* Manifest link is handled via metadata object above, 
-            but this is a fallback for manual configuration */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* iOS Meta Tags */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="PackSite" />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Providers>
@@ -29,7 +37,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-grow">{children}</main>
         </Providers>
 
-        {/* Vercel Analytics */}
         <Analytics />
 
         {/* Monetag Script */}
@@ -41,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           async
         />
 
-        {/* Standard AdSense Loader */}
+        {/* AdSense */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
