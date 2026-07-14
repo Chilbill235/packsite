@@ -19,17 +19,16 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   return (
     <>
       {loading ? (
-        // Container set to 70% background size to create a "zoomed out" effect
-        <div 
-          className="fixed inset-0 z-[9999] w-screen h-screen"
-          style={{
-            backgroundColor: '#000000',
-            backgroundImage: "url('/splash/apple-splash-2048-2732.jpg')",
-            backgroundSize: "70%",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat"
-          }}
-        />
+        // Using a flex container ensures perfect centering on any screen size
+        <div className="fixed inset-0 z-[9999] w-screen h-screen bg-[#000000] flex items-center justify-center p-4">
+          <img 
+            src="/splash/apple-splash-2048-2732.jpg" 
+            alt="Loading" 
+            // 'object-contain' preserves the image ratio
+            // 'max-w-[70%]' and 'max-h-[70%]' prevents the logo from touching screen edges
+            className="w-auto h-auto max-w-[70%] max-h-[70%] animate-pulse object-contain" 
+          />
+        </div>
       ) : (
         <div className="animate-in fade-in duration-500 min-h-screen flex flex-col">
           <Providers>
