@@ -1,46 +1,49 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation"; // Add usePathname
 import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
 import Providers from "@/app/providers";
 import InstallPrompt from "@/components/InstallPrompt";
 import Script from "next/script";
 
-// Assuming you use something like localStorage or a state-based auth
-// Replace `checkAuthStatus` with your actual authentication check
+// Replace with your actual auth check
 const checkAuthStatus = () => {
   // Example: return !!localStorage.getItem("user_token");
   return false; 
 };
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname(); // Get current route
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // 1. Minimum display time for the splash animation
+    // 1. If we are already on login/register, don't show the splash
+    if (pathname === "/login" || pathname === "/register") {
+      setLoading(false);
+      return;
+    }
+
+    // 2. Otherwise, run the splash timer
     const timer = setTimeout(() => {
       const isAuthenticated = checkAuthStatus();
 
       if (!isAuthenticated) {
-        // Redirecting without setting loading to false first 
-        // keeps the splash screen visible until the new page takes over
         router.push("/login");
       } else {
-        // Smoothly fade out the splash
         setLoading(false);
       }
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [router, pathname]);
 
   return (
     <>
       {loading ? (
-        <div className="fixed inset-0 z-[9999] w-screen h-screen bg-[#000000] flex items-center justify-center p-4 animate-in fade-out duration-700">
+        <div className="fixed inset-0 z-[9999] w-screen h-screen bg-[#000000] flex items-center justify-center p-4">
           <img 
             src="/splash/apple-splash-2048-2732.jpg" 
             alt="Loading" 
