@@ -4,8 +4,13 @@ import { useEffect, useState } from "react";
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showButton, setShowButton] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // Check if device is iOS
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsIOS(isIOSDevice);
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -25,6 +30,16 @@ export default function InstallPrompt() {
     }
   };
 
+  // Show manual instructions for iOS
+  if (isIOS) {
+    return (
+      <div className="fixed bottom-20 left-4 right-4 bg-zinc-800 text-white p-4 rounded-xl text-center z-50 shadow-lg">
+        Tap the <b>Share</b> button 📤 and select <b>"Add to Home Screen"</b> to install!
+      </div>
+    );
+  }
+
+  // Show install button for Android/Desktop
   if (!showButton) return null;
 
   return (
