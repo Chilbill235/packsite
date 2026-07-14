@@ -27,8 +27,8 @@ export async function POST() {
       await Promise.all(subscriptions.map(async (sub) => {
         try {
           await webpush.sendNotification(sub.data as any, JSON.stringify({
-            title: "Coins Claimed! 💎",
-            body: "You just received 500 coins.",
+            title: "💎 Coins Claimed! 💎",
+            body: "🪙 You just received 500 coins. 🪙",
             url: "/shop"
           }));
         } catch (err: any) {
