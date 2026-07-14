@@ -19,15 +19,17 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   return (
     <>
       {loading ? (
-        // The container is fixed, takes up the full screen, and centers the logo
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#000000] w-full h-full">
-          <img 
-            src="/splash/apple-splash-2048-2732.jpg" 
-            alt="Loading" 
-            // Increased size classes: w-64 h-64 (256px) or larger as needed
-            className="w-64 h-64 animate-pulse object-contain" 
-          />
-        </div>
+        // This container now covers the full viewport using background properties
+        <div 
+          className="fixed inset-0 z-[9999] w-screen h-screen"
+          style={{
+            backgroundColor: '#000000',
+            backgroundImage: "url('/splash/apple-splash-2048-2732.jpg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat"
+          }}
+        />
       ) : (
         <div className="animate-in fade-in duration-500 min-h-screen flex flex-col">
           <Providers>
