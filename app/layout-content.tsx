@@ -19,13 +19,13 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   return (
     <>
       {loading ? (
-        // This container now covers the full viewport using background properties
+        // Container set to 70% background size to create a "zoomed out" effect
         <div 
           className="fixed inset-0 z-[9999] w-screen h-screen"
           style={{
             backgroundColor: '#000000',
             backgroundImage: "url('/splash/apple-splash-2048-2732.jpg')",
-            backgroundSize: "cover",
+            backgroundSize: "70%",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat"
           }}
