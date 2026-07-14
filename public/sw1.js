@@ -24,11 +24,11 @@ self.addEventListener('push', function(event) {
     actions: [
       {
         action: 'open-shop',
-        title: '💎 Claim Now',
+        title: '💎 Claim Now 💎',
       },
       {
         action: 'close',
-        title: 'Dismiss',
+        title: '❌ Dismiss ❌',
       }
     ]
   };
