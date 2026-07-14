@@ -9,7 +9,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Get the callbackUrl from the URL, default to "/shop" if it doesn't exist
-  const callbackUrl = searchParams.get("callbackUrl") || "/shop";
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
