@@ -144,9 +144,6 @@ export default function ShopPage() {
           </button>
         </div>
 
-        {user && (
-        )}
-
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {packs.map((pack) => (
             <div key={pack.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
