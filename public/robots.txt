@@ -1,0 +1,10 @@
+# Explicitly allow the Google AdSense crawler
+User-agent: Mediapartners-Google
+Allow: /
+
+# Allow all other standard crawlers (Googlebot, Bingbot, etc.)
+User-agent: *
+Allow: /
+
+# Point crawlers to your sitemap
+Sitemap: https://packsite.vercel.app/sitemap.xml

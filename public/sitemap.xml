@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0" 
+                xmlns:xsl="http://www.w3.org/1999/XSL/Transform" 
+                xmlns:s="http://www.sitemaps.org/schemas/sitemap/0.9" 
+                exclude-result-prefixes="s">
+  <xsl:output method="html" version="1.0" encoding="UTF-8" indent="yes"/>
+  <xsl:template match="/">
+    <html lang="en">
+      <head>
+        <title>XML Sitemap | PackSite</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            margin: 0;
+            padding: 40px 20px;
+          }
+          .container {
+            max-width: 1000px;
+            margin: 0 auto;
+          }
+          .header {
+            background: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+            border: 1px solid #3b0764;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+          }
+          h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            background: linear-gradient(to right, #a78bfa, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
+          p.subtitle {
+            margin: 0;
+            color: #9ca3af;
+            font-size: 14px;
+          }
+          .stats {
+            display: inline-block;
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            padding: 8px 16px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-weight: 600;
+            font-size: 14px;
+          }
+          .stats span {
+            color: #a78bfa;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+          }
+          th {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            text-align: left;
+            padding: 16px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          td {
+            padding: 16px;
+            border-bottom: 1px solid #1f2937;
+            font-size: 14px;
+            color: #d1d5db;
+          }
+          tr:last-child td {
+            border-bottom: none;
+          }
+          tr:hover td {
+            background-color: #1e1b4b22;
+          }
+          a {
+            color: #a78bfa;
+            text-decoration: none;
+            word-break: break-all;
+            transition: color 0.15s ease;
+          }
+          a:hover {
+            color: #c084fc;
+            text-decoration: underline;
+          }
+          .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+          .badge-freq {
+            background-color: #1e1b4b;
+            color: #c084fc;
+            border: 1px solid #3b0764;
+          }
+          .badge-priority {
+            background-color: #064e3b;
+            color: #34d399;
+            border: 1px solid #065f46;
+          }
+          .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #4b5563;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>PackSite XML Sitemap</h1>
+            <p class="subtitle">Designed for search engines, styled for humans. This file lists your site's URLs to help Google and AdSense crawl your pages smoothly.</p>
+            <div class="stats">
+              Total Pages Indexed: <span><xsl:value-of select="count(s:urlset/s:url)"/></span>
+            </div>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Target URL</th>
+                <th>Priority</th>
+                <th>Change Frequency</th>
+                <th>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <xsl:for-each select="s:urlset/s:url">
+                <tr>
+                  <td>
+                    <a href="{s:loc}"><xsl:value-of select="s:loc"/></a>
+                  </td>
+                  <td>
+                    <span class="badge badge-priority">
+                      <xsl:value-of select="s:priority"/>
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge badge-freq">
+                      <xsl:value-of select="s:changefreq"/>
+                    </span>
+                  </td>
+                  <td>
+                    <xsl:value-of select="s:lastmod"/>
+                  </td>
+                </tr>
+              </xsl:for-each>
+            </tbody>
+          </table>
+          
+          <div class="footer">
+            Generated by PackSite | Built with Next.js &amp; Vercel
+          </div>
+        </div>
+      </body>
+    </html>
+  </xsl:template>
+</xsl:stylesheet>
