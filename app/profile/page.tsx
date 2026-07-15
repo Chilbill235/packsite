@@ -81,7 +81,7 @@ export default function ProfilePage() {
       <header className="bg-black/50 backdrop-blur-sm border-b border-gray-800/50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between">
           <div className="space-y-2"><h1 className="text-3xl font-bold">Welcome back, {user?.name || 'Explorer'}!</h1></div>
-          <div className="flex items-center space-x-4"><span className="text-2xl">💰</span><p className="text-2xl font-bold text-amber-300">{user?.balance?.toLocaleString() || '0'}</p></div>
+          <div className="flex items-center space-x-4"><span className="text-2xl">💰</span></div>
         </div>
       </header>
 
