@@ -145,9 +145,6 @@ export default function ShopPage() {
         </div>
 
         {user && (
-          <div className="text-2xl font-bold mb-10 text-center">
-            Balance: <span className="text-amber-400">{user.balance.toLocaleString()}</span>
-          </div>
         )}
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
