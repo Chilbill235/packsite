@@ -121,7 +121,6 @@ export default function InventoryPage() {
       <header className="bg-black/50 backdrop-blur-sm border-b border-gray-800/50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between">
           <h1 className="text-3xl font-bold text-white">Your Inventory</h1>
-          </div>
         </div>
       </header>
 
@@ -133,7 +132,6 @@ export default function InventoryPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {sortedInventory.map((item) => (
                 <div key={item.id} className="group relative bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-                  {/* Fixed: Consolidated into one className prop */}
                   <div className="absolute top-3 right-3">
                     <span className={`text-xs font-bold px-2 py-0.5 rounded ${getRarityBadgeClass(item.item?.rarity || '')}`}>
                       {getRarityDisplayText(item.item?.rarity || '')}
