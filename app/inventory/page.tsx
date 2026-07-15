@@ -121,12 +121,6 @@ export default function InventoryPage() {
       <header className="bg-black/50 backdrop-blur-sm border-b border-gray-800/50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between">
           <h1 className="text-3xl font-bold text-white">Your Inventory</h1>
-          <div className="flex items-center space-x-3">
-             <span className="text-2xl text-amber-400">💰</span>
-             <div>
-               <p className="text-sm font-medium text-gray-400">Balance</p>
-               <p className="text-2xl font-bold text-amber-300">{typeof window !== 'undefined' ? localStorage.getItem('userBalance') || '0' : '0'}</p>
-             </div>
           </div>
         </div>
       </header>
