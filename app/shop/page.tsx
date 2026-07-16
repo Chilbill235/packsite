@@ -32,23 +32,6 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
-  // --- Notification Router ---
-  const handleNotificationRouting = useCallback(async (ref: string) => {
-    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
-      setIsFlashSaleActive(true);
-    } else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
-      try {
-        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
-        await fetchUserData();
-      } catch (e) { console.error("Auto-claim failed"); }
-    } else if (["reward-claim", "vault-drop", "mystery-box", "surprise"].includes(ref)) {
-      setShowAdModal(true);
-      if (ref === "reward-claim") handleClaimReward();
-    } else if (["new-item", "best-seller", "refresh", "seasonal"].includes(ref)) {
-      loadShopData();
-    }
-  }, []);
-
   // --- Data Fetching ---
   const fetchUserData = useCallback(async () => {
     try {
@@ -70,7 +53,55 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
-  // --- Ad & Notification Logic ---
+  // --- Ad & Reward Logic ---
+  const handleClaimReward = useCallback(async () => {
+    setIsWaiting(false);
+    targetTimeRef.current = null;
+    const storedAmount = sessionStorage.getItem('pendingRewardAmount');
+    const amount = storedAmount ? parseInt(storedAmount) : 500;
+    try {
+      const verifyRes = await fetch("/api/user/verify-ad-claim");
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || !verifyData.eligible) {
+        setErrorDialog({ message: "Reward not available or already claimed." });
+        return;
+      }
+      const res = await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount }) });
+      if (res.ok) {
+        sessionStorage.removeItem('pendingRewardAmount');
+        setShowAdModal(false);
+        setHasDispatchedPush(false);
+        await fetchUserData();
+      }
+    } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
+  }, [fetchUserData]);
+
+  // --- Notification Router ---
+  const handleNotificationRouting = useCallback(async (ref: string) => {
+    // 1. Flash Sale Group
+    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
+      setIsFlashSaleActive(true);
+    }
+    // 2. Bonus Group
+    else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
+      try {
+        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
+        await fetchUserData();
+      } catch (e) { console.error("Auto-claim failed"); }
+    }
+    // 3. Ad/Reward Group (Restored Logic)
+    else if (["reward-claim", "vault-drop", "mystery-box", "surprise"].includes(ref)) {
+      setShowAdModal(true);
+      if (ref === "reward-claim") {
+         setTimeout(() => handleClaimReward(), 500);
+      }
+    }
+    // 4. Refresh Group
+    else if (["new-item", "best-seller", "refresh", "seasonal"].includes(ref)) {
+      loadShopData();
+    }
+  }, [fetchUserData, handleClaimReward]);
+
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -102,28 +133,6 @@ export default function ShopPage() {
       }
     } catch (err: any) { console.error("Permission Error: " + err.message); }
   };
-
-  const handleClaimReward = useCallback(async () => {
-    setIsWaiting(false);
-    targetTimeRef.current = null;
-    const storedAmount = sessionStorage.getItem('pendingRewardAmount');
-    const amount = storedAmount ? parseInt(storedAmount) : 500;
-    try {
-      const verifyRes = await fetch("/api/user/verify-ad-claim");
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok || !verifyData.eligible) {
-        setErrorDialog({ message: "Reward not available or already claimed." });
-        return;
-      }
-      const res = await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount }) });
-      if (res.ok) {
-        sessionStorage.removeItem('pendingRewardAmount');
-        setShowAdModal(false);
-        setHasDispatchedPush(false);
-        await fetchUserData();
-      }
-    } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
-  }, [fetchUserData]);
 
   const handleWatchAdClick = async (amount: number) => {
     sessionStorage.setItem('pendingRewardAmount', amount.toString());
@@ -205,6 +214,7 @@ export default function ShopPage() {
     };
   }, [handleTimerComplete]);
 
+  // Handle URL Notification Routing (The core fix)
   useEffect(() => {
     if (!loading) {
       const params = new URLSearchParams(window.location.search);
