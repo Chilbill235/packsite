@@ -1,71 +1,82 @@
-import { NextResponse } from 'next/server';
-import webpush from 'web-push';
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import webpush from 'web-push';
 
-function initWebPush() {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-
-  if (!privateKey || !publicKey) {
-    throw new Error("VAPID Keys are missing from environment variables.");
-  }
-
-  webpush.setVapidDetails('mailto:admin@packsite.com', publicKey, privateKey);
-}
-
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const bodyData = await request.json();
-    const { subscription } = bodyData;
-
-    if (!subscription) {
-      return NextResponse.json({ error: "No subscription details provided." }, { status: 400 });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Save the browser's push subscription directly to the database tied to the user!
-    await prisma.subscription.upsert({
+    const body = await req.json();
+    const { delayMs, title, body: msgBody, url, tag } = body;
+
+    // Use the provided delay (e.g., 10000ms), fallback to 10 seconds if empty
+    const delay = delayMs || 10000; 
+
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY || process.env.PRIVATE_VAPID_KEY;
+
+    if (!publicKey || !privateKey) {
+      console.error("[Schedule Push] VAPID keys are missing from environment variables");
+      return NextResponse.json({ error: "VAPID keys not configured" }, { status: 500 });
+    }
+
+    webpush.setVapidDetails('mailto:admin@packsite.com', publicKey, privateKey);
+
+    // Look up the database subscription for the user ID
+    const subscription = await prisma.subscription.findFirst({
       where: {
-        // Assumes your schema has a unique constraint or lookup for subscriptions,
-        // otherwise a standard prisma.subscription.create matches your setup:
-        endpoint: subscription.endpoint, 
-      },
-      update: { data: subscription },
-      create: {
-        endpoint: subscription.endpoint,
-        data: subscription,
-        user: { connect: { email: session.user.email } }
+        OR: [
+          { userId: session.user.id },
+          { user: { email: session.user.email || "" } }
+        ]
       }
     });
 
-    initWebPush();
-
-    // If a delay request is present (Safari backup fallback helper)
-    if (bodyData.delayMs) {
-      setTimeout(async () => {
-        try {
-          await webpush.sendNotification(
-            subscription,
-            JSON.stringify({
-              title: bodyData.title || "Alert",
-              body: bodyData.body || "Notification active!",
-              tag: bodyData.tag,
-              url: bodyData.url,
-              isAdTimer: true
-            })
-          );
-        } catch (err) {
-          console.error("Delayed push delivery failure:", err);
-        }
-      }, bodyData.delayMs);
+    if (!subscription) {
+      console.warn(`[Schedule Push] No active subscription record found in DB for user ID: ${session.user.id}`);
+      return NextResponse.json(
+        { error: "No notification subscription found. Please enable alerts first." }, 
+        { status: 404 }
+      );
     }
 
-    return NextResponse.json({ success: true, message: "Subscribed and saved successfully." });
-  } catch (error: any) {
-    console.error("Subscription endpoint error:", error);
-    return NextResponse.json({ error: error.message || "Internal Error" }, { status: 500 });
+    console.log(`[Schedule Push] Scheduling push notification for user ${session.user.id} to fire in ${delay}ms...`);
+
+    // Run the scheduler in a non-blocking background timeout
+    setTimeout(async () => {
+      try {
+        const payload = JSON.stringify({
+          title: title || "⏱️ Timer Complete! ⏱️",
+          body: msgBody || "Your claim is ready. Tap to collect your 500 coins!",
+          url: url || "/shop?ref=reward-claim",
+          tag: tag || "timer-complete"
+        });
+
+        // Safe JSON parsing regardless of whether your Prisma connector stores it as string or JSON object
+        const pushConfig = typeof subscription.data === 'string'
+          ? JSON.parse(subscription.data)
+          : subscription.data;
+
+        await webpush.sendNotification(pushConfig, payload);
+        console.log(`[Schedule Push] Successfully delivered scheduled push to user ID: ${session.user.id}`);
+      } catch (err: any) {
+        console.error(`[Schedule Push Error] Failed to deliver scheduled notification:`, err);
+        
+        // Clean up expired or stale subscription endpoints automatically
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          console.log(`[Schedule Push] Deleting expired subscription ID: ${subscription.id}`);
+          await prisma.subscription.delete({ where: { id: subscription.id } });
+        }
+      }
+    }, delay);
+
+    return NextResponse.json({ success: true, message: `Notification scheduled in ${delay}ms` });
+  } catch (error) {
+    console.error("[Schedule Push API Error]:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
