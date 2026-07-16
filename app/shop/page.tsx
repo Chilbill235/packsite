@@ -20,6 +20,10 @@ export default function ShopPage() {
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
 
+  // --- Campaign States ---
+  const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
+  const [bonusClaimed, setBonusClaimed] = useState(false);
+
   // --- Developer Test Center States ---
   const [showDevPanel, setShowDevPanel] = useState(false);
   const [testLog, setTestLog] = useState<string[]>([]);
@@ -116,7 +120,6 @@ export default function ShopPage() {
     }
   };
 
-  // NEW: Triggers the background periodic sync/loop from the service worker immediately
   const triggerPeriodicSyncSimulation = async () => {
     if ("serviceWorker" in navigator) {
       try {
@@ -169,6 +172,28 @@ export default function ShopPage() {
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, []);
 
+  // Handler for granting the daily bonus coins directly
+  const handleClaimDailyBonus = async () => {
+    try {
+      // Reusing the coin adding route or similar backend logic to grant free bonus coins
+      const res = await fetch("/api/user/add-coins", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
+        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
+        setBonusClaimed(true);
+        addLog("Daily Bonus 150 Coins claimed directly! 💎");
+        
+        // Clean up URL parameter cleanly
+        if (typeof window !== "undefined") {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    } catch (err) {
+      addLog("Failed to claim Daily Bonus automatically.");
+    }
+  };
+
   const handleWatchAdClick = async () => {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
@@ -211,14 +236,13 @@ export default function ShopPage() {
     };
   }, [handleTimerComplete]);
 
-  // Handle SW URL tracking / dynamic entry references
+  // Handle Campaign Query Parameter routing
   useEffect(() => {
     if (typeof window !== "undefined" && !loading) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
 
       if (ref === "reward-claim") {
-        // Trigger claim automatically on entry
         setShowAdModal(true);
         const claimTimeout = setTimeout(() => {
           handleClaimReward();
@@ -226,17 +250,15 @@ export default function ShopPage() {
         return () => clearTimeout(claimTimeout);
       } 
       
-      // Handle the Flash Deal active campaign
+      // Campaign A: 50% discount active
       else if (ref === "notif_flash") {
-        addLog("User entered from the Flash Deal push notification! ⏳");
-        // Open the ad boosting modal directly to let them capitalize on the discount
-        setShowAdModal(true);
+        setIsFlashSaleActive(true);
+        addLog("Flash Deal URL parameters loaded! Enjoy 50% off all packs! ⏳");
       } 
       
-      // Handle Daily Bonus drop
-      else if (ref === "notif_bonus") {
-        addLog("Daily Bonus offer detected from push alert! 💎");
-        setShowAdModal(true);
+      // Campaign B: Direct Daily Bonus drop claim
+      else if (ref === "notif_bonus" && !bonusClaimed) {
+        handleClaimDailyBonus();
       } 
       
       else if (params.get("open-ad") === "true") {
@@ -271,7 +293,6 @@ export default function ShopPage() {
     };
   }, [isWaiting, handleTimerComplete]);
 
-  // Helper theme color selector for item rarities
   const getRarityStyles = (rarity?: string) => {
     const r = rarity?.toLowerCase() || "common";
     if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
@@ -301,7 +322,6 @@ export default function ShopPage() {
                   </button>
                   <button onClick={() => {
                     setShowAdModal(false);
-                    // Clear search params after close
                     if (typeof window !== "undefined") {
                       window.history.replaceState({}, document.title, window.location.pathname);
                     }
@@ -314,7 +334,6 @@ export default function ShopPage() {
                   <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your 500 coins!</p>
                   <button onClick={() => {
                     setShowAdModal(false);
-                    // Clear search params after close
                     if (typeof window !== "undefined") {
                       window.history.replaceState({}, document.title, window.location.pathname);
                     }
@@ -334,7 +353,6 @@ export default function ShopPage() {
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl"
             onClick={() => setWonItem(null)}
           >
-            {/* Spinning Light Ray Backdrop */}
             <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
               <div className="absolute w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(245,158,11,0.15)_0%,transparent_60%)] animate-pulse" />
               <motion.div 
@@ -347,7 +365,6 @@ export default function ShopPage() {
               />
             </div>
 
-            {/* Sparkles Emitter Container */}
             <div className="absolute pointer-events-none w-full h-full flex items-center justify-center">
               {[...Array(12)].map((_, i) => (
                 <motion.div
@@ -365,7 +382,6 @@ export default function ShopPage() {
               ))}
             </div>
 
-            {/* The Item Card Container */}
             <motion.div 
               initial={{ scale: 0.3, y: 100, rotate: -25 }} 
               animate={{ scale: 1, y: 0, rotate: 0 }} 
@@ -374,7 +390,6 @@ export default function ShopPage() {
               className={`relative bg-gradient-to-b ${currentTheme.glow} to-black/95 border ${currentTheme.border} p-12 rounded-[2.5rem] text-center w-full max-w-sm cursor-pointer shadow-2xl ${currentTheme.shadow}`}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Corner Sci-fi Reticles */}
               <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-white/20" />
               <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-white/20" />
               <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-white/20" />
@@ -405,7 +420,7 @@ export default function ShopPage() {
 
               <button 
                 onClick={() => setWonItem(null)} 
-                className={`w-full py-4 bg-white text-black hover:bg-gray-100 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg`}
+                className="w-full py-4 bg-white text-black hover:bg-gray-100 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg"
               >
                 Claim Item
               </button>
@@ -417,6 +432,52 @@ export default function ShopPage() {
       {/* --- Main Shop Content --- */}
       <div className="max-w-5xl mx-auto">
         
+        {/* --- Campaign Banner: Flash Sale Active --- */}
+        {isFlashSaleActive && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            className="mb-8 p-6 bg-gradient-to-r from-red-500/20 to-amber-500/10 border border-amber-500/40 rounded-3xl flex justify-between items-center shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+          >
+            <div>
+              <h4 className="font-black text-amber-500 text-lg uppercase tracking-wider">⚡ FLASH SALE APPLIED!</h4>
+              <p className="text-sm text-zinc-300">A special 50% discount from your push notification has been applied to all vault packs.</p>
+            </div>
+            <button 
+              onClick={() => {
+                setIsFlashSaleActive(false);
+                addLog("Flash sale deactivated.");
+              }}
+              className="text-xs text-zinc-400 hover:text-white uppercase font-bold tracking-widest bg-white/5 px-4 py-2 rounded-xl transition-all"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        )}
+
+        {/* --- Campaign Banner: Daily Bonus Claimed Notification --- */}
+        {bonusClaimed && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="mb-8 p-5 bg-green-500/10 border border-green-500/30 rounded-3xl flex justify-between items-center"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-2xl">💎</span>
+              <div>
+                <h4 className="font-bold text-green-400 text-md">Daily Bonus Claimed!</h4>
+                <p className="text-xs text-zinc-400">150 coins have been credited automatically to your profile balance.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setBonusClaimed(false)}
+              className="text-xs text-zinc-400 hover:text-white bg-white/5 px-3 py-1.5 rounded-lg transition-all"
+            >
+              Got it
+            </button>
+          </motion.div>
+        )}
+
         {/* --- Dynamic Notification Banner --- */}
         {permission === "default" && (
           <motion.div 
@@ -445,35 +506,50 @@ export default function ShopPage() {
 
         <h1 className="text-4xl font-black mb-12 tracking-tighter">VAULT</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {packs.map((pack) => (
-            <motion.div whileHover={{ y: -5 }} key={pack.id} className="bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl hover:border-amber-500/30 transition-all">
-              <div className="text-4xl mb-6">🎁</div>
-              <h3 className="font-bold text-lg mb-1">{pack.name}</h3>
-              <p className="text-gray-500 text-sm mb-8">Unlock rare items from this tier.</p>
-              <button 
-                onClick={async () => {
-                  const res = await fetch("/api/packs/open", { 
-                    method: "POST", 
-                    body: JSON.stringify({ packId: pack.id }), 
-                    headers: {"Content-Type": "application/json"} 
-                  });
-                  const data = await res.json();
-                  if (res.ok) {
-                    setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-                    document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
-                    setWonItem(data.wonItem);
-                  }
-                }}
-                className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all"
-              >
-                {pack.price.toLocaleString()} COINS
-              </button>
-            </motion.div>
-          ))}
+          {packs.map((pack) => {
+            // Apply a 50% discount factor dynamically if campaign is active
+            const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
+
+            return (
+              <motion.div whileHover={{ y: -5 }} key={pack.id} className="bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl hover:border-amber-500/30 transition-all relative overflow-hidden">
+                {isFlashSaleActive && (
+                  <div className="absolute top-4 right-4 bg-red-500 text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg animate-pulse">
+                    -50% Off
+                  </div>
+                )}
+                <div className="text-4xl mb-6">🎁</div>
+                <h3 className="font-bold text-lg mb-1">{pack.name}</h3>
+                <p className="text-gray-500 text-sm mb-8">Unlock rare items from this tier.</p>
+                <button 
+                  onClick={async () => {
+                    const res = await fetch("/api/packs/open", { 
+                      method: "POST", 
+                      body: JSON.stringify({ packId: pack.id }), 
+                      headers: {"Content-Type": "application/json"} 
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
+                      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
+                      setWonItem(data.wonItem);
+                    }
+                  }}
+                  className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all flex flex-col items-center justify-center"
+                >
+                  {isFlashSaleActive && (
+                    <span className="text-xs line-through text-zinc-500 font-normal mb-0.5">
+                      {pack.price.toLocaleString()} COINS
+                    </span>
+                  )}
+                  <span>{finalPrice.toLocaleString()} COINS</span>
+                </button>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
 
-      {/* --- DEV TEST CENTER PANEL (COLLAPSIBLE) --- */}
+      {/* --- DEV TEST CENTER PANEL --- */}
       <div className="fixed bottom-0 left-0 right-0 z-50 p-4 flex justify-center pointer-events-none">
         <div className="bg-[#121212] border border-red-500/30 rounded-t-3xl shadow-[0_-15px_30px_rgba(0,0,0,0.8)] w-full max-w-xl pointer-events-auto overflow-hidden transition-all duration-300">
           <button 
@@ -508,7 +584,6 @@ export default function ShopPage() {
                   </button>
                 </div>
 
-                {/* Simulated Background Loop Grid Addition */}
                 <div className="grid grid-cols-1">
                   <button 
                     onClick={triggerPeriodicSyncSimulation}

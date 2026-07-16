@@ -39,7 +39,7 @@ export async function POST() {
           const payload = JSON.stringify({
             title: "💎 Coins Claimed! 💎",
             body: "🪙 You just received 500 coins.",
-            url: "/shop?ref=reward-claim",
+            url: "/shop",
             tag: "reward-claim-ready"
           });
 
