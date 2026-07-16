@@ -55,7 +55,7 @@ export default function ShopPage() {
         renotify: true,
         vibrate: [200, 100, 200], // Double vibration alert
         data: { url: window.location.origin + "/shop" }
-      });
+      } as any); // "as any" cast bypasses the strict TypeScript DOM environment types block
     } catch (err) {
       console.warn("Failed to deliver local push notification:", err);
     }
