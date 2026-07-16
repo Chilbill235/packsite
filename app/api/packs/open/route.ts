@@ -8,43 +8,47 @@ type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0
 
 export async function POST(req: Request) {
   try {
-    const { packId, isFastOpen } = await req.json();
     const session = await auth();
-    
-    // Extract email to satisfy TypeScript type checking
-    const email = session?.user?.email;
-    if (!email) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Apply the typed TransactionClient to the callback
-    const result = await prisma.$transaction(async (tx: TransactionClient) => {
+    // Receive the flag from the frontend
+    const { packId, isFlashSale } = await req.json();
+
+    return await prisma.$transaction(async (tx: TransactionClient) => {
       const pack = await tx.pack.findUnique({ where: { id: packId }, include: { items: true } });
+      const user = await tx.user.findUnique({ where: { email: session.user.email as string } });
+
+      if (!pack) return NextResponse.json({ error: "Pack not found" }, { status: 404 });
       
-      // Use the extracted 'email' variable
-      const user = await tx.user.findUnique({ where: { email: email } });
+      // Calculate the price ON THE SERVER
+      const finalPrice = isFlashSale ? Math.floor(pack.price * 0.5) : pack.price;
 
-      if (!pack || !user) throw new Error("Invalid request");
-
-      // Apply the 1.2x multiplier if Fast Mode is active
-      const finalPrice = isFastOpen ? Math.ceil(pack.price * 1.2) : pack.price;
-
-      if (user.balance < finalPrice) throw new Error("Insufficient balance");
+      // Compare balance against the SERVER-CALCULATED price
+      if (!user || user.balance < finalPrice) {
+        return NextResponse.json({ error: "Insufficient funds" }, { status: 400 });
+      }
 
       const wonItem = rollItem(pack.items);
-
-      await tx.user.update({ 
-        where: { id: user.id }, 
-        data: { balance: { decrement: finalPrice } } 
+      
+      // Update using the finalPrice
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: finalPrice } },
       });
+
       await tx.inventory.create({ data: { userId: user.id, itemId: wonItem.id } });
       await tx.opening.create({ data: { userId: user.id, packId, itemId: wonItem.id } });
 
-      return { wonItem, newBalance: user.balance - finalPrice };
+      return NextResponse.json({ 
+        success: true, 
+        wonItem, 
+        newBalance: updatedUser.balance 
+      });
     });
-
-    return NextResponse.json({ success: true, ...result });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Failed to open pack" }, { status: 400 });
+  } catch (error) {
+    console.error("BUY_PACK_ERROR", error);
+    return NextResponse.json({ error: "Failed to buy pack" }, { status: 500 });
   }
 }

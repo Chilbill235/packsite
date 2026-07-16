@@ -17,24 +17,20 @@ export default function ShopPage() {
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
 
-  // --- Campaign States ---
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
   const [bonusClaimed, setBonusClaimed] = useState(false);
 
-  // --- Notification State ---
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
 
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
-  // --- Real-Time Sync Logic ---
   const fetchUserData = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/profile");
+      const res = await fetch(`/api/user/profile?t=${Date.now()}`);
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
-        // Dispatch global event for Navbar or other components to listen to
         window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: userData.balance } }));
       }
     } catch (err) {
@@ -44,11 +40,8 @@ export default function ShopPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      if (!("Notification" in window)) {
-        setPermission("unsupported");
-      } else {
-        setPermission(Notification.permission);
-      }
+      if (!("Notification" in window)) setPermission("unsupported");
+      else setPermission(Notification.permission);
     }
   }, []);
 
@@ -57,9 +50,7 @@ export default function ShopPage() {
     const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
     const rawData = window.atob(base64);
     const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
     return outputArray;
   };
 
@@ -73,12 +64,10 @@ export default function ShopPage() {
           const registration = await navigator.serviceWorker.ready;
           const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
           const convertedKey = urlBase64ToUint8Array(publicKey);
-
           const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: convertedKey
           });
-
           await fetch("/api/user/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -86,42 +75,34 @@ export default function ShopPage() {
           });
         }
       }
-    } catch (err: any) {
-      console.error("Permission Error: " + err.message);
-    }
+    } catch (err: any) { console.error("Permission Error: " + err.message); }
   };
 
   async function loadShopData() {
     try {
       const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        setUser(userData);
-      }
+      if (userRes.ok) setUser(await userRes.json());
       if (packRes.ok) setPacks(await packRes.json());
     } catch (err) { console.error(err); } 
     finally { setLoading(false); }
   }
 
-  // --- Core Claim Logic with Security Validation ---
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
     try {
       const verifyRes = await fetch("/api/user/verify-ad-claim");
       const verifyData = await verifyRes.json();
-
       if (!verifyRes.ok || !verifyData.eligible) {
         setErrorDialog({ message: "Reward not available or already claimed." });
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
-
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       if (res.ok) {
         setShowAdModal(false);
         setHasDispatchedPush(false);
-        await fetchUserData(); // Sync balance
+        await fetchUserData();
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
@@ -132,12 +113,10 @@ export default function ShopPage() {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       if (res.ok) {
         setBonusClaimed(true);
-        await fetchUserData(); // Sync balance
+        await fetchUserData();
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-    } catch (err) {
-      console.error("Failed to claim Daily Bonus automatically.");
-    }
+    } catch (err) { console.error("Failed to claim Daily Bonus automatically."); }
   };
 
   const handleWatchAdClick = async () => {
@@ -145,9 +124,7 @@ export default function ShopPage() {
     setCountdown(10);
     setIsWaiting(true);
     setHasDispatchedPush(false);
-
     adService.current?.showAd(user?.email || "anon");
-
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if (registration.active) {
@@ -160,49 +137,35 @@ export default function ShopPage() {
     }
   };
 
-  // --- SECURITY: Flag the ad as complete in the DB ---
   const handleTimerComplete = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
     setHasDispatchedPush(true);
-    
-    try {
-      await fetch("/api/user/ad-complete", { method: "POST" });
-    } catch (e) {
-      console.error("Failed to sync ad completion.");
-    }
+    try { await fetch("/api/user/ad-complete", { method: "POST" }); } 
+    catch (e) { console.error("Failed to sync ad completion."); }
   }, []);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") {
-        handleTimerComplete();
-      }
+      if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") handleTimerComplete();
     };
     navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
-    return () => {
-      navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
-    };
+    return () => navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
   }, [handleTimerComplete]);
 
-  // Handle Campaign Query Parameter routing
   useEffect(() => {
     if (typeof window !== "undefined" && !loading) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
-
       if (ref === "reward-claim") {
         setShowAdModal(true);
         handleClaimReward();
-      } 
-      else if (ref === "notif_flash") {
+      } else if (ref === "notif_flash") {
         setIsFlashSaleActive(true);
-      } 
-      else if (ref === "notif_bonus" && !bonusClaimed) {
+      } else if (ref === "notif_bonus" && !bonusClaimed) {
         handleClaimDailyBonus();
-      } 
-      else if (params.get("open-ad") === "true") {
+      } else if (params.get("open-ad") === "true") {
         setShowAdModal(true);
       }
     }
@@ -211,23 +174,18 @@ export default function ShopPage() {
   useEffect(() => {
     loadShopData();
     adService.current = new RewardedAdService();
-    
     const openModal = () => {
       setHasDispatchedPush(false);
       setShowAdModal(true);
     };
     window.addEventListener("openBalanceModal", openModal);
-
     const intervalId = setInterval(() => {
       if (isWaiting && targetTimeRef.current) {
         const remaining = Math.max(0, Math.ceil((targetTimeRef.current - Date.now()) / 1000));
         setCountdown(remaining);
-        if (remaining <= 0) {
-          handleTimerComplete();
-        }
+        if (remaining <= 0) handleTimerComplete();
       }
     }, 250);
-
     return () => {
       window.removeEventListener("openBalanceModal", openModal);
       clearInterval(intervalId);
@@ -239,7 +197,7 @@ export default function ShopPage() {
     if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
     if (r.includes("epic")) return { border: "border-purple-500/50", text: "text-purple-400", glow: "from-purple-500/20", shadow: "shadow-purple-500/10" };
     if (r.includes("rare")) return { border: "border-blue-500/50", text: "text-blue-400", glow: "from-blue-500/20", shadow: "shadow-blue-500/10" };
-    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-500/10" };
+    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-600/10" };
   };
 
   const currentTheme = getRarityStyles(wonItem?.rarity);
@@ -248,7 +206,6 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-[#070707] text-white p-6 md:p-12 font-sans relative pb-32">
-      {/* --- Ad Reward Modal --- */}
       <AnimatePresence>
         {showAdModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -260,183 +217,41 @@ export default function ShopPage() {
                   <button onClick={handleWatchAdClick} disabled={isWaiting} className={`w-full py-4 rounded-xl font-black transition-all ${isWaiting ? 'bg-white/5 text-gray-500' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
                     {isWaiting ? `WATCHING (${countdown}s)` : "WATCH AD FOR 500 COINS"}
                   </button>
-                  <button onClick={() => {
-                    setShowAdModal(false);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                  }} className="mt-4 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
+                  <button onClick={() => { setShowAdModal(false); window.history.replaceState({}, document.title, window.location.pathname); }} className="mt-4 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
                 </>
               ) : (
                 <>
                   <div className="text-5xl mb-4 animate-bounce">🔔</div>
                   <h3 className="text-xl font-bold mb-2">Notification Sent!</h3>
                   <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your 500 coins!</p>
-                  <button onClick={() => {
-                    setShowAdModal(false);
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                  }} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
+                  <button onClick={() => { setShowAdModal(false); window.history.replaceState({}, document.title, window.location.pathname); }} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
                 </>
               )}
             </motion.div>
           </motion.div>
         )}
 
-        {/* --- PREMIUM GAME REVEAL MODAL --- */}
         {wonItem && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl"
-            onClick={() => setWonItem(null)}
-          >
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl" onClick={() => setWonItem(null)}>
+             <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
               <div className="absolute w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(245,158,11,0.15)_0%,transparent_60%)] animate-pulse" />
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
-                className="absolute w-[1000px] h-[1000px] opacity-15"
-                style={{
-                  backgroundImage: `repeating-conic-gradient(from 0deg, #fff 0deg, #fff 10deg, transparent 10deg, transparent 25deg)`
-                }}
-              />
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 25, ease: "linear" }} className="absolute w-[1000px] h-[1000px] opacity-15" style={{ backgroundImage: `repeating-conic-gradient(from 0deg, #fff 0deg, #fff 10deg, transparent 10deg, transparent 25deg)` }} />
             </div>
-
-            <div className="absolute pointer-events-none w-full h-full flex items-center justify-center">
-              {[...Array(12)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
-                  animate={{ 
-                    scale: [0.5, 1, 0], 
-                    x: Math.cos((i * 30 * Math.PI) / 180) * 160, 
-                    y: Math.sin((i * 30 * Math.PI) / 180) * 160,
-                    opacity: [1, 1, 0]
-                  }}
-                  transition={{ duration: 1.2, ease: "easeOut", repeat: Infinity, repeatDelay: 1 }}
-                  className="absolute w-2 h-2 rounded-full bg-amber-400"
-                />
-              ))}
-            </div>
-
-            <motion.div 
-              initial={{ scale: 0.3, y: 100, rotate: -25 }} 
-              animate={{ scale: 1, y: 0, rotate: 0 }} 
-              exit={{ scale: 0.3, y: 100, rotate: 25 }}
-              transition={{ type: "spring", damping: 14, stiffness: 100 }}
-              className={`relative bg-gradient-to-b ${currentTheme.glow} to-black/95 border ${currentTheme.border} p-12 rounded-[2.5rem] text-center w-full max-w-sm cursor-pointer shadow-2xl ${currentTheme.shadow}`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-white/20" />
-              <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-white/20" />
-              <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-white/20" />
-              <div className="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-white/20" />
-
-              <motion.div 
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 3, ease: "easeInOut", repeat: Infinity }}
-                className="text-8xl mb-8 filter drop-shadow-[0_15px_15px_rgba(245,158,11,0.3)] select-none"
-              >
-                ✨
-              </motion.div>
-
+            <motion.div initial={{ scale: 0.3, y: 100, rotate: -25 }} animate={{ scale: 1, y: 0, rotate: 0 }} exit={{ scale: 0.3, y: 100, rotate: 25 }} transition={{ type: "spring", damping: 14, stiffness: 100 }} className={`relative bg-gradient-to-b ${currentTheme.glow} to-black/95 border ${currentTheme.border} p-12 rounded-[2.5rem] text-center w-full max-w-sm cursor-pointer shadow-2xl ${currentTheme.shadow}`} onClick={(e) => e.stopPropagation()}>
               <p className="text-xs tracking-[0.3em] font-black uppercase text-white/40 mb-2">unlocked pack item</p>
               <h2 className="text-4xl font-extrabold mb-3 tracking-tight text-white uppercase">YOU WON!</h2>
-              
               <div className="inline-block px-4 py-1.5 bg-white/5 rounded-full border border-white/10 mb-6">
-                <span className={`text-xs font-black uppercase tracking-widest ${currentTheme.text}`}>
-                  {wonItem.rarity || "COMMON"}
-                </span>
+                <span className={`text-xs font-black uppercase tracking-widest ${currentTheme.text}`}>{wonItem.rarity || "COMMON"}</span>
               </div>
-
-              <p className="text-2xl font-black text-white px-2 tracking-tight line-clamp-2 min-h-[4rem] flex items-center justify-center">
-                {wonItem.name}
-              </p>
-
+              <p className="text-2xl font-black text-white px-2 tracking-tight line-clamp-2 min-h-[4rem] flex items-center justify-center">{wonItem.name}</p>
               <div className="h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-6" />
-
-              <button 
-                onClick={() => setWonItem(null)} 
-                className="w-full py-4 bg-white text-black hover:bg-gray-100 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg"
-              >
-                Claim Item
-              </button>
+              <button onClick={() => setWonItem(null)} className="w-full py-4 bg-white text-black hover:bg-gray-100 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg">Claim Item</button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* --- Main Shop Content --- */}
       <div className="max-w-5xl mx-auto">
-        
-        {/* --- Campaign Banner: Flash Sale Active --- */}
-        {isFlashSaleActive && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            className="mb-8 p-6 bg-gradient-to-r from-red-500/20 to-amber-500/10 border border-amber-500/40 rounded-3xl flex justify-between items-center shadow-[0_0_20px_rgba(245,158,11,0.1)]"
-          >
-            <div>
-              <h4 className="font-black text-amber-500 text-lg uppercase tracking-wider">⚡ FLASH SALE APPLIED!</h4>
-              <p className="text-sm text-zinc-300">A special 50% discount from your push notification has been applied to all vault packs.</p>
-            </div>
-            <button 
-              onClick={() => { setIsFlashSaleActive(false); }}
-              className="text-xs text-zinc-400 hover:text-white uppercase font-bold tracking-widest bg-white/5 px-4 py-2 rounded-xl transition-all"
-            >
-              Dismiss
-            </button>
-          </motion.div>
-        )}
-
-        {/* --- Campaign Banner: Daily Bonus Claimed Notification --- */}
-        {bonusClaimed && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="mb-8 p-5 bg-green-500/10 border border-green-500/30 rounded-3xl flex justify-between items-center"
-          >
-            <div className="flex items-center gap-4">
-              <span className="text-2xl">💎</span>
-              <div>
-                <h4 className="font-bold text-green-400 text-md">Daily Bonus Claimed!</h4>
-                <p className="text-xs text-zinc-400">150 coins have been credited automatically to your profile balance.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setBonusClaimed(false)}
-              className="text-xs text-zinc-400 hover:text-white bg-white/5 px-3 py-1.5 rounded-lg transition-all"
-            >
-              Got it
-            </button>
-          </motion.div>
-        )}
-
-        {/* --- Dynamic Notification Banner --- */}
-        {permission === "default" && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="mb-8 p-6 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4"
-          >
-            <div className="text-center md:text-left">
-              <h4 className="font-bold text-amber-500 text-lg">Never miss a drop!</h4>
-              <p className="text-sm text-gray-400">Enable system alerts to get notified when new packs are ready.</p>
-            </div>
-            <button 
-              onClick={handleEnableNotifications} 
-              className="px-6 py-3 bg-amber-500 text-black rounded-xl font-bold hover:bg-amber-400 transition-all text-sm uppercase tracking-wider"
-            >
-              Enable Alerts
-            </button>
-          </motion.div>
-        )}
-
-        {permission === "denied" && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-3xl text-center text-xs text-red-400">
-            Alerts are blocked. Please unlock notification permissions in your browser's site settings.
-          </div>
-        )}
-
         <h1 className="text-4xl font-black mb-12 tracking-tighter">VAULT</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packs.map((pack) => {
@@ -456,13 +271,16 @@ export default function ShopPage() {
                   onClick={async () => {
                     const res = await fetch("/api/packs/open", { 
                       method: "POST", 
-                      body: JSON.stringify({ packId: pack.id }), 
+                      // FIX: Pass the flash sale state to the backend
+                      body: JSON.stringify({ packId: pack.id, isFlashSale: isFlashSaleActive }), 
                       headers: {"Content-Type": "application/json"} 
                     });
                     const data = await res.json();
                     if (res.ok) {
                       setWonItem(data.wonItem);
-                      await fetchUserData(); // Sync balance
+                      await fetchUserData(); 
+                    } else {
+                        setErrorDialog({ message: data.error || "Failed to open pack" });
                     }
                   }}
                   className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all flex flex-col items-center justify-center"
