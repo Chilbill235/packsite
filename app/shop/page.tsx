@@ -16,6 +16,9 @@ export default function ShopPage() {
   const [wonItem, setWonItem] = useState<any>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
 
+  // Track if they have successfully dispatched a push request so we can display instructions
+  const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
+
   // --- Notification State ---
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
 
@@ -49,7 +52,7 @@ export default function ShopPage() {
     return outputArray;
   };
 
-  // --- Notification Request Trigger (Fixed to register with the Backend) ---
+  // --- Notification Request Trigger ---
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) return;
 
@@ -61,7 +64,6 @@ export default function ShopPage() {
         if ("serviceWorker" in navigator) {
           const registration = await navigator.serviceWorker.ready;
           
-          // Match the exact Public VAPID key used on your server
           const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
           const convertedKey = urlBase64ToUint8Array(publicKey);
 
@@ -70,18 +72,22 @@ export default function ShopPage() {
             applicationServerKey: convertedKey
           });
 
-          // Save subscription in your database
-          await fetch("/api/subscribe", {
+          const response = await fetch("/api/user/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ subscription })
           });
 
-          console.log("Notifications enabled and saved to subscription database.");
+          if (response.ok) {
+            console.log("[Push Register] Notifications enabled and saved.");
+          } else {
+            const errData = await response.json();
+            console.error("[Push Register Error]", errData);
+          }
         }
       }
     } catch (err) {
-      console.error("Error requesting notification permission:", err);
+      console.error("[Push Register Error]", err);
     }
   };
 
@@ -99,6 +105,7 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
+  // ONLY called when users click the actual notification URL (?ref=reward-claim)
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
@@ -109,6 +116,7 @@ export default function ShopPage() {
         setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
         document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setShowAdModal(false);
+        setHasDispatchedPush(false);
         
         // Clean up URL parameters so they don't claim again on manual refreshes
         if (typeof window !== "undefined") {
@@ -122,6 +130,7 @@ export default function ShopPage() {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
+    setHasDispatchedPush(false);
 
     // 1. Fire up the monetization ad
     adService.current?.showAd(user?.email || "anon");
@@ -139,13 +148,22 @@ export default function ShopPage() {
     }
   };
 
+  // Timer complete step (Runs when the client-side 10s timer ends)
+  const handleTimerComplete = useCallback(() => {
+    setIsWaiting(false);
+    targetTimeRef.current = null;
+    setHasDispatchedPush(true); // Switches modal UI to say "Check your notifications!"
+  }, []);
+
   // Listen for messages directly from the Service Worker
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") {
-        handleClaimReward();
+        // When the SW says the timer completed in the background, we do NOT claim here anymore.
+        // We let the SW dispatch the push notification!
+        handleTimerComplete();
       }
     };
 
@@ -153,20 +171,20 @@ export default function ShopPage() {
     return () => {
       navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
     };
-  }, [handleClaimReward]);
+  }, [handleTimerComplete]);
 
-  // --- FIXED: Check parameters on load and apply visual delay so modal doesn't immediately vanish ---
+  // --- Check parameters on load and apply visual delay ---
   useEffect(() => {
     if (typeof window !== "undefined" && !loading) {
       const params = new URLSearchParams(window.location.search);
       
+      // They clicked the notification! Trigger claim now.
       if (params.get("ref") === "reward-claim") {
         setShowAdModal(true);
         
-        // Give the UI 1 second to visually show "Boost Your Balance" before claiming and closing
         const claimTimeout = setTimeout(() => {
           handleClaimReward();
-        }, 1000);
+        }, 1200);
 
         return () => clearTimeout(claimTimeout);
       } else if (params.get("open-ad") === "true") {
@@ -180,14 +198,19 @@ export default function ShopPage() {
     loadShopData();
     adService.current = new RewardedAdService();
     
-    const openModal = () => setShowAdModal(true);
+    const openModal = () => {
+      setHasDispatchedPush(false);
+      setShowAdModal(true);
+    };
     window.addEventListener("openBalanceModal", openModal);
 
     const intervalId = setInterval(() => {
       if (isWaiting && targetTimeRef.current) {
         const remaining = Math.max(0, Math.ceil((targetTimeRef.current - Date.now()) / 1000));
         setCountdown(remaining);
-        if (remaining <= 0) handleClaimReward();
+        if (remaining <= 0) {
+          handleTimerComplete();
+        }
       }
     }, 250);
 
@@ -195,7 +218,7 @@ export default function ShopPage() {
       window.removeEventListener("openBalanceModal", openModal);
       clearInterval(intervalId);
     };
-  }, [isWaiting, handleClaimReward]);
+  }, [isWaiting, handleTimerComplete]);
 
   if (loading) return <div className="min-h-screen bg-black" />;
 
@@ -207,11 +230,24 @@ export default function ShopPage() {
         {showAdModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#111] border border-white/10 p-8 rounded-3xl w-full max-w-sm text-center">
-              <h3 className="text-xl font-bold mb-6">Boost Your Balance</h3>
-              <button onClick={handleWatchAdClick} disabled={isWaiting} className={`w-full py-4 rounded-xl font-black transition-all ${isWaiting ? 'bg-white/5 text-gray-500' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
-                {isWaiting ? `WATCHING (${countdown}s)` : "WATCH AD FOR 500 COINS"}
-              </button>
-              <button onClick={() => setShowAdModal(false)} className="mt-4 text-sm text-gray-500 hover:text-white">Cancel</button>
+              
+              {!hasDispatchedPush ? (
+                <>
+                  <h3 className="text-xl font-bold mb-6">Boost Your Balance</h3>
+                  <button onClick={handleWatchAdClick} disabled={isWaiting} className={`w-full py-4 rounded-xl font-black transition-all ${isWaiting ? 'bg-white/5 text-gray-500' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
+                    {isWaiting ? `WATCHING (${countdown}s)` : "WATCH AD FOR 500 COINS"}
+                  </button>
+                  <button onClick={() => setShowAdModal(false)} className="mt-4 text-sm text-gray-500 hover:text-white">Cancel</button>
+                </>
+              ) : (
+                <>
+                  <div className="text-5xl mb-4">🔔</div>
+                  <h3 className="text-xl font-bold mb-2">Notification Sent!</h3>
+                  <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your 500 coins!</p>
+                  <button onClick={() => setShowAdModal(false)} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
+                </>
+              )}
+              
             </motion.div>
           </motion.div>
         )}
