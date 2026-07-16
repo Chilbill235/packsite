@@ -115,12 +115,14 @@ self.addEventListener('message', (event) => {
             }
 
             // Otherwise, they are still away, so we safely notify them!
+            // requireInteraction: true keeps it active on screen until they tap it.
             await self.registration.showNotification("Ad Completed! 🪙", {
               body: "Your countdown is done! Tap here to return and claim your 500 coins.",
               icon: APP_ICON,
               badge: APP_BADGE,
               tag: "reward-claim-ready",
               renotify: true,
+              requireInteraction: true, // <-- PERSISTENT STATE: Will not auto-dismiss
               vibrate: [200, 100, 200],
               data: { url: targetUrl }
             });
