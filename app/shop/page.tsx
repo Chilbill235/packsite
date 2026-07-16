@@ -29,10 +29,12 @@ export default function ShopPage() {
   const [notification, setNotification] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   
-  // New States for Subscription Checking & Beautiful Modal UI
+  // States for Subscription Checking & Beautiful Modal UI
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
+  // Background-safe countdown target reference
+  const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
   const notify = (msg: string) => {
@@ -66,7 +68,6 @@ export default function ShopPage() {
       });
 
       if (status.state === 'granted') {
-        // Register the background reminder task (20 minutes)
         await reg.periodicSync.register('random-shop-alert', {
           minInterval: 20 * 60 * 1000, 
         });
@@ -85,7 +86,6 @@ export default function ShopPage() {
         return;
       }
 
-      // 1. Request Permission
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         console.warn("Permission denied for notifications");
@@ -94,14 +94,12 @@ export default function ShopPage() {
       
       const registration = await navigator.serviceWorker.ready;
       
-      // 2. Subscribe with properly converted key
       const vapidKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey)
       });
 
-      // 3. Send to server
       await fetch('/api/user/subscribe', {
         method: 'POST',
         body: JSON.stringify(sub),
@@ -110,7 +108,6 @@ export default function ShopPage() {
       console.log("Successfully subscribed");
       setIsSubscribed(true);
 
-      // 4. Fire off dynamic background notification scheduling if supported
       await registerPeriodicNotifications(registration);
       
     } catch (err) {
@@ -132,6 +129,7 @@ export default function ShopPage() {
 
   const handleClaimReward = async () => {
     setIsWaiting(false);
+    targetTimeRef.current = null; // Clean up target timestamp
     try {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       const data = await res.json();
@@ -148,9 +146,12 @@ export default function ShopPage() {
   };
 
   const handleWatchAdClick = async () => {
+    // Set target time: current system time + 10 seconds
+    targetTimeRef.current = Date.now() + 10000;
+    setCountdown(10);
     setIsWaiting(true);
+
     if (isSubscribed) {
-      // Already subscribed! Directly show the gorgeous modal instead of subscribing again
       setShowSubscriptionModal(true);
     } else {
       await registerPushSubscription();
@@ -158,16 +159,13 @@ export default function ShopPage() {
     adService.current?.showAd(user?.email || "anon"); 
   };
 
-  // Register SW, check subscription status, and initialize components
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw1.js')
         .then((reg) => {
-          // Attempt to register periodic tasks if notifications are already allowed
           if (Notification.permission === 'granted') {
             registerPeriodicNotifications(reg);
           }
-          // Scan for pre-existing active subscriptions
           checkSubscriptionStatus();
         })
         .catch(console.error);
@@ -176,22 +174,52 @@ export default function ShopPage() {
     loadShopData();
   }, []);
 
+  // --- BACKGROUND-SAFE COUNTDOWN LOGIC ---
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let animationFrameId: number;
+
+    const updateTimer = () => {
+      if (!isWaiting || !targetTimeRef.current) return;
+
+      const now = Date.now();
+      const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
+
+      setCountdown(remainingSeconds);
+
+      if (remainingSeconds <= 0) {
+        handleClaimReward();
+      } else {
+        // Keeps updating smoothly even if the browser slows down the tab
+        animationFrameId = requestAnimationFrame(updateTimer);
+      }
+    };
+
     if (isWaiting) {
-      setCountdown(10);
-      interval = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            handleClaimReward();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      animationFrameId = requestAnimationFrame(updateTimer);
     }
-    return () => clearInterval(interval);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isWaiting]);
+
+  // Listen to visibility transitions (e.g., returning to tab after clicking ad)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isWaiting && targetTimeRef.current) {
+        const now = Date.now();
+        const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
+        
+        setCountdown(remainingSeconds);
+        
+        if (remainingSeconds <= 0) {
+          handleClaimReward();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isWaiting]);
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
@@ -207,18 +235,14 @@ export default function ShopPage() {
       {/* --- BEAUTIFULLY CUSTOMIZED MODAL FOR EXISTING SUBSCRIBERS --- */}
       {showSubscriptionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop Blur overlay */}
           <div 
             className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
             onClick={() => setShowSubscriptionModal(false)}
           />
           
-          {/* Modal Container */}
           <div className="relative transform overflow-hidden rounded-3xl border border-amber-500/30 bg-gray-950 p-8 text-center shadow-2xl transition-all max-w-md w-full ring-1 ring-amber-500/10">
-            {/* Ambient Background Glow */}
             <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Glowing Bell Icon */}
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20 mb-6 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
               <span className="text-3xl animate-bounce">🔔</span>
             </div>
