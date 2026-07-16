@@ -3,9 +3,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
 
-// Utility type to extract the transaction client type
-type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -13,37 +10,54 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Receive the flag from the frontend
-    const { packId, isFlashSale } = await req.json();
+    // 1. Get quantity from body (default to 1)
+    const { packId, isFlashSale, quantity = 1 } = await req.json();
 
-    return await prisma.$transaction(async (tx: TransactionClient) => {
-      const pack = await tx.pack.findUnique({ where: { id: packId }, include: { items: true } });
-      const user = await tx.user.findUnique({ where: { email: session.user.email as string } });
+    return await prisma.$transaction(async (tx) => {
+      const pack = await tx.pack.findUnique({ 
+        where: { id: packId }, 
+        include: { items: true } 
+      });
+      const user = await tx.user.findUnique({ 
+        where: { email: session.user.email as string } 
+      });
 
       if (!pack) return NextResponse.json({ error: "Pack not found" }, { status: 404 });
+      if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
       
-      // Calculate the price ON THE SERVER
-      const finalPrice = isFlashSale ? Math.floor(pack.price * 0.5) : pack.price;
+      // 2. Calculate price for the batch
+      const unitPrice = isFlashSale ? Math.floor(pack.price * 0.5) : pack.price;
+      const totalPrice = unitPrice * quantity;
 
-      // Compare balance against the SERVER-CALCULATED price
-      if (!user || user.balance < finalPrice) {
+      if (user.balance < totalPrice) {
         return NextResponse.json({ error: "Insufficient funds" }, { status: 400 });
       }
 
-      const wonItem = rollItem(pack.items);
+      // 3. Roll the items X times
+      const wonItems = [];
+      for (let i = 0; i < quantity; i++) {
+        wonItems.push(rollItem(pack.items));
+      }
       
-      // Update using the finalPrice
+      // 4. Perform Updates
       const updatedUser = await tx.user.update({
         where: { id: user.id },
-        data: { balance: { decrement: finalPrice } },
+        data: { balance: { decrement: totalPrice } },
       });
 
-      await tx.inventory.create({ data: { userId: user.id, itemId: wonItem.id } });
-      await tx.opening.create({ data: { userId: user.id, packId, itemId: wonItem.id } });
+      // Bulk create inventory items
+      await tx.inventory.createMany({
+        data: wonItems.map(item => ({ userId: user.id, itemId: item.id }))
+      });
+
+      // Bulk create history logs
+      await tx.opening.createMany({
+        data: wonItems.map(item => ({ userId: user.id, packId, itemId: item.id }))
+      });
 
       return NextResponse.json({ 
         success: true, 
-        wonItem, 
+        wonItems, // Returning the array
         newBalance: updatedUser.balance 
       });
     });

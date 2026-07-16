@@ -8,13 +8,18 @@ import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
+  // --- States ---
   const [packs, setPacks] = useState<PackWithItems[]>([]);
   const [user, setUser] = useState<{ id?: string; email?: string; balance?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
-  const [wonItem, setWonItem] = useState<{ name: string; rarity?: string; value?: number } | null>(null);
+  
+  // Bulk & Won Item States
+  const [openQuantity, setOpenQuantity] = useState(1);
+  const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
+  
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
@@ -25,6 +30,7 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
+  // --- Data Fetching ---
   const fetchUserData = useCallback(async () => {
     try {
       const res = await fetch(`/api/user/profile?t=${Date.now()}`);
@@ -45,13 +51,7 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      if (!("Notification" in window)) setPermission("unsupported");
-      else setPermission(Notification.permission);
-    }
-  }, []);
-
+  // --- Ad & Notification Logic ---
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -87,10 +87,8 @@ export default function ShopPage() {
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
-    
     const storedAmount = sessionStorage.getItem('pendingRewardAmount');
     const amount = storedAmount ? parseInt(storedAmount) : 500;
-
     try {
       const verifyRes = await fetch("/api/user/verify-ad-claim");
       const verifyData = await verifyRes.json();
@@ -99,13 +97,7 @@ export default function ShopPage() {
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
-      
-      const res = await fetch("/api/user/add-coins", { 
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount })
-      });
-      
+      const res = await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount }) });
       if (res.ok) {
         sessionStorage.removeItem('pendingRewardAmount');
         setShowAdModal(false);
@@ -118,11 +110,7 @@ export default function ShopPage() {
 
   const handleClaimDailyBonus = async () => {
     try {
-      const res = await fetch("/api/user/add-coins", { 
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: 150 }) // Updated from 500 to 150
-      });
+      const res = await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
       if (res.ok) {
         setBonusClaimed(true);
         await fetchUserData();
@@ -133,22 +121,15 @@ export default function ShopPage() {
 
   const handleWatchAdClick = async (amount: number) => {
     sessionStorage.setItem('pendingRewardAmount', amount.toString());
-    
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
     setHasDispatchedPush(false);
     adService.current?.showAd(user?.email || "anon");
-    
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if (registration.active) {
-        registration.active.postMessage({
-          type: "START_BACKGROUND_TIMER",
-          delay: 10000,
-          amount: amount, 
-          url: window.location.origin + "/shop?ref=reward-claim"
-        });
+        registration.active.postMessage({ type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: window.location.origin + "/shop?ref=reward-claim" });
       }
     }
   };
@@ -157,44 +138,64 @@ export default function ShopPage() {
     setIsWaiting(false);
     targetTimeRef.current = null;
     setHasDispatchedPush(true);
-    try { await fetch("/api/user/ad-complete", { method: "POST" }); } 
-    catch (e) { console.error("Failed to sync ad completion."); }
+    try { await fetch("/api/user/ad-complete", { method: "POST" }); } catch (e) { console.error("Failed to sync ad completion."); }
   }, []);
 
+  // --- Pack Opening ---
+  const handleOpenPack = async (packId: string) => {
+    try {
+      const res = await fetch("/api/packs/open", { 
+        method: "POST", 
+        body: JSON.stringify({ packId, quantity: openQuantity, isFlashSale: isFlashSaleActive }), 
+        headers: {"Content-Type": "application/json"} 
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWonItems(data.wonItems || [data.wonItem]); 
+        await fetchUserData(); 
+      } else {
+        setErrorDialog({ message: data.error || "Failed to open pack" });
+      }
+    } catch (err) { setErrorDialog({ message: "Network error occurred" }); }
+  };
+
+  // --- Effects ---
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    if (typeof window !== "undefined") {
+      if (!("Notification" in window)) setPermission("unsupported");
+      else setPermission(Notification.permission);
+    }
+    loadShopData();
+    adService.current = new RewardedAdService();
+    
+    // Service worker listeners
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") handleTimerComplete();
     };
-    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
-    return () => navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
+
+    // Balance modal listener
+    const openModal = () => { setHasDispatchedPush(false); setShowAdModal(true); };
+    window.addEventListener("openBalanceModal", openModal);
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
+      window.removeEventListener("openBalanceModal", openModal);
+    };
   }, [handleTimerComplete]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !loading) {
+    if (!loading) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
-      if (ref === "reward-claim") {
-        setShowAdModal(true);
-        handleClaimReward();
-      } else if (ref === "notif_flash") {
-        setIsFlashSaleActive(true);
-      } else if (ref === "notif_bonus" && !bonusClaimed) {
-        handleClaimDailyBonus();
-      } else if (params.get("open-ad") === "true") {
-        setShowAdModal(true);
-      }
+      if (ref === "reward-claim") { setShowAdModal(true); handleClaimReward(); }
+      else if (ref === "notif_flash") { setIsFlashSaleActive(true); }
+      else if (ref === "notif_bonus" && !bonusClaimed) { handleClaimDailyBonus(); }
+      else if (params.get("open-ad") === "true") { setShowAdModal(true); }
     }
   }, [loading, handleClaimReward, bonusClaimed]);
 
   useEffect(() => {
-    loadShopData();
-    adService.current = new RewardedAdService();
-    const openModal = () => {
-      setHasDispatchedPush(false);
-      setShowAdModal(true);
-    };
-    window.addEventListener("openBalanceModal", openModal);
     const intervalId = setInterval(() => {
       if (isWaiting && targetTimeRef.current) {
         const remaining = Math.max(0, Math.ceil((targetTimeRef.current - Date.now()) / 1000));
@@ -202,12 +203,10 @@ export default function ShopPage() {
         if (remaining <= 0) handleTimerComplete();
       }
     }, 250);
-    return () => {
-      window.removeEventListener("openBalanceModal", openModal);
-      clearInterval(intervalId);
-    };
+    return () => clearInterval(intervalId);
   }, [isWaiting, handleTimerComplete]);
 
+  // --- Helpers ---
   const getRarityStyles = (rarity?: string) => {
     const r = rarity?.toLowerCase() || "common";
     if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
@@ -216,179 +215,131 @@ export default function ShopPage() {
     return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-600/10" };
   };
 
-  const currentTheme = getRarityStyles(wonItem?.rarity);
-
   if (loading) return <div className="min-h-screen bg-black" />;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white p-6 md:p-12 font-sans relative pb-32">
       
+      {/* Notifications Banner */}
       <AnimatePresence>
         {permission === "default" && showBanner && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-12 relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6"
-          >
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="mb-12 relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
             <div className="flex items-center gap-4 relative z-10">
-              <div className="p-3 bg-amber-500/20 rounded-xl text-amber-500">
-                <Bell size={24} />
-              </div>
+              <div className="p-3 bg-amber-500/20 rounded-xl text-amber-500"><Bell size={24} /></div>
               <div>
                 <h4 className="font-bold text-lg">Enable Notifications</h4>
                 <p className="text-gray-400 text-sm">Get alerts for shop drops, flash sales, and bonus claims.</p>
               </div>
             </div>
             <div className="flex items-center gap-3 relative z-10 w-full md:w-auto">
-              <button 
-                onClick={handleEnableNotifications} 
-                className="flex-1 md:flex-none px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-              >
-                ALLOW ALERTS
-              </button>
-              <button onClick={() => setShowBanner(false)} className="p-3 text-gray-500 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
+              <button onClick={handleEnableNotifications} className="flex-1 md:flex-none px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]">ALLOW ALERTS</button>
+              <button onClick={() => setShowBanner(false)} className="p-3 text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Ad Modal */}
       <AnimatePresence>
         {showAdModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#111111] border border-white/10 p-8 rounded-[2rem] w-full max-w-sm text-center relative overflow-hidden shadow-2xl"
-            >
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-transparent" />
-
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div className="bg-[#111111] border border-white/10 p-8 rounded-[2rem] w-full max-w-sm text-center relative overflow-hidden shadow-2xl">
               {isWaiting ? (
                 <div className="flex flex-col items-center py-8">
                   <div className="relative w-24 h-24 mb-6 flex items-center justify-center">
                     <svg className="w-full h-full rotate-[-90deg]">
                       <circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-zinc-800" />
-                      <motion.circle 
-                        cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-amber-500"
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: 1 }}
-                        transition={{ duration: 10, ease: "linear" }}
-                      />
+                      <motion.circle cx="48" cy="48" r="44" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-amber-500" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 10, ease: "linear" }} />
                     </svg>
                     <span className="absolute text-3xl font-black">{countdown}</span>
                   </div>
                   <h3 className="text-xl font-bold">Watching Ad</h3>
-                  <p className="text-zinc-500 text-sm mt-1">Please keep this window open...</p>
                 </div>
               ) : !hasDispatchedPush ? (
                 <>
-                  <div className="mb-6">
-                    <h3 className="text-2xl font-black mb-2 tracking-tight">Boost Balance</h3>
-                    <p className="text-gray-400 text-sm">Watch an ad to instantly earn coins.</p>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <button 
-                      onClick={() => handleWatchAdClick(500)} 
-                      className="w-full py-4 rounded-2xl font-black bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/50 text-amber-500 transition-all duration-300"
-                    >
-                      WATCH AD (500)
-                    </button>
-                  </div>
-                  <button 
-                    onClick={() => { setShowAdModal(false); window.history.replaceState({}, document.title, window.location.pathname); }} 
-                    className="mt-6 text-sm text-zinc-600 hover:text-white transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  <h3 className="text-2xl font-black mb-2 tracking-tight">Boost Balance</h3>
+                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-4 rounded-2xl font-black bg-amber-500/10 border border-amber-500/20 text-amber-500">WATCH AD (500)</button>
+                  <button onClick={() => setShowAdModal(false)} className="mt-6 text-sm text-zinc-600">Cancel</button>
                 </>
               ) : (
                 <div className="py-6">
                   <div className="text-5xl mb-4 animate-bounce">🔔</div>
-                  <h3 className="text-xl font-bold mb-2">Notification Sent!</h3>
-                  <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your coins!</p>
-                  <button 
-                    onClick={() => { setShowAdModal(false); window.history.replaceState({}, document.title, window.location.pathname); }} 
-                    className="w-full py-3 bg-white text-black font-black rounded-xl hover:bg-gray-200 transition-all"
-                  >
-                    Close Window
-                  </button>
+                  <h3 className="text-xl font-bold">Notification Sent!</h3>
+                  <button onClick={() => setShowAdModal(false)} className="w-full py-3 bg-white text-black font-black rounded-xl">Close</button>
                 </div>
               )}
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
 
-        {wonItem && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl" onClick={() => setWonItem(null)}>
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-              <div className="absolute w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(245,158,11,0.15)_0%,transparent_60%)] animate-pulse" />
-              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 25, ease: "linear" }} className="absolute w-[1000px] h-[1000px] opacity-15" style={{ backgroundImage: `repeating-conic-gradient(from 0deg, #fff 0deg, #fff 10deg, transparent 10deg, transparent 25deg)` }} />
-            </div>
-            <motion.div initial={{ scale: 0.3, y: 100, rotate: -25 }} animate={{ scale: 1, y: 0, rotate: 0 }} exit={{ scale: 0.3, y: 100, rotate: 25 }} transition={{ type: "spring", damping: 14, stiffness: 100 }} className={`relative bg-gradient-to-b ${currentTheme.glow} to-black/95 border ${currentTheme.border} p-12 rounded-[2.5rem] text-center w-full max-w-sm cursor-pointer shadow-2xl ${currentTheme.shadow}`} onClick={(e) => e.stopPropagation()}>
-              <p className="text-xs tracking-[0.3em] font-black uppercase text-white/40 mb-2">unlocked pack item</p>
-              <h2 className="text-4xl font-extrabold mb-3 tracking-tight text-white uppercase">YOU WON!</h2>
-              <div className="inline-block px-4 py-1.5 bg-white/5 rounded-full border border-white/10 mb-6">
-                <span className={`text-xs font-black uppercase tracking-widest ${currentTheme.text}`}>{wonItem.rarity || "COMMON"}</span>
+      {/* Won Items Grid Modal */}
+      <AnimatePresence>
+        {wonItems.length > 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 overflow-y-auto" onClick={() => setWonItems([])}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-center text-4xl font-black mb-12 uppercase tracking-widest text-white">You Won!</h2>
+              
+              {/* Force 3 Columns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full justify-items-center">
+                {wonItems.map((item, idx) => {
+                  const theme = getRarityStyles(item.rarity);
+                  return (
+                    <motion.div 
+                      key={idx} 
+                      initial={{ y: 20, opacity: 0, scale: 0.9 }} 
+                      animate={{ y: 0, opacity: 1, scale: 1 }} 
+                      transition={{ delay: idx * 0.05 }} 
+                      className={`w-full max-w-[200px] bg-black border ${theme.border} p-6 rounded-2xl text-center relative overflow-hidden`}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-b ${theme.glow} to-transparent`} />
+                      <div className="relative z-10">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${theme.text} mb-2 block`}>{item.rarity || "COMMON"}</span>
+                        <p className="font-bold text-lg mb-2">{item.name}</p>
+                        <p className="text-amber-500 font-bold text-xs">{item.value?.toLocaleString()} COINS</p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
-              <p className="text-2xl font-black text-white px-2 tracking-tight line-clamp-2 min-h-[4rem] flex items-center justify-center">{wonItem.name}</p>
-              <div className="h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-6" />
-              <button onClick={() => setWonItem(null)} className="w-full py-4 bg-white text-black hover:bg-gray-100 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg">Claim Item</button>
+
+              <button onClick={() => setWonItems([])} className="mt-12 w-full max-w-xs mx-auto block py-4 bg-white text-black hover:bg-gray-200 rounded-2xl font-black transition-all">Collect All</button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <h1 className="text-4xl font-black mb-12 tracking-tighter">VAULT</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {packs.map((pack) => {
+      {/* Centered Wrapper for Main Content */}
+      <div className="max-w-5xl mx-auto flex flex-col items-center w-full">
+        <h1 className="text-4xl font-black mb-2 tracking-tighter text-center">VAULT</h1>
+        
+        {/* Quantity Selector */}
+        <div className="flex gap-2 mb-10 bg-[#111] p-1.5 rounded-2xl w-fit border border-white/5">
+          {[1, 3, 6].map((q) => (
+            <button key={q} onClick={() => setOpenQuantity(q)} className={`px-6 py-2 rounded-xl font-bold transition-all ${openQuantity === q ? "bg-white text-black" : "text-zinc-500 hover:text-white"}`}>Open {q}</button>
+          ))}
+        </div>
+        
+        {/* Pack Grid with Center Alignment */}
+        <div className="flex flex-wrap justify-center gap-6 w-full">
+          {packs.map((pack) => {
             const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
+            const totalCost = finalPrice * openQuantity;
             return (
-              <motion.div whileHover={{ y: -5 }} key={pack.id} className="bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl hover:border-amber-500/30 transition-all relative overflow-hidden">
-                {isFlashSaleActive && (
-                  <div className="absolute top-4 right-4 bg-red-500 text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg animate-pulse">
-                    -50% Off
-                  </div>
-                )}
+              <motion.div key={pack.id} className="w-full max-w-[320px] bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl relative overflow-hidden">
+                {isFlashSaleActive && <div className="absolute top-4 right-4 bg-red-500 text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase shadow-lg animate-pulse">-50%</div>}
                 <div className="text-4xl mb-6">🎁</div>
-                <h3 className="font-bold text-lg mb-1">{pack.name}</h3>
-                <button 
-                  onClick={async () => {
-                    const res = await fetch("/api/packs/open", { 
-                      method: "POST", 
-                      body: JSON.stringify({ packId: pack.id, isFlashSale: isFlashSaleActive }), 
-                      headers: {"Content-Type": "application/json"} 
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      setWonItem(data.wonItem);
-                      await fetchUserData(); 
-                    } else {
-                        setErrorDialog({ message: data.error || "Failed to open pack" });
-                    }
-                  }}
-                  className="w-full mt-4 py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all"
-                >
-                  {isFlashSaleActive && (
-                    <span className="text-xs line-through text-zinc-500 font-normal mb-0.5 block">
-                      {pack.price.toLocaleString()} COINS
-                    </span>
-                  )}
-                  {finalPrice.toLocaleString()} COINS
+                <h3 className="font-bold text-lg mb-4">{pack.name}</h3>
+                <button onClick={() => handleOpenPack(pack.id)} className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all">
+                  OPEN {openQuantity} FOR {totalCost.toLocaleString()} COINS
                 </button>
               </motion.div>
             );
-        })}
+          })}
+        </div>
       </div>
+
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
   );
