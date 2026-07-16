@@ -96,18 +96,33 @@ self.addEventListener('message', (event) => {
     // CRITICAL: Force the browser to keep the Service Worker alive for the full countdown duration
     event.waitUntil(
       new Promise((resolve) => {
-        setTimeout(() => {
-          self.registration.showNotification("Ad Completed! 🪙", {
-            body: "Your countdown is done! Tap here to return and claim your 500 coins.",
-            icon: APP_ICON,
-            badge: APP_BADGE,
-            tag: "reward-claim-ready",
-            renotify: true,
-            vibrate: [200, 100, 200],
-            data: { url: targetUrl }
-          })
-          .then(resolve)
-          .catch(resolve);
+        setTimeout(async () => {
+          try {
+            // Check if any client tab of this origin is currently focused
+            const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+            const isAnyClientFocused = clientList.some(client => client.focused);
+
+            // If a tab is already open and focused on the screen, skip the push notification!
+            if (isAnyClientFocused) {
+              resolve();
+              return;
+            }
+
+            // Otherwise, they're in another app or tab—notify them!
+            await self.registration.showNotification("Ad Completed! 🪙", {
+              body: "Your countdown is done! Tap here to return and claim your 500 coins.",
+              icon: APP_ICON,
+              badge: APP_BADGE,
+              tag: "reward-claim-ready",
+              renotify: true,
+              vibrate: [200, 100, 200],
+              data: { url: targetUrl }
+            });
+          } catch (err) {
+            console.error("Error evaluating focus during ad completion:", err);
+          } finally {
+            resolve();
+          }
         }, delayMs);
       })
     );
