@@ -1,52 +1,72 @@
 "use client";
+
 import { useEffect, useState } from "react";
+
+// 1. Define the correct TypeScript interface for the PWA install event
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: Array<string>;
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
 
 export default function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
   const [show, setShow] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // 1. Check if already installed
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                         (window.navigator as any).standalone === true;
+    // Check if already installed
+    const isStandalone = 
+      window.matchMedia('(display-mode: standalone)').matches || 
+      (window.navigator as any).standalone === true;
+    
     if (isStandalone) return;
 
-    // 2. Check snooze
+    // Check snooze
     const dismissedUntil = localStorage.getItem("install_prompt_dismissed");
     if (dismissedUntil && Date.now() < parseInt(dismissedUntil)) return;
 
-    // 3. Set Device
+    // Set Device
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     setIsIOS(iOS);
 
-    // 4. Capture event (for Android/Chrome)
-    const handleBeforeInstallPrompt = (e: any) => {
+    // Capture event (for Android/Chrome)
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    // Cast window to any to bypass TS window event maps, or use a custom listener
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt as any);
 
-    // 5. FORCE SHOW: We show the modal after 1 second regardless of the event
-    // This ensures iOS users see the "Share" instructions
+    // FORCE SHOW: Show modal after 1 second
     const timer = setTimeout(() => setShow(true), 1000);
 
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    // CLEANUP: Remove listeners AND clear the timeout
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt as any);
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') setShow(false);
+      if (outcome === 'accepted') {
+        setShow(false);
+      }
     } else {
-      // If no prompt event, just explain the manual way
+      // If no prompt event (like on iOS), explain manual installation
       alert('To install, tap the Share button 📤 and select "Add to Home Screen"');
     }
   };
 
   const handleDismiss = () => {
+    // Snooze for 10 minutes
     const snoozeTime = Date.now() + 10 * 60 * 1000;
     localStorage.setItem("install_prompt_dismissed", snoozeTime.toString());
     setShow(false);
