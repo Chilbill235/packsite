@@ -13,10 +13,7 @@ export default function ShopPage() {
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
-  
-  // High-fidelity Reward Modal states
   const [wonItem, setWonItem] = useState<{ name: string; rarity?: string; value?: number } | null>(null);
-  
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
 
@@ -153,10 +150,24 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
+  // --- Core Claim Logic with Security Validation ---
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
     try {
+      // 1. SECURITY: Verify eligibility with server before processing
+      const verifyRes = await fetch("/api/user/verify-ad-claim");
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok || !verifyData.eligible) {
+        addLog("Security: Invalid claim attempt blocked.");
+        setErrorDialog({ message: "Reward not available or already claimed." });
+        // Clean URL params to prevent re-triggering
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      // 2. Process Reward
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
@@ -164,18 +175,14 @@ export default function ShopPage() {
         document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setShowAdModal(false);
         setHasDispatchedPush(false);
-        if (typeof window !== "undefined") {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
+        window.history.replaceState({}, document.title, window.location.pathname);
         addLog("Coins successfully credited! 🎉");
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, []);
 
-  // Handler for granting the daily bonus coins directly
   const handleClaimDailyBonus = async () => {
     try {
-      // Reusing the coin adding route or similar backend logic to grant free bonus coins
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
@@ -183,11 +190,7 @@ export default function ShopPage() {
         document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setBonusClaimed(true);
         addLog("Daily Bonus 150 Coins claimed directly! 💎");
-        
-        // Clean up URL parameter cleanly
-        if (typeof window !== "undefined") {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) {
       addLog("Failed to claim Daily Bonus automatically.");
@@ -216,11 +219,19 @@ export default function ShopPage() {
     }
   };
 
-  const handleTimerComplete = useCallback(() => {
+  // --- SECURITY: Flag the ad as complete in the DB ---
+  const handleTimerComplete = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
     setHasDispatchedPush(true);
-    addLog("Timer complete! Push dispatched. Check system notifications.");
+    addLog("Timer complete! Flagging ad as watched in database.");
+    
+    try {
+      // API call to set pendingReward: true in database
+      await fetch("/api/user/ad-complete", { method: "POST" });
+    } catch (e) {
+      addLog("Failed to sync ad completion.");
+    }
   }, []);
 
   useEffect(() => {
@@ -244,23 +255,16 @@ export default function ShopPage() {
 
       if (ref === "reward-claim") {
         setShowAdModal(true);
-        const claimTimeout = setTimeout(() => {
-          handleClaimReward();
-        }, 1200);
-        return () => clearTimeout(claimTimeout);
+        // Automatically attempt to process the claim based on the URL param
+        handleClaimReward();
       } 
-      
-      // Campaign A: 50% discount active
       else if (ref === "notif_flash") {
         setIsFlashSaleActive(true);
         addLog("Flash Deal URL parameters loaded! Enjoy 50% off all packs! ⏳");
       } 
-      
-      // Campaign B: Direct Daily Bonus drop claim
       else if (ref === "notif_bonus" && !bonusClaimed) {
         handleClaimDailyBonus();
       } 
-      
       else if (params.get("open-ad") === "true") {
         setShowAdModal(true);
       }
@@ -307,7 +311,6 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-[#070707] text-white p-6 md:p-12 font-sans relative pb-32">
-      
       {/* --- Ad Reward Modal --- */}
       <AnimatePresence>
         {showAdModal && (
@@ -322,9 +325,7 @@ export default function ShopPage() {
                   </button>
                   <button onClick={() => {
                     setShowAdModal(false);
-                    if (typeof window !== "undefined") {
-                      window.history.replaceState({}, document.title, window.location.pathname);
-                    }
+                    window.history.replaceState({}, document.title, window.location.pathname);
                   }} className="mt-4 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
                 </>
               ) : (
@@ -334,9 +335,7 @@ export default function ShopPage() {
                   <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your 500 coins!</p>
                   <button onClick={() => {
                     setShowAdModal(false);
-                    if (typeof window !== "undefined") {
-                      window.history.replaceState({}, document.title, window.location.pathname);
-                    }
+                    window.history.replaceState({}, document.title, window.location.pathname);
                   }} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
                 </>
               )}
@@ -507,7 +506,6 @@ export default function ShopPage() {
         <h1 className="text-4xl font-black mb-12 tracking-tighter">VAULT</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packs.map((pack) => {
-            // Apply a 50% discount factor dynamically if campaign is active
             const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
 
             return (

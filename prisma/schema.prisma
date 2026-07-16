@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  }
+}
 
 model Account {
   id                String  @id @default(cuid())
@@ -39,12 +39,12 @@ model User {
   balance       Int            @default(100000)
   createdAt     DateTime       @default(now())
   lastAdWatched DateTime?
+  pendingReward Boolean        @default(false)
   accounts      Account[]
   inventory     Inventory[]
   openings      Opening[]
   sessions      Session[]
-  // RELATION FIX: Changed to allow multiple subscriptions per user (e.g., multiple devices)
-  subscriptions Subscription[] 
+  subscriptions Subscription[]
 }
 
 model Pack {
@@ -82,8 +82,8 @@ model Inventory {
 
 model Subscription {
   id     String @id @default(cuid())
-  userId String @unique  // <--- This @unique is required for the 'where' lookup
-  data   Json   
+  userId String @unique // <-- Fixed: Marked as @unique to allow upsert
+  data   Json
   user   User   @relation(fields: [userId], references: [id])
 }
 
