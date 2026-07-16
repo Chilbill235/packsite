@@ -8,7 +8,7 @@ import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
-  const [user, setUser] = useState<{ id?: string; email?: string } | null>(null);
+  const [user, setUser] = useState<{ id?: string; email?: string; balance?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -26,6 +26,21 @@ export default function ShopPage() {
 
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
+
+  // --- Real-Time Sync Logic ---
+  const fetchUserData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/profile");
+      if (res.ok) {
+        const userData = await res.json();
+        setUser(userData);
+        // Dispatch global event for Navbar or other components to listen to
+        window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: userData.balance } }));
+      }
+    } catch (err) {
+      console.error("Failed to refresh user:", err);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -93,32 +108,31 @@ export default function ShopPage() {
     setIsWaiting(false);
     targetTimeRef.current = null;
     try {
-      // 1. SECURITY: Verify eligibility with server before processing
       const verifyRes = await fetch("/api/user/verify-ad-claim");
       const verifyData = await verifyRes.json();
 
       if (!verifyRes.ok || !verifyData.eligible) {
         setErrorDialog({ message: "Reward not available or already claimed." });
-        // Clean URL params to prevent re-triggering
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
 
-      // 2. Process Reward
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       if (res.ok) {
         setShowAdModal(false);
         setHasDispatchedPush(false);
+        await fetchUserData(); // Sync balance
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
-  }, []);
+  }, [fetchUserData]);
 
   const handleClaimDailyBonus = async () => {
     try {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       if (res.ok) {
         setBonusClaimed(true);
+        await fetchUserData(); // Sync balance
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) {
@@ -153,7 +167,6 @@ export default function ShopPage() {
     setHasDispatchedPush(true);
     
     try {
-      // API call to set pendingReward: true in database
       await fetch("/api/user/ad-complete", { method: "POST" });
     } catch (e) {
       console.error("Failed to sync ad completion.");
@@ -181,7 +194,6 @@ export default function ShopPage() {
 
       if (ref === "reward-claim") {
         setShowAdModal(true);
-        // Automatically attempt to process the claim based on the URL param
         handleClaimReward();
       } 
       else if (ref === "notif_flash") {
@@ -227,7 +239,7 @@ export default function ShopPage() {
     if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
     if (r.includes("epic")) return { border: "border-purple-500/50", text: "text-purple-400", glow: "from-purple-500/20", shadow: "shadow-purple-500/10" };
     if (r.includes("rare")) return { border: "border-blue-500/50", text: "text-blue-400", glow: "from-blue-500/20", shadow: "shadow-blue-500/10" };
-    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-600/10" };
+    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-500/10" };
   };
 
   const currentTheme = getRarityStyles(wonItem?.rarity);
@@ -368,9 +380,7 @@ export default function ShopPage() {
               <p className="text-sm text-zinc-300">A special 50% discount from your push notification has been applied to all vault packs.</p>
             </div>
             <button 
-              onClick={() => {
-                setIsFlashSaleActive(false);
-              }}
+              onClick={() => { setIsFlashSaleActive(false); }}
               className="text-xs text-zinc-400 hover:text-white uppercase font-bold tracking-widest bg-white/5 px-4 py-2 rounded-xl transition-all"
             >
               Dismiss
@@ -452,6 +462,7 @@ export default function ShopPage() {
                     const data = await res.json();
                     if (res.ok) {
                       setWonItem(data.wonItem);
+                      await fetchUserData(); // Sync balance
                     }
                   }}
                   className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all flex flex-col items-center justify-center"

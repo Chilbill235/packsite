@@ -33,14 +33,16 @@ export default function Navbar() {
     }
   }, [isAuthenticated, refreshBalance]);
 
+  // FIXED: Updated event listener to listen for 'balanceUpdated' 
+  // and properly access 'detail.balance'[cite: 1, 2]
   useEffect(() => {
-    const handleBalanceChange = (event: Event) => {
-      const customEvent = event as CustomEvent<number>;
-      setBalance(customEvent.detail);
+    const handleBalanceUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ balance: number }>;
+      setBalance(customEvent.detail.balance);
     };
 
-    window.addEventListener("balanceChanged", handleBalanceChange);
-    return () => window.removeEventListener("balanceChanged", handleBalanceChange);
+    window.addEventListener("balanceUpdated", handleBalanceUpdate);
+    return () => window.removeEventListener("balanceUpdated", handleBalanceUpdate);
   }, []);
 
   useEffect(() => {
@@ -84,7 +86,6 @@ export default function Navbar() {
         <div className="flex items-center space-x-3">
           {isAuthenticated ? (
             <>
-              {/* TRIGGER UPDATED HERE */}
               <button 
                 onClick={() => window.dispatchEvent(new Event("openBalanceModal"))}
                 className="hover:opacity-80 transition-opacity"
@@ -123,7 +124,6 @@ export default function Navbar() {
             {isAuthenticated ? (
               <>
                 <div className="mt-3">
-                  {/* MOBILE TRIGGER UPDATED HERE */}
                   <button 
                     onClick={() => {
                       window.dispatchEvent(new Event("openBalanceModal"));
