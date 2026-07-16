@@ -21,11 +21,6 @@ export default function ShopPage() {
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
   const [bonusClaimed, setBonusClaimed] = useState(false);
 
-  // --- Developer Test Center States ---
-  const [showDevPanel, setShowDevPanel] = useState(false);
-  const [testLog, setTestLog] = useState<string[]>([]);
-  const [isTestingPush, setIsTestingPush] = useState(false);
-
   // --- Notification State ---
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
 
@@ -41,10 +36,6 @@ export default function ShopPage() {
       }
     }
   }, []);
-
-  const addLog = (msg: string) => {
-    setTestLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
-  };
 
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -73,67 +64,15 @@ export default function ShopPage() {
             applicationServerKey: convertedKey
           });
 
-          const response = await fetch("/api/user/subscribe", {
+          await fetch("/api/user/subscribe", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ subscription })
           });
-
-          if (response.ok) {
-            addLog("Notification subscription synchronized to DB.");
-          } else {
-            addLog("Sync failed: " + response.statusText);
-          }
         }
       }
     } catch (err: any) {
-      addLog("Permission Error: " + err.message);
-    }
-  };
-
-  // --- Dev Tools: Test Route Triggers ---
-  const triggerInstantNotification = async () => {
-    if (permission !== "granted") {
-      alert("Please request and allow notification permissions first!");
-      return;
-    }
-    setIsTestingPush(true);
-    addLog("Triggering immediate notification drop request...");
-    try {
-      const response = await fetch("/api/user/trigger-test-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      const data = await response.json();
-      if (response.ok) {
-        addLog("Test Push Sent! Check your device notifications.");
-      } else {
-        addLog(`Push Failed: ${data.error || 'Server Error'}`);
-      }
-    } catch (error: any) {
-      addLog(`Network Error: ${error.message}`);
-    } finally {
-      setIsTestingPush(false);
-    }
-  };
-
-  const triggerPeriodicSyncSimulation = async () => {
-    if ("serviceWorker" in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        if (registration.active) {
-          registration.active.postMessage({
-            type: "FORCE_DEV_LOOP_TRIGGER"
-          });
-          addLog("Loop triggered! Check your notifications.");
-        } else {
-          addLog("No active Service Worker available.");
-        }
-      } catch (err: any) {
-        addLog("SW loop dispatch failed: " + err.message);
-      }
-    } else {
-      addLog("Service workers are unsupported in this client environment.");
+      console.error("Permission Error: " + err.message);
     }
   };
 
@@ -159,7 +98,6 @@ export default function ShopPage() {
       const verifyData = await verifyRes.json();
 
       if (!verifyRes.ok || !verifyData.eligible) {
-        addLog("Security: Invalid claim attempt blocked.");
         setErrorDialog({ message: "Reward not available or already claimed." });
         // Clean URL params to prevent re-triggering
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -172,7 +110,6 @@ export default function ShopPage() {
         setShowAdModal(false);
         setHasDispatchedPush(false);
         window.history.replaceState({}, document.title, window.location.pathname);
-        addLog("Coins successfully credited! 🎉");
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, []);
@@ -182,11 +119,10 @@ export default function ShopPage() {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       if (res.ok) {
         setBonusClaimed(true);
-        addLog("Daily Bonus 150 Coins claimed directly! 💎");
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) {
-      addLog("Failed to claim Daily Bonus automatically.");
+      console.error("Failed to claim Daily Bonus automatically.");
     }
   };
 
@@ -195,7 +131,6 @@ export default function ShopPage() {
     setCountdown(10);
     setIsWaiting(true);
     setHasDispatchedPush(false);
-    addLog("Ad play started. Initializing background timer registration...");
 
     adService.current?.showAd(user?.email || "anon");
 
@@ -207,7 +142,6 @@ export default function ShopPage() {
           delay: 10000,
           url: window.location.origin + "/shop?ref=reward-claim"
         });
-        addLog("Background tracking registered.");
       }
     }
   };
@@ -217,13 +151,12 @@ export default function ShopPage() {
     setIsWaiting(false);
     targetTimeRef.current = null;
     setHasDispatchedPush(true);
-    addLog("Timer complete! Flagging ad as watched in database.");
     
     try {
       // API call to set pendingReward: true in database
       await fetch("/api/user/ad-complete", { method: "POST" });
     } catch (e) {
-      addLog("Failed to sync ad completion.");
+      console.error("Failed to sync ad completion.");
     }
   }, []);
 
@@ -253,7 +186,6 @@ export default function ShopPage() {
       } 
       else if (ref === "notif_flash") {
         setIsFlashSaleActive(true);
-        addLog("Flash Deal URL parameters loaded! Enjoy 50% off all packs! ⏳");
       } 
       else if (ref === "notif_bonus" && !bonusClaimed) {
         handleClaimDailyBonus();
@@ -295,7 +227,7 @@ export default function ShopPage() {
     if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
     if (r.includes("epic")) return { border: "border-purple-500/50", text: "text-purple-400", glow: "from-purple-500/20", shadow: "shadow-purple-500/10" };
     if (r.includes("rare")) return { border: "border-blue-500/50", text: "text-blue-400", glow: "from-blue-500/20", shadow: "shadow-blue-500/10" };
-    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-500/10" };
+    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-600/10" };
   };
 
   const currentTheme = getRarityStyles(wonItem?.rarity);
@@ -438,7 +370,6 @@ export default function ShopPage() {
             <button 
               onClick={() => {
                 setIsFlashSaleActive(false);
-                addLog("Flash sale deactivated.");
               }}
               className="text-xs text-zinc-400 hover:text-white uppercase font-bold tracking-widest bg-white/5 px-4 py-2 rounded-xl transition-all"
             >
@@ -535,66 +466,6 @@ export default function ShopPage() {
               </motion.div>
             );
           })}
-        </div>
-      </div>
-
-      {/* --- DEV TEST CENTER PANEL --- */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 flex justify-center pointer-events-none">
-        <div className="bg-[#121212] border border-red-500/30 rounded-t-3xl shadow-[0_-15px_30px_rgba(0,0,0,0.8)] w-full max-w-xl pointer-events-auto overflow-hidden transition-all duration-300">
-          <button 
-            onClick={() => setShowDevPanel(!showDevPanel)}
-            className="w-full px-6 py-3 bg-red-950/20 flex justify-between items-center text-xs font-mono font-bold tracking-wider text-red-400 hover:bg-red-950/45 transition-all border-b border-white/5"
-          >
-            <span>🛠️ DEV TEST CENTER</span>
-            <span>{showDevPanel ? "[ HIDE ]" : "[ EXPAND ]"}</span>
-          </button>
-          
-          <AnimatePresence>
-            {showDevPanel && (
-              <motion.div 
-                initial={{ height: 0 }} 
-                animate={{ height: "auto" }} 
-                exit={{ height: 0 }}
-                className="p-6 space-y-4"
-              >
-                <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    onClick={triggerInstantNotification}
-                    disabled={isTestingPush}
-                    className="py-3 px-4 bg-red-500 text-black text-xs font-bold font-mono rounded-xl hover:bg-red-400 disabled:opacity-50 transition-all uppercase"
-                  >
-                    {isTestingPush ? "Dispatching..." : "⚡ Test Push Now"}
-                  </button>
-                  <button 
-                    onClick={handleEnableNotifications}
-                    className="py-3 px-4 bg-zinc-800 text-white text-xs font-bold font-mono rounded-xl hover:bg-zinc-700 transition-all uppercase"
-                  >
-                    🔄 Re-Sync Token
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1">
-                  <button 
-                    onClick={triggerPeriodicSyncSimulation}
-                    className="py-3 px-4 bg-amber-500 text-black text-xs font-bold font-mono rounded-xl hover:bg-amber-400 transition-all uppercase"
-                  >
-                    ⏰ Simulate 2-4m Drop Loop
-                  </button>
-                </div>
-
-                <div className="p-3 bg-black rounded-xl border border-white/5">
-                  <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-mono mb-2">Live Debug Logs:</div>
-                  <div className="space-y-1.5 font-mono text-[11px] text-zinc-300 h-24 overflow-y-auto">
-                    {testLog.length === 0 ? (
-                      <span className="text-zinc-600">No events captured. Click an action to test.</span>
-                    ) : (
-                      testLog.map((log, idx) => <div key={idx} className="line-clamp-1">{log}</div>)
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
       
