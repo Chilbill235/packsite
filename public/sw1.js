@@ -1,18 +1,16 @@
 // --- LIFECYCLE HANDLERS ---
-// Forces the service worker to install and activate instantly, resolving the "not the client's active service worker" error.
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim()); // Takes control of open client pages immediately
+  event.waitUntil(clients.claim()); 
 });
 
 // --- CONSTANTS & CONFIGS ---
 const APP_ICON = '/images/cup.png';
-const APP_BADGE = '/images/apple-pay.png'; // Monochromatic status bar badge
+const APP_BADGE = '/images/apple-pay.png'; 
 
-// Pool of highly engaging, randomized shop-related notifications
 const CAMPAIGN_NOTIFICATION_POOL = [
   {
     title: "⚡ Flash Deal Active!",
@@ -40,23 +38,21 @@ const CAMPAIGN_NOTIFICATION_POOL = [
   }
 ];
 
-// Helper to select a random notification from our pool
 function getRandomNotification() {
   const randomIndex = Math.floor(Math.random() * CAMPAIGN_NOTIFICATION_POOL.length);
   return CAMPAIGN_NOTIFICATION_POOL[randomIndex];
 }
 
-// Helper to build robust, beautiful notification options
 function buildNotificationOptions(payload) {
   return {
     body: payload.body || "Tap to see what's new!",
     icon: APP_ICON,
     badge: APP_BADGE,
-    image: payload.image || '/images/banner.png', // Large hero card image
-    requireInteraction: true, // Forces modal sticky state on desktop/Android
-    vibrate: [200, 50, 100, 50, 200], // Premium triple-pulse vibration
-    tag: payload.tag || 'general-broadcast', // Replaces old notification of the same type
-    renotify: true, // Vibrates/alerts again even if tag matches
+    image: payload.image || '/images/banner.png', 
+    requireInteraction: true, 
+    vibrate: [200, 50, 100, 50, 200], 
+    tag: payload.tag || 'general-broadcast', 
+    renotify: true, 
     data: {
       url: payload.url || '/shop'
     },
@@ -80,7 +76,7 @@ self.addEventListener('push', function(event) {
     data = event.data ? event.data.json() : {};
   } catch (e) {
     console.warn("Could not parse JSON payload, falling back to random local campaign.", e);
-    data = getRandomNotification(); // Fallback to random interactive local alert if server push is empty
+    data = getRandomNotification(); 
   }
 
   const title = data.title || "Special Alert";
@@ -91,8 +87,28 @@ self.addEventListener('push', function(event) {
   );
 });
 
-// --- DYNAMIC LOCAL RUNTIME SCHEDULING (OPTIONAL BACKGROUND FLOWS) ---
-// Triggered on device background checks (periodic sync intervals)
+// --- BACKGROUND MESSAGING HANDLER FOR AD TIMER ---
+// This listens to the React page and sets a strictly isolated background timer.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'START_BACKGROUND_TIMER') {
+    const delayMs = event.data.delay || 10000;
+    
+    // Set a reliable timeout that executes even if the main site tab goes out of focus
+    setTimeout(() => {
+      self.registration.showNotification("Ad Completed! 🪙", {
+        body: "Your countdown is done! Tap here to return and claim your 500 coins.",
+        icon: APP_ICON,
+        badge: APP_BADGE,
+        tag: "reward-claim-ready",
+        renotify: true,
+        vibrate: [200, 100, 200],
+        data: { url: self.location.origin + "/shop" }
+      });
+    }, delayMs);
+  }
+});
+
+// --- DYNAMIC LOCAL RUNTIME SCHEDULING ---
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'random-shop-alert') {
     const randomCampaign = getRandomNotification();
@@ -111,26 +127,21 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'close') return;
 
-  // Grab the exact redirect URL from metadata properties
   const targetUrl = event.notification.data?.url || '/shop';
 
   event.waitUntil(
-    // CHANGED: includeUncontrolled set to true so backgrounded tabs/PWA shells are captured accurately
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // 1. Try to find an existing tab open on your site
       for (const client of clientList) {
         if ('focus' in client) {
           const clientUrl = new URL(client.url);
           const redirectUrl = new URL(targetUrl, self.location.origin);
           
           if (clientUrl.origin === redirectUrl.origin) {
-            // Navigate the open tab directly to the reward claim page and pull it into focus
             client.navigate(targetUrl);
             return client.focus();
           }
         }
       }
-      // 2. If no matching window is open at all, open a fresh window
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
