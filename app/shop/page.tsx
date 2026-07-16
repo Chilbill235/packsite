@@ -47,7 +47,8 @@ export default function ShopPage() {
         // Sends a signal to sw1.js to schedule a background-safe system notification
         registration.active.postMessage({
           type: "START_BACKGROUND_TIMER",
-          delay: msRemaining
+          delay: msRemaining,
+          url: window.location.href // 👈 Captured the full page URL with any ?ref= parameters
         });
       }
     } catch (err) {
