@@ -63,7 +63,7 @@ function buildNotificationOptions(payload) {
       },
       {
         action: 'close',
-        title: 'Dismiss',
+        title: '❌ Dismiss ❌',
       }
     ]
   };
