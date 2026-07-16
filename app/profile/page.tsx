@@ -10,7 +10,10 @@ type InventoryItem = { id: string; item: Item; };
 type Opening = { id: string; item: Item; createdAt: string; };
 
 export default function ProfilePage() {
-  const [loading, setLoading] = useState(true);
+  // Split loading states to prevent "Waterfall" blocking
+  const [loadingInventory, setLoadingInventory] = useState(true);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [openings, setOpenings] = useState<Opening[]>([]);
   const [tabs, setTabs] = useState<"overview" | "inventory" | "activity">("overview");
@@ -20,26 +23,29 @@ export default function ProfilePage() {
   const [filterRarity, setFilterRarity] = useState<"all" | Rarity>("all");
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; action: () => void; title: string; desc: string } | null>(null);
 
-  const loadData = useCallback(async () => {
+  // Separate fetch functions
+  const fetchInventory = useCallback(async () => {
     try {
-      setLoading(true);
-      const [invRes, openRes] = await Promise.all([
-        fetch("/api/inventory"),
-        fetch("/api/openings")
-      ]);
-      const invData = await invRes.json();
-      const openData = await openRes.json();
-      
-      setInventory(invData.inventory || []);
-      setOpenings(openData.openings || []);
-    } catch (e) { 
-      console.error(e); 
-    } finally { 
-      setLoading(false); 
-    }
+      const res = await fetch("/api/inventory");
+      const data = await res.json();
+      setInventory(data.inventory || []);
+    } catch (e) { console.error(e); } 
+    finally { setLoadingInventory(false); }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  const fetchOpenings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/openings");
+      const data = await res.json();
+      setOpenings(data.openings || []);
+    } catch (e) { console.error(e); } 
+    finally { setLoadingActivity(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchInventory();
+    fetchOpenings();
+  }, [fetchInventory, fetchOpenings]);
 
   const processedInventory = useMemo(() => {
     let result = [...inventory];
@@ -56,14 +62,10 @@ export default function ProfilePage() {
     try {
       const res = await fetch("/api/inventory/sell-all", { method: "POST" });
       if (res.ok) {
-        // 1. Refresh local data immediately
-        await loadData();
-        
-        // 2. Fetch latest profile to get current balance
+        await fetchInventory();
         const userRes = await fetch("/api/user/profile");
         const userData = await userRes.json();
         
-        // 3. Emit exact event name required by Navbar[cite: 1]
         window.dispatchEvent(new CustomEvent("balanceUpdated", { 
           detail: { balance: userData.balance } 
         }));
@@ -73,7 +75,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12">
-      {/* Modal */}
       <AnimatePresence>
         {confirmModal?.isOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -106,9 +107,18 @@ export default function ProfilePage() {
         {/* --- Overview --- */}
         {tabs === "overview" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl"><p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Total Opened</p><h2 className="text-5xl font-black">{openings.length}</h2></div>
-            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl"><p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Inventory Items</p><h2 className="text-5xl font-black">{inventory.length}</h2></div>
-            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl"><p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Net Value</p><h2 className="text-5xl font-black">{inventory.reduce((acc, curr) => acc + curr.item.value, 0).toLocaleString()}</h2></div>
+            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Total Opened</p>
+              <h2 className="text-5xl font-black">{loadingActivity ? "..." : openings.length}</h2>
+            </div>
+            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Inventory Items</p>
+              <h2 className="text-5xl font-black">{loadingInventory ? "..." : inventory.length}</h2>
+            </div>
+            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl">
+              <p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Net Value</p>
+              <h2 className="text-5xl font-black">{loadingInventory ? "..." : inventory.reduce((acc, curr) => acc + curr.item.value, 0).toLocaleString()}</h2>
+            </div>
           </div>
         )}
 
@@ -141,7 +151,9 @@ export default function ProfilePage() {
         {/* --- Activity --- */}
         {tabs === "activity" && (
           <div className="space-y-4">
-            {openings.length === 0 ? (
+            {loadingActivity ? (
+              <div className="text-center py-20 text-gray-500">Loading...</div>
+            ) : openings.length === 0 ? (
               <div className="text-center py-20 text-gray-500">No activity yet.</div>
             ) : (
               openings.map((op) => (
