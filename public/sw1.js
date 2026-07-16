@@ -91,21 +91,26 @@ self.addEventListener('push', function(event) {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'START_BACKGROUND_TIMER') {
     const delayMs = event.data.delay || 10000;
-    
-    // Safely capture the exact incoming URL (including '?ref=whatever') or fallback
     const targetUrl = event.data.url || (self.location.origin + "/shop");
     
-    setTimeout(() => {
-      self.registration.showNotification("Ad Completed! 🪙", {
-        body: "Your countdown is done! Tap here to return and claim your 500 coins.",
-        icon: APP_ICON,
-        badge: APP_BADGE,
-        tag: "reward-claim-ready",
-        renotify: true,
-        vibrate: [200, 100, 200],
-        data: { url: targetUrl } // Passes the exact URL (with query params) back to the click handler
-      });
-    }, delayMs);
+    // CRITICAL: Force the browser to keep the Service Worker alive for the full countdown duration
+    event.waitUntil(
+      new Promise((resolve) => {
+        setTimeout(() => {
+          self.registration.showNotification("Ad Completed! 🪙", {
+            body: "Your countdown is done! Tap here to return and claim your 500 coins.",
+            icon: APP_ICON,
+            badge: APP_BADGE,
+            tag: "reward-claim-ready",
+            renotify: true,
+            vibrate: [200, 100, 200],
+            data: { url: targetUrl }
+          })
+          .then(resolve)
+          .catch(resolve);
+        }, delayMs);
+      })
+    );
   }
 });
 
@@ -133,6 +138,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Look for any tab open on our origin
       for (const client of clientList) {
         if ('focus' in client) {
           const clientUrl = new URL(client.url);
@@ -144,6 +150,7 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       
+      // Open a brand new tab if none are open
       if (clients.openWindow) {
         return clients.openWindow(destinationUrl);
       }

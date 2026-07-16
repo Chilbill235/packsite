@@ -43,13 +43,18 @@ export default function ShopPage() {
     if (!('serviceWorker' in navigator)) return;
     try {
       const registration = await navigator.serviceWorker.ready;
+      const messagePayload = {
+        type: "START_BACKGROUND_TIMER",
+        delay: msRemaining,
+        url: window.location.href // Crucial: dynamically tracks current window query params
+      };
+
+      // Ensure compatibility with both active worker instances and runtime controller fallbacks
       if (registration.active) {
-        // Sends a signal to sw1.js to schedule a background-safe system notification
-        registration.active.postMessage({
-          type: "START_BACKGROUND_TIMER",
-          delay: msRemaining,
-          url: window.location.href // 👈 Captured the full page URL with any ?ref= parameters
-        });
+        registration.active.postMessage(messagePayload);
+      }
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage(messagePayload);
       }
     } catch (err) {
       console.warn("Failed to delegate background countdown to Service Worker:", err);
