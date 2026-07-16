@@ -17,23 +17,37 @@ export default function ShopPage() {
   const [showAdModal, setShowAdModal] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
-  // iOS/Safari standalone check states
   const [isStandalone, setIsStandalone] = useState(true);
   const [isIOS, setIsIOS] = useState(false);
   
-  // Bulk & Won Item States
   const [openQuantity, setOpenQuantity] = useState(1);
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
   
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
-  const [bonusClaimed, setBonusClaimed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const [showBanner, setShowBanner] = useState(true);
 
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
+
+  // --- Notification Router ---
+  const handleNotificationRouting = useCallback(async (ref: string) => {
+    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
+      setIsFlashSaleActive(true);
+    } else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
+      try {
+        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
+        await fetchUserData();
+      } catch (e) { console.error("Auto-claim failed"); }
+    } else if (["reward-claim", "vault-drop", "mystery-box", "surprise"].includes(ref)) {
+      setShowAdModal(true);
+      if (ref === "reward-claim") handleClaimReward();
+    } else if (["new-item", "best-seller", "refresh", "seasonal"].includes(ref)) {
+      loadShopData();
+    }
+  }, []);
 
   // --- Data Fetching ---
   const fetchUserData = useCallback(async () => {
@@ -99,7 +113,6 @@ export default function ShopPage() {
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok || !verifyData.eligible) {
         setErrorDialog({ message: "Reward not available or already claimed." });
-        window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
       const res = await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount }) });
@@ -108,21 +121,9 @@ export default function ShopPage() {
         setShowAdModal(false);
         setHasDispatchedPush(false);
         await fetchUserData();
-        window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, [fetchUserData]);
-
-  const handleClaimDailyBonus = async () => {
-    try {
-      const res = await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
-      if (res.ok) {
-        setBonusClaimed(true);
-        await fetchUserData();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    } catch (err) { console.error("Failed to claim Daily Bonus automatically."); }
-  };
 
   const handleWatchAdClick = async (amount: number) => {
     sessionStorage.setItem('pendingRewardAmount', amount.toString());
@@ -132,7 +133,6 @@ export default function ShopPage() {
     setHasDispatchedPush(false);
     adService.current?.showAd(user?.email || "anon");
 
-    // Send the start signal to the background service worker timer
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if (registration.active) {
@@ -153,7 +153,6 @@ export default function ShopPage() {
     try { await fetch("/api/user/ad-complete", { method: "POST" }); } catch (e) { console.error("Failed to sync ad completion."); }
   }, []);
 
-  // --- Pack Opening ---
   const handleOpenPack = async (packId: string) => {
     try {
       const res = await fetch("/api/packs/open", { 
@@ -173,7 +172,6 @@ export default function ShopPage() {
 
   // --- Effects ---
   useEffect(() => {
-    // 1. Detect device environments for proper Notification features
     if (typeof window !== "undefined") {
       const is_ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
       const is_standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
@@ -184,23 +182,20 @@ export default function ShopPage() {
       else setPermission(Notification.permission);
     }
 
-    // 2. Register sw1.js correctly
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw1.js")
-        .then((reg) => console.log("Service Worker registered on root scope: ", reg.scope))
+        .then((reg) => console.log("Service Worker registered: ", reg.scope))
         .catch((err) => console.error("Service Worker registration failed: ", err));
     }
 
     loadShopData();
     adService.current = new RewardedAdService();
     
-    // Service worker message listeners
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") handleTimerComplete();
     };
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
 
-    // Balance modal event triggers
     const openModal = () => { setHasDispatchedPush(false); setShowAdModal(true); };
     window.addEventListener("openBalanceModal", openModal);
 
@@ -214,12 +209,12 @@ export default function ShopPage() {
     if (!loading) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
-      if (ref === "reward-claim") { setShowAdModal(true); handleClaimReward(); }
-      else if (ref === "notif_flash") { setIsFlashSaleActive(true); }
-      else if (ref === "notif_bonus" && !bonusClaimed) { handleClaimDailyBonus(); }
-      else if (params.get("open-ad") === "true") { setShowAdModal(true); }
+      if (ref) {
+        handleNotificationRouting(ref);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
-  }, [loading, handleClaimReward, bonusClaimed]);
+  }, [loading, handleNotificationRouting]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -232,7 +227,6 @@ export default function ShopPage() {
     return () => clearInterval(intervalId);
   }, [isWaiting, handleTimerComplete]);
 
-  // --- Helpers ---
   const getRarityStyles = (rarity?: string) => {
     const r = rarity?.toLowerCase() || "common";
     if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
@@ -386,10 +380,13 @@ export default function ShopPage() {
             const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
             const totalCost = finalPrice * openQuantity;
             return (
-              <motion.div key={pack.id} className="w-full max-w-[320px] bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl relative overflow-hidden">
+              <motion.div 
+                key={pack.id} 
+                className="w-full max-w-[320px] bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl relative overflow-hidden flex flex-col items-center"
+              >
                 {isFlashSaleActive && <div className="absolute top-4 right-4 bg-red-500 text-black text-[10px] font-black px-2.5 py-1 rounded-full uppercase shadow-lg animate-pulse">-50%</div>}
                 <div className="text-4xl mb-6">🎁</div>
-                <h3 className="font-bold text-lg mb-4">{pack.name}</h3>
+                <h3 className="font-bold text-lg mb-4 text-center">{pack.name}</h3>
                 <button onClick={() => handleOpenPack(pack.id)} className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all">
                   OPEN {openQuantity} FOR {totalCost.toLocaleString()} COINS
                 </button>
