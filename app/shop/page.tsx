@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
@@ -46,10 +46,9 @@ export default function ShopPage() {
       const messagePayload = {
         type: "START_BACKGROUND_TIMER",
         delay: msRemaining,
-        url: window.location.href // Crucial: dynamically tracks current window query params
+        url: window.location.href
       };
 
-      // Ensure compatibility with both active worker instances and runtime controller fallbacks
       if (registration.active) {
         registration.active.postMessage(messagePayload);
       }
@@ -129,7 +128,8 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
-  const handleClaimReward = async () => {
+  // Wrapped in useCallback to prevent closure stale-state issues
+  const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
     try {
@@ -145,9 +145,8 @@ export default function ShopPage() {
     } catch (err) {
       setErrorDialog({ message: "Error claiming reward." });
     }
-  };
+  }, []);
 
-  // Helper to close modal and mark as "seen"
   const handleDismissSubscriptionModal = () => {
     setShowSubscriptionModal(false);
     localStorage.setItem("hasSeenSubscribedModal", "true");
@@ -159,7 +158,6 @@ export default function ShopPage() {
     setIsWaiting(true);
 
     if (isSubscribed) {
-      // ONLY show the modal if they haven't acknowledged/seen it once already
       const hasSeen = localStorage.getItem("hasSeenSubscribedModal");
       if (!hasSeen) {
         setShowSubscriptionModal(true);
@@ -168,9 +166,7 @@ export default function ShopPage() {
       await registerPushSubscription();
     }
 
-    // Tell the Service Worker to run a guaranteed 10s background clock right now
     await delegateCountdownToServiceWorker(10000);
-
     adService.current?.showAd(user?.email || "anon"); 
   };
 
@@ -189,12 +185,12 @@ export default function ShopPage() {
     loadShopData();
   }, []);
 
-  // --- LOCAL UI COUNTDOWN LOGIC ---
+  // --- LOCAL UI COUNTDOWN LOGIC (Using robust setInterval to prevent background freezes) ---
   useEffect(() => {
-    let animationFrameId: number;
+    if (!isWaiting) return;
 
-    const updateTimer = () => {
-      if (!isWaiting || !targetTimeRef.current) return;
+    const intervalId = setInterval(() => {
+      if (!targetTimeRef.current) return;
 
       const now = Date.now();
       const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
@@ -202,24 +198,17 @@ export default function ShopPage() {
       setCountdown(remainingSeconds);
 
       if (remainingSeconds <= 0) {
+        clearInterval(intervalId);
         handleClaimReward();
-      } else {
-        animationFrameId = requestAnimationFrame(updateTimer);
       }
-    };
+    }, 250); // Run more frequently than 1s to keep the countdown fluid
 
-    if (isWaiting) {
-      animationFrameId = requestAnimationFrame(updateTimer);
-    }
+    return () => clearInterval(intervalId);
+  }, [isWaiting, handleClaimReward]);
 
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [isWaiting]);
-
-  // Listen to visibility transitions
+  // --- BACKUP: IMMEDIATELY CLAIM IF RETURNING FROM BACKGROUND AFTER TIMER EXPIRED ---
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const checkTimerProgress = () => {
       if (document.visibilityState === "visible" && isWaiting && targetTimeRef.current) {
         const now = Date.now();
         const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
@@ -232,9 +221,14 @@ export default function ShopPage() {
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isWaiting]);
+    document.addEventListener("visibilitychange", checkTimerProgress);
+    window.addEventListener("focus", checkTimerProgress);
+
+    return () => {
+      document.removeEventListener("visibilitychange", checkTimerProgress);
+      window.removeEventListener("focus", checkTimerProgress);
+    };
+  }, [isWaiting, handleClaimReward]);
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
