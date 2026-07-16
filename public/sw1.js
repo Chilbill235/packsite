@@ -1,6 +1,6 @@
 /**
  * PWA Service Worker (sw1.js)
- * Classic JavaScript format to avoid browser module parsing errors.
+ * Full code: Includes all logic for periodic loops, push notifications, and dynamic ad timers.
  */
 
 // --- 1. LIFE-CYCLE EVENTS ---
@@ -11,7 +11,6 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     self.clients.claim().then(function() {
-      // Start background looping schedule when Service Worker is activated
       startPeriodicNotificationLoop();
     })
   );
@@ -38,7 +37,7 @@ var CAMPAIGN_POOL = [
     title: "🎁 Rare Vault Drop!",
     body: "The vault just refreshed! Tap here to see if you got a Legendary Drop. 🌟",
     tag: "vault-drop",
-    url: "/shop?ref=reward-claim" // Points to claiming trigger URL
+    url: "/shop?ref=reward-claim"
   }
 ];
 
@@ -46,7 +45,6 @@ var CAMPAIGN_POOL = [
 var loopTimeoutId = null;
 
 function getRandomIntervalMs() {
-  // Random time between 2 minutes (120,000ms) and 4 minutes (240,000ms)
   var min = 120000;
   var max = 240000;
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -54,20 +52,15 @@ function getRandomIntervalMs() {
 
 function startPeriodicNotificationLoop() {
   if (loopTimeoutId) clearTimeout(loopTimeoutId);
-
   var nextDelay = getRandomIntervalMs();
-  console.log("[SW Loop] Next notification scheduled in " + (nextDelay / 1000) + " seconds.");
-
   loopTimeoutId = setTimeout(function () {
     triggerPeriodicAlert();
-    // Recursively reschedule the next loop
     startPeriodicNotificationLoop();
   }, nextDelay);
 }
 
 function triggerPeriodicAlert() {
   var campaign = CAMPAIGN_POOL[Math.floor(Math.random() * CAMPAIGN_POOL.length)];
-  
   self.registration.showNotification(campaign.title, {
     body: campaign.body,
     icon: APP_ICON,
@@ -77,20 +70,12 @@ function triggerPeriodicAlert() {
     requireInteraction: true,
     vibrate: [200, 100, 200],
     data: { url: self.location.origin + campaign.url }
-  }).catch(function(err) {
-    console.error("[SW Loop] Failed to show periodic alert:", err);
-  });
+  }).catch(function(err) { console.error("[SW Loop] Failed to show periodic alert:", err); });
 }
 
-// Support for standard browser-triggered Periodic Background Sync
 self.addEventListener('periodicsync', function (event) {
   if (event.tag === 'periodic-drops') {
-    event.waitUntil(
-      new Promise(function(resolve) {
-        triggerPeriodicAlert();
-        resolve();
-      })
-    );
+    event.waitUntil(new Promise(function(resolve) { triggerPeriodicAlert(); resolve(); }));
   }
 });
 
@@ -98,45 +83,42 @@ self.addEventListener('periodicsync', function (event) {
 self.addEventListener('message', function (event) {
   if (!event.data) return;
 
-  // Manual developer command to trigger the 2-4 min loop immediately
   if (event.data.type === 'FORCE_DEV_LOOP_TRIGGER') {
     triggerPeriodicAlert();
-    startPeriodicNotificationLoop(); // Resets and continues the background loop
+    startPeriodicNotificationLoop();
   }
 
-  // Background timer logic sent from ShopPage (ad watched reward)
   if (event.data.type === 'START_BACKGROUND_TIMER') {
     var isSafari = /^((?!chrome|android).)*safari/i.test(self.navigator.userAgent);
-    if (isSafari) return; // Guard Safari background constraints
+    if (isSafari) return;
 
     var delayMs = event.data.delay || 10000;
     var targetUrl = event.data.url || (self.location.origin + "/shop");
+    // Dynamic amount handler
+    var amount = event.data.amount || 500; 
 
     event.waitUntil(
       new Promise(function (resolve) {
         setTimeout(function () {
-          
           self.registration.showNotification("Ad Completed! 🪙", {
-            body: "Your countdown is finished! Tap here to claim your 500 coins.",
+            body: "Your countdown is finished! Tap here to claim your " + amount + " coins.",
             icon: APP_ICON,
             badge: APP_BADGE,
             tag: "reward-claim-ready",
             renotify: true,
             requireInteraction: true,
             vibrate: [200, 100, 200],
-            data: { url: targetUrl }
+            data: { url: targetUrl, amount: amount }
           }).then(function() {
-            // Notify any open app windows simultaneously
             return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
           }).then(function(clientList) {
             for (var i = 0; i < clientList.length; i++) {
               if (clientList[i].focused) {
-                clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE' });
+                clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
               }
             }
             resolve();
           }).catch(resolve);
-
         }, delayMs);
       })
     );
@@ -169,7 +151,6 @@ self.addEventListener('push', function (event) {
 // --- 6. NOTIFICATION CLICK ROUTING ---
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-
   var targetUrl = event.notification.data ? event.notification.data.url : '/shop';
   var destinationUrl = new URL(targetUrl, self.location.origin).href;
 
@@ -179,8 +160,6 @@ self.addEventListener('notificationclick', function (event) {
         var client = clientList[i];
         if ('focus' in client && new URL(client.url).origin === self.location.origin) {
           client.navigate(destinationUrl);
-          
-          // Small safety delay to let the page settle before passing the claim trigger
           setTimeout(function () {
             client.postMessage({ type: 'BACKGROUND_TIMER_COMPLETE' });
           }, 800);

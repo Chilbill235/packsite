@@ -1,77 +1,49 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
+// --- Types ---
 type Rarity = "common" | "rare" | "epic" | "legendary";
-
-type Item = {
-  id: string;
-  name: string;
-  value: number;
-  rarity: Rarity;
-};
-
-type InventoryItem = {
-  id: string;
-  item: Item;
-};
+type Item = { id: string; name: string; value: number; rarity: Rarity; };
+type InventoryItem = { id: string; item: Item; };
+type Opening = { id: string; item: Item; createdAt: string; };
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  // --- State ---
-  const [user, setUser] = useState<any>(null);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [openings, setOpenings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [openings, setOpenings] = useState<Opening[]>([]);
   const [tabs, setTabs] = useState<"overview" | "inventory" | "activity">("overview");
-  
-  // --- Inventory Controls ---
+
+  // Functional States
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "name">("value-desc");
   const [filterRarity, setFilterRarity] = useState<"all" | Rarity>("all");
-  const [isSellingAll, setIsSellingAll] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; action: () => void; title: string; desc: string } | null>(null);
 
-  // --- Data Fetching ---
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        const [userRes, invRes, openRes] = await Promise.all([
-          fetch("/api/user/profile"),
-          fetch("/api/inventory"),
-          fetch("/api/openings")
-        ]);
-
-        if (userRes.status === 401) {
-          router.push(`/login?callbackUrl=${encodeURIComponent(pathname)}`);
-          return;
-        }
-
-        const invData = await invRes.json();
-        const userData = await userRes.json();
-        const openData = await openRes.json();
-
-        setUser(userData);
-        setInventory(invData.inventory || []); // Ensure array
-        setOpenings(openData.openings || []);
-      } catch (e) {
-        setError("Failed to load profile data.");
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [invRes, openRes] = await Promise.all([
+        fetch("/api/inventory"),
+        fetch("/api/openings")
+      ]);
+      const invData = await invRes.json();
+      const openData = await openRes.json();
+      
+      setInventory(invData.inventory || []);
+      setOpenings(openData.openings || []);
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setLoading(false); 
     }
-    loadData();
-  }, [router, pathname]);
+  }, []);
 
-  // --- Logic ---
+  useEffect(() => { loadData(); }, [loadData]);
+
   const processedInventory = useMemo(() => {
     let result = [...inventory];
-    if (filterRarity !== "all") {
-      result = result.filter((i) => i.item.rarity === filterRarity);
-    }
+    if (filterRarity !== "all") result = result.filter((i) => i.item.rarity === filterRarity);
     return result.sort((a, b) => {
       if (sortBy === "value-desc") return b.item.value - a.item.value;
       if (sortBy === "value-asc") return a.item.value - b.item.value;
@@ -79,100 +51,112 @@ export default function ProfilePage() {
     });
   }, [inventory, sortBy, filterRarity]);
 
-  const handleSellAll = async () => {
-    if (!confirm("Are you sure you want to sell ALL visible items?")) return;
-    setIsSellingAll(true);
+  const handleSellAllConfirmed = async () => {
+    setConfirmModal(null);
     try {
       const res = await fetch("/api/inventory/sell-all", { method: "POST" });
       if (res.ok) {
-        setInventory([]); // Clear display
-        alert("Inventory cleared!");
+        // 1. Refresh local data immediately
+        await loadData();
+        
+        // 2. Fetch latest profile to get current balance
+        const userRes = await fetch("/api/user/profile");
+        const userData = await userRes.json();
+        
+        // 3. Emit exact event name required by Navbar[cite: 1]
+        window.dispatchEvent(new CustomEvent("balanceUpdated", { 
+          detail: { balance: userData.balance } 
+        }));
       }
-    } catch (err) {
-      alert("Failed to sell all.");
-    } finally {
-      setIsSellingAll(false);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-black">Loading...</div>;
-
   return (
-    <div className="min-h-screen bg-black text-white p-6">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold">Welcome back, {user?.name || 'Explorer'}!</h1>
-      </header>
-
-      {/* --- Tabs --- */}
-      <div className="flex gap-4 mb-8 border-b border-gray-800 pb-2">
-        {(["overview", "inventory", "activity"] as const).map((t) => (
-          <button 
-            key={t} 
-            onClick={() => setTabs(t)} 
-            className={`capitalize pb-2 px-2 ${tabs === t ? "text-amber-400 border-b-2 border-amber-400" : "text-gray-500"}`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {/* --- Overview Tab --- */}
-      {tabs === "overview" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-            <h3 className="text-gray-400">Total Packs Opened</h3>
-            <p className="text-4xl font-bold">{openings.length}</p>
-          </div>
-          <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-            <h3 className="text-gray-400">Total Inventory Items</h3>
-            <p className="text-4xl font-bold">{inventory.length}</p>
-          </div>
-        </div>
-      )}
-
-      {/* --- Inventory Tab --- */}
-      {tabs === "inventory" && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap gap-4 bg-gray-900 p-4 rounded-xl border border-gray-800">
-            <select onChange={(e) => setFilterRarity(e.target.value as any)} className="bg-black p-2 rounded border border-gray-700">
-              <option value="all">All Rarity</option>
-              <option value="legendary">Legendary</option>
-              <option value="epic">Epic</option>
-              <option value="rare">Rare</option>
-            </select>
-            <select onChange={(e) => setSortBy(e.target.value as any)} className="bg-black p-2 rounded border border-gray-700">
-              <option value="value-desc">Highest Value</option>
-              <option value="value-asc">Lowest Value</option>
-              <option value="name">Name</option>
-            </select>
-            <button onClick={handleSellAll} className="ml-auto bg-red-900/50 hover:bg-red-800 px-4 py-2 rounded font-bold">
-              {isSellingAll ? "Selling..." : "Sell All Visible"}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {processedInventory.map((item) => (
-              <div key={item.id} className="bg-gray-900 p-4 rounded-xl border border-gray-800 hover:border-amber-500/50">
-                <div className="text-3xl mb-2 text-center">📦</div>
-                <h3 className="font-semibold text-sm truncate">{item.item.name}</h3>
-                <p className="text-amber-400 text-xs font-mono">{item.item.value.toLocaleString()} COINS</p>
+    <div className="min-h-screen bg-[#050505] text-white p-6 md:p-12">
+      {/* Modal */}
+      <AnimatePresence>
+        {confirmModal?.isOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div className="bg-[#111] border border-white/10 p-8 rounded-xl w-full max-w-sm">
+              <h3 className="text-xl font-bold mb-2">{confirmModal.title}</h3>
+              <p className="text-gray-400 mb-8">{confirmModal.desc}</p>
+              <div className="flex gap-4">
+                <button onClick={() => setConfirmModal(null)} className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition">Cancel</button>
+                <button onClick={confirmModal.action} className="flex-1 py-3 rounded-lg bg-red-600 hover:bg-red-500 transition font-bold">Confirm</button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* --- Activity Tab --- */}
-      {tabs === "activity" && (
-        <div className="space-y-2">
-          {openings.map((op, i) => (
-            <div key={i} className="bg-gray-900 p-4 rounded-lg flex justify-between">
-              <span>{op.item?.name}</span>
-              <span className="text-emerald-400">+{op.item?.value}</span>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-10">
+          <h1 className="text-5xl font-black mb-2">VAULT</h1>
+          <p className="text-gray-500">Your collection. Your legacy.</p>
+        </header>
+
+        <div className="flex gap-8 mb-10 border-b border-white/10 pb-4">
+          {["overview", "inventory", "activity"].map((t) => (
+            <button key={t} onClick={() => setTabs(t as any)} className={`capitalize font-bold text-sm tracking-widest transition ${tabs === t ? "text-white" : "text-gray-600 hover:text-white"}`}>
+              {t.toUpperCase()}
+            </button>
           ))}
         </div>
-      )}
+
+        {/* --- Overview --- */}
+        {tabs === "overview" && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl"><p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Total Opened</p><h2 className="text-5xl font-black">{openings.length}</h2></div>
+            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl"><p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Inventory Items</p><h2 className="text-5xl font-black">{inventory.length}</h2></div>
+            <div className="bg-[#0c0c0c] border border-white/5 p-8 rounded-xl"><p className="text-xs text-gray-500 uppercase tracking-widest mb-2">Net Value</p><h2 className="text-5xl font-black">{inventory.reduce((acc, curr) => acc + curr.item.value, 0).toLocaleString()}</h2></div>
+          </div>
+        )}
+
+        {/* --- Inventory --- */}
+        {tabs === "inventory" && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 bg-[#0c0c0c] p-4 rounded-xl border border-white/5">
+              <select onChange={(e) => setFilterRarity(e.target.value as any)} className="bg-black p-3 rounded-lg text-sm border border-white/10 outline-none">
+                <option value="all">All Rarities</option>
+                <option value="legendary">Legendary</option>
+                <option value="epic">Epic</option>
+              </select>
+              <select onChange={(e) => setSortBy(e.target.value as any)} className="bg-black p-3 rounded-lg text-sm border border-white/10 outline-none">
+                <option value="value-desc">Highest Value</option>
+              </select>
+              <button onClick={() => setConfirmModal({ isOpen: true, title: "Sell All", desc: "Sell all visible items?", action: handleSellAllConfirmed })} className="ml-auto px-6 py-3 rounded-lg bg-red-900/20 text-red-500 text-sm font-bold hover:bg-red-900/40 transition">Sell All Visible</button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              {processedInventory.map((item) => (
+                <div key={item.id} className="bg-[#0c0c0c] border border-white/5 p-6 rounded-xl">
+                  <div className="text-2xl mb-4">📦</div>
+                  <h3 className="font-bold text-sm truncate">{item.item.name}</h3>
+                  <p className="text-amber-500 text-xs font-bold">{item.item.value.toLocaleString()} COINS</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- Activity --- */}
+        {tabs === "activity" && (
+          <div className="space-y-4">
+            {openings.length === 0 ? (
+              <div className="text-center py-20 text-gray-500">No activity yet.</div>
+            ) : (
+              openings.map((op) => (
+                <div key={op.id} className="bg-[#0c0c0c] border border-white/5 p-6 rounded-xl flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold">{op.item?.name || "Unknown Item"}</h3>
+                    <p className="text-xs text-gray-500">{new Date(op.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <p className="text-green-500 font-bold">+{op.item?.value?.toLocaleString() || 0}</p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
