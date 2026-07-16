@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation"; // 1. Import Next.js pathname hook
 
-// 1. Define the correct TypeScript interface for the PWA install event
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: Array<string>;
   readonly userChoice: Promise<{
@@ -13,11 +13,18 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  const pathname = usePathname(); // 2. Get current path
   const [isIOS, setIsIOS] = useState(false);
   const [show, setShow] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
+    // 3. ONLY run this logic on the shop page
+    if (pathname !== "/shop") {
+      setShow(false);
+      return;
+    }
+
     // Check if already installed
     const isStandalone = 
       window.matchMedia('(display-mode: standalone)').matches || 
@@ -35,22 +42,23 @@ export default function InstallPrompt() {
 
     // Capture event (for Android/Chrome)
     const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
+      e.preventDefault(); // Prevents default browser banner so we can use ours
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    // Cast window to any to bypass TS window event maps, or use a custom listener
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt as any);
 
-    // FORCE SHOW: Show modal after 1 second
+    // Show modal after 1 second
     const timer = setTimeout(() => setShow(true), 1000);
 
-    // CLEANUP: Remove listeners AND clear the timeout
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt as any);
       clearTimeout(timer);
     };
-  }, []);
+  }, [pathname]); // 4. Run hook again if path changes
+
+  // If we aren't on the shop page, or the state is set to hide, render absolutely nothing
+  if (pathname !== "/shop" || !show) return null;
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -60,19 +68,15 @@ export default function InstallPrompt() {
         setShow(false);
       }
     } else {
-      // If no prompt event (like on iOS), explain manual installation
       alert('To install, tap the Share button 📤 and select "Add to Home Screen"');
     }
   };
 
   const handleDismiss = () => {
-    // Snooze for 10 minutes
-    const snoozeTime = Date.now() + 10 * 60 * 1000;
+    const snoozeTime = Date.now() + 10 * 60 * 1000; // 10 minutes
     localStorage.setItem("install_prompt_dismissed", snoozeTime.toString());
     setShow(false);
   };
-
-  if (!show) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
