@@ -51,7 +51,7 @@ export default function ShopPage() {
       if (status.state === 'granted') {
         // Register the background reminder task (runs roughly every 12 hours)
         await reg.periodicSync.register('random-shop-alert', {
-          minInterval: 12 * 60 * 60 * 1000, 
+          minInterval: 20 * 60 * 1000,
         });
         console.log("Successfully registered dynamic background notifications.");
       }
