@@ -29,6 +29,28 @@ export default function ShopPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // --- Register Background Periodic Reminders ---
+  async function registerPeriodicNotifications(registration: ServiceWorkerRegistration) {
+    if (!('periodicSync' in registration)) return;
+    
+    try {
+      const status = await navigator.permissions.query({
+        name: 'periodic-background-sync' as any,
+      });
+
+      if (status.state === 'granted') {
+        // Register the background reminder task (runs roughly every 12 hours)
+        await registration.periodicSync.register('random-shop-alert', {
+          minInterval: 12 * 60 * 60 * 1000, 
+        });
+        console.log("Successfully registered dynamic background notifications.");
+      }
+    } catch (err) {
+      console.warn("Periodic sync registry skipped (requires installed PWA to run):", err);
+    }
+  }
+
+  // --- Setup Main Push Subscription ---
   async function registerPushSubscription() {
     try {
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -59,6 +81,10 @@ export default function ShopPage() {
         headers: { 'Content-Type': 'application/json' }
       });
       console.log("Successfully subscribed");
+
+      // 4. Fire off dynamic background notification scheduling if supported
+      await registerPeriodicNotifications(registration);
+      
     } catch (err) {
       console.error("Push subscription failed:", err);
     }
@@ -93,9 +119,17 @@ export default function ShopPage() {
     }
   };
 
+  // Register SW and initialize components
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw1.js').catch(console.error);
+      navigator.serviceWorker.register('/sw1.js')
+        .then((reg) => {
+          // Attempt to register periodic tasks if notifications are already allowed
+          if (Notification.permission === 'granted') {
+            registerPeriodicNotifications(reg);
+          }
+        })
+        .catch(console.error);
     }
     adService.current = new RewardedAdService();
     loadShopData();
