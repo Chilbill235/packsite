@@ -13,6 +13,13 @@ function urlBase64ToUint8Array(base64String: string) {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+// 1. Define custom interface to make TypeScript compile the experimental API cleanly
+interface ExtendedServiceWorkerRegistration extends ServiceWorkerRegistration {
+  periodicSync?: {
+    register(tag: string, options?: { minInterval: number }): Promise<void>;
+  };
+}
+
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
   const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
@@ -31,7 +38,10 @@ export default function ShopPage() {
 
   // --- Register Background Periodic Reminders ---
   async function registerPeriodicNotifications(registration: ServiceWorkerRegistration) {
-    if (!('periodicSync' in registration)) return;
+    // 2. Cast registration to our extended interface so periodicSync is recognized
+    const reg = registration as ExtendedServiceWorkerRegistration;
+    
+    if (!reg.periodicSync) return;
     
     try {
       const status = await navigator.permissions.query({
@@ -40,7 +50,7 @@ export default function ShopPage() {
 
       if (status.state === 'granted') {
         // Register the background reminder task (runs roughly every 12 hours)
-        await registration.periodicSync.register('random-shop-alert', {
+        await reg.periodicSync.register('random-shop-alert', {
           minInterval: 12 * 60 * 60 * 1000, 
         });
         console.log("Successfully registered dynamic background notifications.");
