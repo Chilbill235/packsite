@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation"; // <-- Imported for navigation
 import Notification from "@/components/Notification";
 import ErrorDialog from "@/components/ErrorDialog";
 
@@ -12,6 +13,9 @@ type ProfileUser = {
 };
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const pathname = usePathname(); // Captures '/profile'
+
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [inventory, setInventory] = useState<any[]>([]);
   const [openings, setOpenings] = useState<any[]>([]);
@@ -57,6 +61,18 @@ export default function ProfilePage() {
           fetch("/api/openings")
         ]);
         
+        // --- AUTHENTICATION SHIELD ---
+        // If the server returns 401 Unauthorized, send the user to the login page.
+        // We append the current pathname ('/profile') as a callbackUrl query.
+        if (userRes.status === 401) {
+          router.push(`/login?callbackUrl=${encodeURIComponent(pathname)}`);
+          return;
+        }
+
+        if (!userRes.ok || !invRes.ok || !openRes.ok) {
+          throw new Error("Failed to retrieve user profile data.");
+        }
+
         const userData = await userRes.json();
         const invData = await invRes.json();
         const openData = await openRes.json();
@@ -71,7 +87,7 @@ export default function ProfilePage() {
       }
     }
     loadData();
-  }, []);
+  }, [router, pathname]);
 
   if (error) return <div className="min-h-screen flex items-center justify-center bg-black text-white p-6"><div className="text-center bg-gray-800/50 p-8 max-w-md w-full"><h2 className="text-xl font-bold mb-4">Error</h2><p>{error}</p><button onClick={() => window.location.reload()} className="mt-6 w-full bg-amber-600 py-2 rounded">Try Again</button></div></div>;
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-black"><div className="animate-spin h-8 w-8 border-4 border-amber-300 border-t-transparent rounded-full"></div></div>;
