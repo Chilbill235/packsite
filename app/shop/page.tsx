@@ -8,16 +8,22 @@ import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
-  const [user, setUser] = useState<{ balance: number; email?: string } | null>(null);
+  const [user, setUser] = useState<{ id?: string; balance: number; email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
-  const [wonItem, setWonItem] = useState<any>(null);
+  
+  // High-fidelity Reward Modal states
+  const [wonItem, setWonItem] = useState<{ name: string; rarity?: string; value?: number } | null>(null);
+  
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
-
-  // Track if they have successfully dispatched a push request so we can display instructions
   const [hasDispatchedPush, setHasDispatchedPush] = useState(false);
+
+  // --- Developer Test Center States ---
+  const [showDevPanel, setShowDevPanel] = useState(false);
+  const [testLog, setTestLog] = useState<string[]>([]);
+  const [isTestingPush, setIsTestingPush] = useState(false);
 
   // --- Notification State ---
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -25,7 +31,6 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
-  // Check current notification state on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       if (!("Notification" in window)) {
@@ -36,34 +41,29 @@ export default function ShopPage() {
     }
   }, []);
 
-  // Helper utility to convert base64 VAPID keys into Uint8Array
+  const addLog = (msg: string) => {
+    setTestLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 4)]);
+  };
+
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/\-/g, '+')
-      .replace(/_/g, '/');
-
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
     const rawData = window.atob(base64);
     const outputArray = new Uint8Array(rawData.length);
-
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);
     }
     return outputArray;
   };
 
-  // --- Notification Request Trigger ---
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) return;
-
     try {
       const result = await Notification.requestPermission();
       setPermission(result);
-
       if (result === "granted") {
         if ("serviceWorker" in navigator) {
           const registration = await navigator.serviceWorker.ready;
-          
           const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
           const convertedKey = urlBase64ToUint8Array(publicKey);
 
@@ -79,19 +79,64 @@ export default function ShopPage() {
           });
 
           if (response.ok) {
-            console.log("[Push Register] Notifications enabled and saved.");
+            addLog("Notification subscription synchronized to DB.");
           } else {
-            const errData = await response.json();
-            console.error("[Push Register Error]", errData);
+            addLog("Sync failed: " + response.statusText);
           }
         }
       }
-    } catch (err) {
-      console.error("[Push Register Error]", err);
+    } catch (err: any) {
+      addLog("Permission Error: " + err.message);
     }
   };
 
-  // --- Logic Helpers ---
+  // --- Dev Tools: Test Route Triggers ---
+  const triggerInstantNotification = async () => {
+    if (permission !== "granted") {
+      alert("Please request and allow notification permissions first!");
+      return;
+    }
+    setIsTestingPush(true);
+    addLog("Triggering immediate notification drop request...");
+    try {
+      const response = await fetch("/api/user/trigger-test-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await response.json();
+      if (response.ok) {
+        addLog("Test Push Sent! Check your device notifications.");
+      } else {
+        addLog(`Push Failed: ${data.error || 'Server Error'}`);
+      }
+    } catch (error: any) {
+      addLog(`Network Error: ${error.message}`);
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
+
+  // NEW: Triggers the background periodic sync/loop from the service worker immediately
+  const triggerPeriodicSyncSimulation = async () => {
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.active) {
+          registration.active.postMessage({
+            type: "FORCE_DEV_LOOP_TRIGGER"
+          });
+          addLog("Loop triggered! Check your notifications.");
+        } else {
+          addLog("No active Service Worker available.");
+        }
+      } catch (err: any) {
+        addLog("SW loop dispatch failed: " + err.message);
+      }
+    } else {
+      addLog("Service workers are unsupported in this client environment.");
+    }
+  };
+
   async function loadShopData() {
     try {
       const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
@@ -105,7 +150,6 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
-  // ONLY called when users click the actual notification URL (?ref=reward-claim)
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
@@ -117,11 +161,10 @@ export default function ShopPage() {
         document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setShowAdModal(false);
         setHasDispatchedPush(false);
-        
-        // Clean up URL parameters so they don't claim again on manual refreshes
         if (typeof window !== "undefined") {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
+        addLog("Coins successfully credited! 🎉");
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, []);
@@ -131,11 +174,10 @@ export default function ShopPage() {
     setCountdown(10);
     setIsWaiting(true);
     setHasDispatchedPush(false);
+    addLog("Ad play started. Initializing background timer registration...");
 
-    // 1. Fire up the monetization ad
     adService.current?.showAd(user?.email || "anon");
 
-    // 2. Alert the Service Worker to begin the background timer
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if (registration.active) {
@@ -144,48 +186,39 @@ export default function ShopPage() {
           delay: 10000,
           url: window.location.origin + "/shop?ref=reward-claim"
         });
+        addLog("Background tracking registered.");
       }
     }
   };
 
-  // Timer complete step (Runs when the client-side 10s timer ends)
   const handleTimerComplete = useCallback(() => {
     setIsWaiting(false);
     targetTimeRef.current = null;
-    setHasDispatchedPush(true); // Switches modal UI to say "Check your notifications!"
+    setHasDispatchedPush(true);
+    addLog("Timer complete! Push dispatched. Check system notifications.");
   }, []);
 
-  // Listen for messages directly from the Service Worker
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") {
-        // When the SW says the timer completed in the background, we do NOT claim here anymore.
-        // We let the SW dispatch the push notification!
         handleTimerComplete();
       }
     };
-
     navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
     return () => {
       navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
     };
   }, [handleTimerComplete]);
 
-  // --- Check parameters on load and apply visual delay ---
   useEffect(() => {
     if (typeof window !== "undefined" && !loading) {
       const params = new URLSearchParams(window.location.search);
-      
-      // They clicked the notification! Trigger claim now.
       if (params.get("ref") === "reward-claim") {
         setShowAdModal(true);
-        
         const claimTimeout = setTimeout(() => {
           handleClaimReward();
         }, 1200);
-
         return () => clearTimeout(claimTimeout);
       } else if (params.get("open-ad") === "true") {
         setShowAdModal(true);
@@ -193,7 +226,6 @@ export default function ShopPage() {
     }
   }, [loading, handleClaimReward]);
 
-  // --- Effects ---
   useEffect(() => {
     loadShopData();
     adService.current = new RewardedAdService();
@@ -220,45 +252,132 @@ export default function ShopPage() {
     };
   }, [isWaiting, handleTimerComplete]);
 
+  // Helper theme color selector for item rarities
+  const getRarityStyles = (rarity?: string) => {
+    const r = rarity?.toLowerCase() || "common";
+    if (r.includes("legend")) return { border: "border-yellow-500/50", text: "text-yellow-400", glow: "from-yellow-500/20", shadow: "shadow-yellow-500/10" };
+    if (r.includes("epic")) return { border: "border-purple-500/50", text: "text-purple-400", glow: "from-purple-500/20", shadow: "shadow-purple-500/10" };
+    if (r.includes("rare")) return { border: "border-blue-500/50", text: "text-blue-400", glow: "from-blue-500/20", shadow: "shadow-blue-500/10" };
+    return { border: "border-amber-600/50", text: "text-amber-500", glow: "from-amber-600/20", shadow: "shadow-amber-500/10" };
+  };
+
+  const currentTheme = getRarityStyles(wonItem?.rarity);
+
   if (loading) return <div className="min-h-screen bg-black" />;
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 md:p-12 font-sans">
+    <div className="min-h-screen bg-[#070707] text-white p-6 md:p-12 font-sans relative pb-32">
       
       {/* --- Ad Reward Modal --- */}
       <AnimatePresence>
         {showAdModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#111] border border-white/10 p-8 rounded-3xl w-full max-w-sm text-center">
-              
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, y: 15 }} animate={{ scale: 1, y: 0 }} className="bg-[#111] border border-white/10 p-8 rounded-3xl w-full max-w-sm text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-b from-amber-500/5 to-transparent pointer-events-none" />
               {!hasDispatchedPush ? (
                 <>
                   <h3 className="text-xl font-bold mb-6">Boost Your Balance</h3>
                   <button onClick={handleWatchAdClick} disabled={isWaiting} className={`w-full py-4 rounded-xl font-black transition-all ${isWaiting ? 'bg-white/5 text-gray-500' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
                     {isWaiting ? `WATCHING (${countdown}s)` : "WATCH AD FOR 500 COINS"}
                   </button>
-                  <button onClick={() => setShowAdModal(false)} className="mt-4 text-sm text-gray-500 hover:text-white">Cancel</button>
+                  <button onClick={() => setShowAdModal(false)} className="mt-4 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
                 </>
               ) : (
                 <>
-                  <div className="text-5xl mb-4">🔔</div>
+                  <div className="text-5xl mb-4 animate-bounce">🔔</div>
                   <h3 className="text-xl font-bold mb-2">Notification Sent!</h3>
                   <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your 500 coins!</p>
                   <button onClick={() => setShowAdModal(false)} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
                 </>
               )}
-              
             </motion.div>
           </motion.div>
         )}
 
-        {/* --- Pack Reveal Modal --- */}
+        {/* --- PREMIUM GAME REVEAL MODAL --- */}
         {wonItem && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl" onClick={() => setWonItem(null)}>
-            <motion.div initial={{ scale: 0.5, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} className="bg-gradient-to-b from-amber-500/20 to-transparent p-10 rounded-[3rem] border border-amber-500/30 text-center">
-              <div className="text-8xl mb-6">✨</div>
-              <h2 className="text-4xl font-black mb-2">YOU WON!</h2>
-              <p className="text-2xl text-amber-500 font-bold">{wonItem.name}</p>
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl"
+            onClick={() => setWonItem(null)}
+          >
+            {/* Spinning Light Ray Backdrop */}
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+              <div className="absolute w-[800px] h-[800px] bg-[radial-gradient(circle,rgba(245,158,11,0.15)_0%,transparent_60%)] animate-pulse" />
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 25, ease: "linear" }}
+                className="absolute w-[1000px] h-[1000px] opacity-15"
+                style={{
+                  backgroundImage: `repeating-conic-gradient(from 0deg, #fff 0deg, #fff 10deg, transparent 10deg, transparent 25deg)`
+                }}
+              />
+            </div>
+
+            {/* Sparkles Emitter Container */}
+            <div className="absolute pointer-events-none w-full h-full flex items-center justify-center">
+              {[...Array(12)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
+                  animate={{ 
+                    scale: [0.5, 1, 0], 
+                    x: Math.cos((i * 30 * Math.PI) / 180) * 160, 
+                    y: Math.sin((i * 30 * Math.PI) / 180) * 160,
+                    opacity: [1, 1, 0]
+                  }}
+                  transition={{ duration: 1.2, ease: "easeOut", repeat: Infinity, repeatDelay: 1 }}
+                  className="absolute w-2 h-2 rounded-full bg-amber-400"
+                />
+              ))}
+            </div>
+
+            {/* The Item Card Container */}
+            <motion.div 
+              initial={{ scale: 0.3, y: 100, rotate: -25 }} 
+              animate={{ scale: 1, y: 0, rotate: 0 }} 
+              exit={{ scale: 0.3, y: 100, rotate: 25 }}
+              transition={{ type: "spring", damping: 14, stiffness: 100 }}
+              className={`relative bg-gradient-to-b ${currentTheme.glow} to-black/95 border ${currentTheme.border} p-12 rounded-[2.5rem] text-center w-full max-w-sm cursor-pointer shadow-2xl ${currentTheme.shadow}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Corner Sci-fi Reticles */}
+              <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-white/20" />
+              <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-white/20" />
+              <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-white/20" />
+              <div className="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-white/20" />
+
+              <motion.div 
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 3, ease: "easeInOut", repeat: Infinity }}
+                className="text-8xl mb-8 filter drop-shadow-[0_15px_15px_rgba(245,158,11,0.3)] select-none"
+              >
+                ✨
+              </motion.div>
+
+              <p className="text-xs tracking-[0.3em] font-black uppercase text-white/40 mb-2">unlocked pack item</p>
+              <h2 className="text-4xl font-extrabold mb-3 tracking-tight text-white uppercase">YOU WON!</h2>
+              
+              <div className="inline-block px-4 py-1.5 bg-white/5 rounded-full border border-white/10 mb-6">
+                <span className={`text-xs font-black uppercase tracking-widest ${currentTheme.text}`}>
+                  {wonItem.rarity || "COMMON"}
+                </span>
+              </div>
+
+              <p className="text-2xl font-black text-white px-2 tracking-tight line-clamp-2 min-h-[4rem] flex items-center justify-center">
+                {wonItem.name}
+              </p>
+
+              <div className="h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent my-6" />
+
+              <button 
+                onClick={() => setWonItem(null)} 
+                className={`w-full py-4 bg-white text-black hover:bg-gray-100 rounded-2xl font-black text-sm uppercase tracking-wider transition-all duration-300 shadow-lg`}
+              >
+                Claim Item
+              </button>
             </motion.div>
           </motion.div>
         )}
@@ -296,13 +415,17 @@ export default function ShopPage() {
         <h1 className="text-4xl font-black mb-12 tracking-tighter">VAULT</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packs.map((pack) => (
-            <motion.div whileHover={{ y: -5 }} key={pack.id} className="bg-[#0a0a0a] border border-white/5 p-8 rounded-3xl hover:border-amber-500/30 transition-all">
+            <motion.div whileHover={{ y: -5 }} key={pack.id} className="bg-[#0c0c0c] border border-white/5 p-8 rounded-3xl hover:border-amber-500/30 transition-all">
               <div className="text-4xl mb-6">🎁</div>
               <h3 className="font-bold text-lg mb-1">{pack.name}</h3>
               <p className="text-gray-500 text-sm mb-8">Unlock rare items from this tier.</p>
               <button 
                 onClick={async () => {
-                  const res = await fetch("/api/packs/open", { method: "POST", body: JSON.stringify({ packId: pack.id }), headers: {"Content-Type": "application/json"} });
+                  const res = await fetch("/api/packs/open", { 
+                    method: "POST", 
+                    body: JSON.stringify({ packId: pack.id }), 
+                    headers: {"Content-Type": "application/json"} 
+                  });
                   const data = await res.json();
                   if (res.ok) {
                     setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
@@ -316,6 +439,67 @@ export default function ShopPage() {
               </button>
             </motion.div>
           ))}
+        </div>
+      </div>
+
+      {/* --- DEV TEST CENTER PANEL (COLLAPSIBLE) --- */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 flex justify-center pointer-events-none">
+        <div className="bg-[#121212] border border-red-500/30 rounded-t-3xl shadow-[0_-15px_30px_rgba(0,0,0,0.8)] w-full max-w-xl pointer-events-auto overflow-hidden transition-all duration-300">
+          <button 
+            onClick={() => setShowDevPanel(!showDevPanel)}
+            className="w-full px-6 py-3 bg-red-950/20 flex justify-between items-center text-xs font-mono font-bold tracking-wider text-red-400 hover:bg-red-950/45 transition-all border-b border-white/5"
+          >
+            <span>🛠️ DEV TEST CENTER</span>
+            <span>{showDevPanel ? "[ HIDE ]" : "[ EXPAND ]"}</span>
+          </button>
+          
+          <AnimatePresence>
+            {showDevPanel && (
+              <motion.div 
+                initial={{ height: 0 }} 
+                animate={{ height: "auto" }} 
+                exit={{ height: 0 }}
+                className="p-6 space-y-4"
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={triggerInstantNotification}
+                    disabled={isTestingPush}
+                    className="py-3 px-4 bg-red-500 text-black text-xs font-bold font-mono rounded-xl hover:bg-red-400 disabled:opacity-50 transition-all uppercase"
+                  >
+                    {isTestingPush ? "Dispatching..." : "⚡ Test Push Now"}
+                  </button>
+                  <button 
+                    onClick={handleEnableNotifications}
+                    className="py-3 px-4 bg-zinc-800 text-white text-xs font-bold font-mono rounded-xl hover:bg-zinc-700 transition-all uppercase"
+                  >
+                    🔄 Re-Sync Token
+                  </button>
+                </div>
+
+                {/* Simulated Background Loop Grid Addition */}
+                <div className="grid grid-cols-1">
+                  <button 
+                    onClick={triggerPeriodicSyncSimulation}
+                    className="py-3 px-4 bg-amber-500 text-black text-xs font-bold font-mono rounded-xl hover:bg-amber-400 transition-all uppercase"
+                  >
+                    ⏰ Simulate 2-4m Drop Loop
+                  </button>
+                </div>
+
+                <div className="p-3 bg-black rounded-xl border border-white/5">
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-mono mb-2">Live Debug Logs:</div>
+                  <div className="space-y-1.5 font-mono text-[11px] text-zinc-300 h-24 overflow-y-auto">
+                    {testLog.length === 0 ? (
+                      <span className="text-zinc-600">No events captured. Click an action to test.</span>
+                    ) : (
+                      testLog.map((log, idx) => <div key={idx} className="line-clamp-1">{log}</div>)
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
       

@@ -1,8 +1,24 @@
-// app/lib/auth.ts (or auth.ts in your project root)
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import CredentialsProvider from "next-auth/providers/credentials";
+
+// Extend Next-Auth's default types to include user.id and customized fields
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      username?: string | null;
+    };
+  }
+
+  interface User {
+    id?: string;
+    email?: string | null;
+    username?: string | null;
+  }
+}
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -25,8 +41,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
         if (!user) return null;
 
-        // Add your password validation logic here (e.g., bcrypt.compare)
-        // For security, never return the plain password hash
+        // NOTE: Securely compare your password here:
+        // const isValid = await bcrypt.compare(credentials.password as string, user.passwordHash);
+        // if (!isValid) return null;
+
         return {
           id: user.id,
           email: user.email,
