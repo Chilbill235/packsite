@@ -69,7 +69,7 @@ function buildNotificationOptions(payload) {
   };
 }
 
-// --- PUSH EVENT LISTENER (SERVER-TRIGGERED) ---
+// --- PUSH EVENT LISTENER (SERVER-TRIGGERED FOR SAFARI & STANDALONE PUSH) ---
 self.addEventListener('push', function(event) {
   let data = {};
   try {
@@ -79,50 +79,67 @@ self.addEventListener('push', function(event) {
     data = getRandomNotification(); 
   }
 
-  const title = data.title || "Special Alert";
-  const options = buildNotificationOptions(data);
+  // Check if this push event is the ad completion trigger (from server API)
+  const isAdCompleted = data.tag === "reward-claim-ready" || data.isAdTimer;
+
+  const title = data.title || (isAdCompleted ? "Ad Completed! 🪙" : "Special Alert");
+  
+  const options = {
+    body: data.body || (isAdCompleted ? "Your countdown is done! Tap here to return and claim your 500 coins." : "Tap to open!"),
+    icon: APP_ICON,
+    badge: APP_BADGE,
+    image: isAdCompleted ? null : (data.image || '/images/banner.png'), 
+    requireInteraction: true, // <-- STICKY: Remains on screen on iOS Safari and Android
+    vibrate: [200, 100, 200], 
+    tag: data.tag || (isAdCompleted ? 'reward-claim-ready' : 'general-broadcast'), 
+    renotify: true, 
+    data: {
+      url: data.url || '/shop'
+    }
+  };
 
   event.waitUntil(
     self.registration.showNotification(title, options)
   );
 });
 
-// --- BACKGROUND MESSAGING HANDLER FOR AD TIMER ---
+// --- BACKGROUND MESSAGING HANDLER (LOCAL TIMER FALLBACK FOR NON-SAFARI BROWSERS) ---
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'START_BACKGROUND_TIMER') {
+    // Detect Safari inside the worker environment
+    const isSafari = /^((?!chrome|android).)*safari/i.test(self.navigator.userAgent);
+    
+    // Safari handles timers via backend Push API because iOS aggressively pauses SW background threads.
+    if (isSafari) return; 
+
     const delayMs = event.data.delay || 10000;
     const targetUrl = event.data.url || (self.location.origin + "/shop");
     
-    // CRITICAL: Force the browser to keep the Service Worker alive for the full countdown duration
     event.waitUntil(
       new Promise((resolve) => {
         setTimeout(async () => {
           try {
-            // GRACE PERIOD: Wait an extra 3 seconds (3000ms) after the timer ends.
-            // This gives the React app's local code plenty of time to claim the coins,
-            // fire the "🎉 500 coins added!" toast, and lets the transitions settle.
+            // GRACE PERIOD: Allow client code to auto-claim first if user is actively on-page
             await new Promise(r => setTimeout(r, 3000));
 
-            // Check if any client tab of this origin is currently focused
+            // Check if any client tab is currently active/focused
             const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
             const isAnyClientFocused = clientList.some(client => client.focused);
 
-            // If they focused back on the tab during or right after the timer,
-            // we do NOT trigger the duplicate browser push notification.
+            // Do not fire a notification if they have already returned to the active page
             if (isAnyClientFocused) {
               resolve();
               return;
             }
 
-            // Otherwise, they are still away, so we safely notify them!
-            // requireInteraction: true keeps it active on screen until they tap it.
+            // Fire sticky persistent notification
             await self.registration.showNotification("Ad Completed! 🪙", {
               body: "Your countdown is done! Tap here to return and claim your 500 coins.",
               icon: APP_ICON,
               badge: APP_BADGE,
               tag: "reward-claim-ready",
               renotify: true,
-              requireInteraction: true, // <-- PERSISTENT STATE: Will not auto-dismiss
+              requireInteraction: true, // <-- STICKY: Will not dismiss until clicked
               vibrate: [200, 100, 200],
               data: { url: targetUrl }
             });
@@ -161,7 +178,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Look for any tab open on our origin
+      // Look for any tab open on our origin and focus it
       for (const client of clientList) {
         if ('focus' in client) {
           const clientUrl = new URL(client.url);
@@ -173,7 +190,7 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       
-      // Open a brand new tab if none are open
+      // Open a brand new tab if none are active
       if (clients.openWindow) {
         return clients.openWindow(destinationUrl);
       }

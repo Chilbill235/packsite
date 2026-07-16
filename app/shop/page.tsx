@@ -38,25 +38,53 @@ export default function ShopPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // --- Hand off countdown to the Service Worker ---
+  // --- Hand off countdown to the Server (Safari Fix) or local Service Worker (Others) ---
   const delegateCountdownToServiceWorker = async (msRemaining: number) => {
     if (!('serviceWorker' in navigator)) return;
     try {
       const registration = await navigator.serviceWorker.ready;
-      const messagePayload = {
-        type: "START_BACKGROUND_TIMER",
-        delay: msRemaining,
-        url: window.location.href
-      };
+      
+      // Check if browser is Safari (including iOS mobile Safari)
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-      if (registration.active) {
-        registration.active.postMessage(messagePayload);
-      }
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage(messagePayload);
+      if (isSafari) {
+        // Retrieve current active Push subscription
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          console.warn("No active push subscription found to schedule Safari background reward notification.");
+          return;
+        }
+
+        // Delegate the delay to the backend server to bypass Apple's background thread restrictions
+        await fetch('/api/user/schedule-timer-push', {
+          method: 'POST',
+          body: JSON.stringify({
+            subscription,
+            delayMs: msRemaining,
+            title: "Ad Completed! 🪙",
+            body: "Your countdown is done! Tap here to return and claim your 500 coins.",
+            tag: "reward-claim-ready",
+            url: window.location.href
+          }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } else {
+        // Fallback for non-Safari browsers (Chrome, Firefox, Android Native) using a worker message timer
+        const messagePayload = {
+          type: "START_BACKGROUND_TIMER",
+          delay: msRemaining,
+          url: window.location.href
+        };
+
+        if (registration.active) {
+          registration.active.postMessage(messagePayload);
+        }
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage(messagePayload);
+        }
       }
     } catch (err) {
-      console.warn("Failed to delegate background countdown to Service Worker:", err);
+      console.warn("Failed to delegate background countdown:", err);
     }
   };
 
@@ -191,7 +219,7 @@ export default function ShopPage() {
     const intervalId = setInterval(() => {
       if (!targetTimeRef.current) return;
 
-      // SAFETY SHIELD: Do not run any logic or auto-claims if the tab is hidden!
+      // SAFETY SHIELD: Do not run any local logic or auto-claims if the tab is hidden!
       if (document.visibilityState !== "visible") {
         return; 
       }
