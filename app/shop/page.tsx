@@ -8,7 +8,7 @@ import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
-  const [user, setUser] = useState<{ id?: string; balance: number; email?: string } | null>(null);
+  const [user, setUser] = useState<{ id?: string; email?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
@@ -143,7 +143,6 @@ export default function ShopPage() {
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
-        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: userData.balance, bubbles: true }));
       }
       if (packRes.ok) setPacks(await packRes.json());
     } catch (err) { console.error(err); } 
@@ -169,10 +168,7 @@ export default function ShopPage() {
 
       // 2. Process Reward
       const res = await fetch("/api/user/add-coins", { method: "POST" });
-      const data = await res.json();
       if (res.ok) {
-        setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
-        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setShowAdModal(false);
         setHasDispatchedPush(false);
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -184,10 +180,7 @@ export default function ShopPage() {
   const handleClaimDailyBonus = async () => {
     try {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
-      const data = await res.json();
       if (res.ok) {
-        setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
-        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
         setBonusClaimed(true);
         addLog("Daily Bonus 150 Coins claimed directly! 💎");
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -527,8 +520,6 @@ export default function ShopPage() {
                     });
                     const data = await res.json();
                     if (res.ok) {
-                      setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
-                      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
                       setWonItem(data.wonItem);
                     }
                   }}
