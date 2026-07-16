@@ -1,6 +1,16 @@
+// --- LIFECYCLE HANDLERS ---
+// Forces the service worker to install and activate instantly, resolving the "not the client's active service worker" error.
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim()); // Takes control of open client pages immediately
+});
+
 // --- CONSTANTS & CONFIGS ---
 const APP_ICON = '/images/cup.png';
-const APP_BADGE = '/images/apple-pay.png'; // Ideal for android status bars
+const APP_BADGE = '/images/apple-pay.png'; // Monochromatic status bar badge
 
 // Pool of highly engaging, randomized shop-related notifications
 const CAMPAIGN_NOTIFICATION_POOL = [
@@ -70,7 +80,7 @@ self.addEventListener('push', function(event) {
     data = event.data ? event.data.json() : {};
   } catch (e) {
     console.warn("Could not parse JSON payload, falling back to random local campaign.", e);
-    data = getRandomNotification(); // Fallback to random interactive local alert if server push empty
+    data = getRandomNotification(); // Fallback to random interactive local alert if server push is empty
   }
 
   const title = data.title || "Special Alert";
@@ -82,7 +92,7 @@ self.addEventListener('push', function(event) {
 });
 
 // --- DYNAMIC LOCAL RUNTIME SCHEDULING (OPTIONAL BACKGROUND FLOWS) ---
-// When the app goes to sleep or background checks sync, trigger randomized notifications.
+// Triggered on device background checks (periodic sync intervals)
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'random-shop-alert') {
     const randomCampaign = getRandomNotification();
@@ -105,21 +115,21 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = event.notification.data?.url || '/shop';
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // 1. Try to find a tab that is already open to our domain
+    clients.matchAll({ type: 'window', includeUncontrolled: false }).then((clientList) => {
+      // 1. Try to find a tab that is controlled and active on our host domain
       for (const client of clientList) {
         if ('focus' in client) {
-          // If the page matches or is already on our host, focus it and redirect
           const clientUrl = new URL(client.url);
           const redirectUrl = new URL(targetUrl, self.location.origin);
           
           if (clientUrl.origin === redirectUrl.origin) {
-            client.navigate(targetUrl); // Redirect existing tab directly to /shop
+            // Direct redirect inside client tab safely
+            client.navigate(targetUrl);
             return client.focus();
           }
         }
       }
-      // 2. If no matching window is open, open a brand new tab to the route
+      // 2. If no matching window is open, open a fresh window
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
