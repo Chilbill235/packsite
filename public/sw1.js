@@ -1,6 +1,7 @@
 /**
  * PWA Service Worker (sw1.js)
  * Full code: Includes all logic for periodic loops, push notifications, and dynamic ad timers.
+ * Fully compatible with iOS, Safari, Chrome, and desktop platforms.
  */
 
 // --- 1. LIFE-CYCLE EVENTS ---
@@ -45,8 +46,8 @@ var CAMPAIGN_POOL = [
 var loopTimeoutId = null;
 
 function getRandomIntervalMs() {
-  var min = 120000;
-  var max = 240000;
+  var min = 120000;  // 2 minutes
+  var max = 240000;  // 4 minutes
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -73,6 +74,7 @@ function triggerPeriodicAlert() {
   }).catch(function(err) { console.error("[SW Loop] Failed to show periodic alert:", err); });
 }
 
+// Support for browsers that run PeriodicSync API (e.g. Chrome, Edge)
 self.addEventListener('periodicsync', function (event) {
   if (event.tag === 'periodic-drops') {
     event.waitUntil(new Promise(function(resolve) { triggerPeriodicAlert(); resolve(); }));
@@ -89,12 +91,10 @@ self.addEventListener('message', function (event) {
   }
 
   if (event.data.type === 'START_BACKGROUND_TIMER') {
-    var isSafari = /^((?!chrome|android).)*safari/i.test(self.navigator.userAgent);
-    if (isSafari) return;
+    // Safari block was removed here to allow iOS PWA support
 
     var delayMs = event.data.delay || 10000;
     var targetUrl = event.data.url || (self.location.origin + "/shop");
-    // Dynamic amount handler
     var amount = event.data.amount || 500; 
 
     event.waitUntil(
@@ -113,9 +113,8 @@ self.addEventListener('message', function (event) {
             return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
           }).then(function(clientList) {
             for (var i = 0; i < clientList.length; i++) {
-              if (clientList[i].focused) {
-                clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
-              }
+              // iOS compatibility: match focused tabs or open ones and send complete signal
+              clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
             }
             resolve();
           }).catch(resolve);

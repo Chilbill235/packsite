@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X, ChevronDown } from "lucide-react";
+import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
@@ -16,6 +16,10 @@ export default function ShopPage() {
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // iOS/Safari standalone check states
+  const [isStandalone, setIsStandalone] = useState(true);
+  const [isIOS, setIsIOS] = useState(false);
   
   // Bulk & Won Item States
   const [openQuantity, setOpenQuantity] = useState(1);
@@ -127,10 +131,17 @@ export default function ShopPage() {
     setIsWaiting(true);
     setHasDispatchedPush(false);
     adService.current?.showAd(user?.email || "anon");
+
+    // Send the start signal to the background service worker timer
     if ("serviceWorker" in navigator) {
       const registration = await navigator.serviceWorker.ready;
       if (registration.active) {
-        registration.active.postMessage({ type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: window.location.origin + "/shop?ref=reward-claim" });
+        registration.active.postMessage({ 
+          type: "START_BACKGROUND_TIMER", 
+          delay: 10000, 
+          amount: amount, 
+          url: window.location.origin + "/shop?ref=reward-claim" 
+        });
       }
     }
   };
@@ -162,20 +173,34 @@ export default function ShopPage() {
 
   // --- Effects ---
   useEffect(() => {
+    // 1. Detect device environments for proper Notification features
     if (typeof window !== "undefined") {
+      const is_ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      const is_standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      setIsIOS(is_ios);
+      setIsStandalone(is_standalone);
+
       if (!("Notification" in window)) setPermission("unsupported");
       else setPermission(Notification.permission);
     }
+
+    // 2. Register sw1.js correctly
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw1.js")
+        .then((reg) => console.log("Service Worker registered on root scope: ", reg.scope))
+        .catch((err) => console.error("Service Worker registration failed: ", err));
+    }
+
     loadShopData();
     adService.current = new RewardedAdService();
     
-    // Service worker listeners
+    // Service worker message listeners
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") handleTimerComplete();
     };
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
 
-    // Balance modal listener
+    // Balance modal event triggers
     const openModal = () => { setHasDispatchedPush(false); setShowAdModal(true); };
     window.addEventListener("openBalanceModal", openModal);
 
@@ -221,7 +246,18 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-[#070707] text-white p-6 md:p-12 font-sans relative pb-32">
       
-      {/* Notifications Banner */}
+      {/* iOS Safari Standalone Guide Banner */}
+      {isIOS && !isStandalone && (
+        <div className="mb-6 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+          <Smartphone className="text-amber-500 shrink-0" size={28} />
+          <div>
+            <h4 className="font-bold text-amber-500">Enable Safari Background Alerts</h4>
+            <p className="text-sm text-gray-300">Tap the <strong className="text-white">Share</strong> button in Safari, then choose <strong className="text-white">"Add to Home Screen"</strong> to receive background timer payouts and free drops!</p>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications Request Banner */}
       <AnimatePresence>
         {permission === "default" && showBanner && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="mb-12 relative overflow-hidden rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -282,7 +318,6 @@ export default function ShopPage() {
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
               <h2 className="text-center text-4xl font-black mb-12 uppercase tracking-widest text-white">You Won!</h2>
               
-              {/* Perfectly Centered Flex Container */}
               <div className="flex flex-wrap justify-center gap-4 w-full">
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
@@ -311,7 +346,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* Centered Wrapper for Main Content */}
+      {/* Main Content */}
       <div className="max-w-5xl mx-auto flex flex-col items-center w-full">
         <h1 className="text-4xl font-black mb-10 tracking-tighter text-center">VAULT</h1>
         
@@ -345,7 +380,7 @@ export default function ShopPage() {
           </AnimatePresence>
         </div>
         
-        {/* Pack Grid with Center Alignment */}
+        {/* Pack Grid */}
         <div className="flex flex-wrap justify-center gap-6 w-full max-w-5xl">
           {packs.map((pack) => {
             const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
