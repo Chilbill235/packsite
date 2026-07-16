@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X } from "lucide-react";
+import { Bell, X, ChevronDown } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
@@ -15,6 +15,7 @@ export default function ShopPage() {
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   // Bulk & Won Item States
   const [openQuantity, setOpenQuantity] = useState(1);
@@ -281,8 +282,8 @@ export default function ShopPage() {
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
               <h2 className="text-center text-4xl font-black mb-12 uppercase tracking-widest text-white">You Won!</h2>
               
-              {/* Force 3 Columns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full justify-items-center">
+              {/* Perfectly Centered Flex Container */}
+              <div className="flex flex-wrap justify-center gap-4 w-full">
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
                   return (
@@ -312,17 +313,40 @@ export default function ShopPage() {
 
       {/* Centered Wrapper for Main Content */}
       <div className="max-w-5xl mx-auto flex flex-col items-center w-full">
-        <h1 className="text-4xl font-black mb-2 tracking-tighter text-center">VAULT</h1>
+        <h1 className="text-4xl font-black mb-10 tracking-tighter text-center">VAULT</h1>
         
-        {/* Quantity Selector */}
-        <div className="flex gap-2 mb-10 bg-[#111] p-1.5 rounded-2xl w-fit border border-white/5">
-          {[1, 3, 6].map((q) => (
-            <button key={q} onClick={() => setOpenQuantity(q)} className={`px-6 py-2 rounded-xl font-bold transition-all ${openQuantity === q ? "bg-white text-black" : "text-zinc-500 hover:text-white"}`}>Open {q}</button>
-          ))}
+        {/* Quantity Dropdown */}
+        <div className="relative mb-12 z-20">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-4 bg-[#111] border border-white/10 px-6 py-3 rounded-2xl hover:bg-[#1a1a1a] transition-all min-w-[200px] justify-between group"
+          >
+            <span className="font-bold">Open {openQuantity} {openQuantity > 1 ? "Packs" : "Pack"}</span>
+            <ChevronDown className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} size={20} />
+          </button>
+          
+          <AnimatePresence>
+            {isDropdownOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                className="absolute top-full left-0 w-full mt-2 bg-[#161616] border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
+              >
+                {[1, 3, 6].map((q) => (
+                  <button 
+                    key={q} 
+                    onClick={() => { setOpenQuantity(q); setIsDropdownOpen(false); }}
+                    className={`w-full px-6 py-4 text-left font-bold transition-all hover:bg-white/5 ${openQuantity === q ? "text-amber-500 bg-white/5" : "text-white"}`}
+                  >
+                    Open {q} {q > 1 ? "Packs" : "Pack"}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         
         {/* Pack Grid with Center Alignment */}
-        <div className="flex flex-wrap justify-center gap-6 w-full">
+        <div className="flex flex-wrap justify-center gap-6 w-full max-w-5xl">
           {packs.map((pack) => {
             const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
             const totalCost = finalPrice * openQuantity;
