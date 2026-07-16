@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth'; // Imports the unified Next-Auth v5 helper
-
-// Initialize VAPID details for web-push
-webpush.setVapidDetails(
-  `mailto:${process.env.WEB_PUSH_EMAIL || 'admin@packsite.com'}`,
-  process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY!,
-  process.env.WEB_PUSH_PRIVATE_KEY!
-);
+import { auth } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
-    // 1. Authenticate using Next-Auth v5's universal auth() helper
+    // 1. Authenticate using Next-Auth v5
     const session = await auth(); 
     
     if (!session || !session.user || !session.user.id) {
@@ -21,8 +14,28 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
 
-    // 2. Fetch the user's active push subscriptions from Prisma
-    const userSubscriptions = await prisma.pushSubscription.findMany({
+    // 2. Safely capture your environment variables
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    const subject = process.env.VAPID_SUBJECT || 'mailto:admin@packsite.com';
+
+    // Guardrail: Provide clean logs if keys are missing from .env
+    if (!publicKey || !privateKey) {
+      console.error("❌ [VAPID ERROR] Missing keys in environment variables!");
+      console.error(`- VAPID_PUBLIC_KEY: ${publicKey ? '✅ Detected' : '❌ MISSING'}`);
+      console.error(`- VAPID_PRIVATE_KEY: ${privateKey ? '✅ Detected' : '❌ MISSING'}`);
+      
+      return NextResponse.json(
+        { error: 'VAPID Keys are missing from server configuration.' },
+        { status: 500 }
+      );
+    }
+
+    // 3. Set VAPID details on-demand
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+
+    // 4. Fetch the user's active push subscriptions using your correct model "subscription"
+    const userSubscriptions = await prisma.subscription.findMany({
       where: { userId },
     });
 
@@ -33,7 +46,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Define the push payload
+    // 5. Define the push payload
     const notificationPayload = JSON.stringify({
       title: 'PackSite Test Alert! 📦',
       body: 'This is an instant test push notification. Your service worker is receiving pushes correctly!',
@@ -44,22 +57,30 @@ export async function POST(req: Request) {
       },
     });
 
-    // 4. Dispatch the test notifications
+    // 6. Dispatch the test notifications
     const pushPromises = userSubscriptions.map(async (sub) => {
+      // Safely typecast and parse subscription details from your dynamic Json "data" field
+      const subscriptionData = sub.data as any;
+
+      if (!subscriptionData || !subscriptionData.endpoint || !subscriptionData.keys) {
+        console.warn(`Skipping invalid subscription format for subscription ID: ${sub.id}`);
+        return;
+      }
+
       const pushConfig = {
-        endpoint: sub.endpoint,
+        endpoint: subscriptionData.endpoint,
         keys: {
-          p256dh: sub.p256dh,
-          auth: sub.auth,
+          p256dh: subscriptionData.keys.p256dh,
+          auth: subscriptionData.keys.auth,
         },
       };
 
       try {
         await webpush.sendNotification(pushConfig, notificationPayload);
       } catch (error: any) {
-        // Automatically clean up expired or revoked browser subscriptions (410 Gone / 404 Not Found)
+        // Automatically prune expired or revoked browser subscriptions (410 Gone / 404 Not Found)
         if (error.statusCode === 410 || error.statusCode === 404) {
-          await prisma.pushSubscription.delete({
+          await prisma.subscription.delete({
             where: { id: sub.id },
           });
         }
@@ -67,7 +88,6 @@ export async function POST(req: Request) {
       }
     });
 
-    // Run dispatch operations concurrently
     await Promise.allSettled(pushPromises);
 
     return NextResponse.json({ success: true, message: 'Test alert triggered successfully!' });
