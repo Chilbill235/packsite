@@ -88,12 +88,13 @@ self.addEventListener('push', function(event) {
 });
 
 // --- BACKGROUND MESSAGING HANDLER FOR AD TIMER ---
-// This listens to the React page and sets a strictly isolated background timer.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'START_BACKGROUND_TIMER') {
     const delayMs = event.data.delay || 10000;
     
-    // Set a reliable timeout that executes even if the main site tab goes out of focus
+    // Safely capture the exact incoming URL (including '?ref=whatever') or fallback
+    const targetUrl = event.data.url || (self.location.origin + "/shop");
+    
     setTimeout(() => {
       self.registration.showNotification("Ad Completed! 🪙", {
         body: "Your countdown is done! Tap here to return and claim your 500 coins.",
@@ -102,7 +103,7 @@ self.addEventListener('message', (event) => {
         tag: "reward-claim-ready",
         renotify: true,
         vibrate: [200, 100, 200],
-        data: { url: self.location.origin + "/shop" }
+        data: { url: targetUrl } // Passes the exact URL (with query params) back to the click handler
       });
     }, delayMs);
   }
@@ -127,26 +128,22 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'close') return;
 
-  // 1. Convert any relative target URL safely into an absolute path
   const targetUrl = event.notification.data?.url || '/shop';
   const destinationUrl = new URL(targetUrl, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // 2. Search for any open tab belonging to your domain
       for (const client of clientList) {
         if ('focus' in client) {
           const clientUrl = new URL(client.url);
           
           if (clientUrl.origin === self.location.origin) {
-            // Force-navigate the tab to the exact query-param destination and pull it into focus!
             client.navigate(destinationUrl);
             return client.focus();
           }
         }
       }
       
-      // 3. If the user doesn't have your site open at all, launch a fresh window
       if (clients.openWindow) {
         return clients.openWindow(destinationUrl);
       }
