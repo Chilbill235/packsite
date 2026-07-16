@@ -115,21 +115,22 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = event.notification.data?.url || '/shop';
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: false }).then((clientList) => {
-      // 1. Try to find a tab that is controlled and active on our host domain
+    // CHANGED: includeUncontrolled set to true so backgrounded tabs/PWA shells are captured accurately
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // 1. Try to find an existing tab open on your site
       for (const client of clientList) {
         if ('focus' in client) {
           const clientUrl = new URL(client.url);
           const redirectUrl = new URL(targetUrl, self.location.origin);
           
           if (clientUrl.origin === redirectUrl.origin) {
-            // Direct redirect inside client tab safely
+            // Navigate the open tab directly to the reward claim page and pull it into focus
             client.navigate(targetUrl);
             return client.focus();
           }
         }
       }
-      // 2. If no matching window is open, open a fresh window
+      // 2. If no matching window is open at all, open a fresh window
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
