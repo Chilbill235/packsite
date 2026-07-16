@@ -211,16 +211,35 @@ export default function ShopPage() {
     };
   }, [handleTimerComplete]);
 
+  // Handle SW URL tracking / dynamic entry references
   useEffect(() => {
     if (typeof window !== "undefined" && !loading) {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("ref") === "reward-claim") {
+      const ref = params.get("ref");
+
+      if (ref === "reward-claim") {
+        // Trigger claim automatically on entry
         setShowAdModal(true);
         const claimTimeout = setTimeout(() => {
           handleClaimReward();
         }, 1200);
         return () => clearTimeout(claimTimeout);
-      } else if (params.get("open-ad") === "true") {
+      } 
+      
+      // Handle the Flash Deal active campaign
+      else if (ref === "notif_flash") {
+        addLog("User entered from the Flash Deal push notification! ⏳");
+        // Open the ad boosting modal directly to let them capitalize on the discount
+        setShowAdModal(true);
+      } 
+      
+      // Handle Daily Bonus drop
+      else if (ref === "notif_bonus") {
+        addLog("Daily Bonus offer detected from push alert! 💎");
+        setShowAdModal(true);
+      } 
+      
+      else if (params.get("open-ad") === "true") {
         setShowAdModal(true);
       }
     }
@@ -280,14 +299,26 @@ export default function ShopPage() {
                   <button onClick={handleWatchAdClick} disabled={isWaiting} className={`w-full py-4 rounded-xl font-black transition-all ${isWaiting ? 'bg-white/5 text-gray-500' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
                     {isWaiting ? `WATCHING (${countdown}s)` : "WATCH AD FOR 500 COINS"}
                   </button>
-                  <button onClick={() => setShowAdModal(false)} className="mt-4 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
+                  <button onClick={() => {
+                    setShowAdModal(false);
+                    // Clear search params after close
+                    if (typeof window !== "undefined") {
+                      window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                  }} className="mt-4 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
                 </>
               ) : (
                 <>
                   <div className="text-5xl mb-4 animate-bounce">🔔</div>
                   <h3 className="text-xl font-bold mb-2">Notification Sent!</h3>
                   <p className="text-sm text-gray-400 mb-6">Tap the system push notification that just appeared on your device to claim your 500 coins!</p>
-                  <button onClick={() => setShowAdModal(false)} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
+                  <button onClick={() => {
+                    setShowAdModal(false);
+                    // Clear search params after close
+                    if (typeof window !== "undefined") {
+                      window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                  }} className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">Close Window</button>
                 </>
               )}
             </motion.div>
