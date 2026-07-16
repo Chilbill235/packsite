@@ -147,13 +147,23 @@ export default function ShopPage() {
     }
   };
 
+  // Helper to close modal and mark as "seen"
+  const handleDismissSubscriptionModal = () => {
+    setShowSubscriptionModal(false);
+    localStorage.setItem("hasSeenSubscribedModal", "true");
+  };
+
   const handleWatchAdClick = async () => {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
 
     if (isSubscribed) {
-      setShowSubscriptionModal(true);
+      // ONLY show the modal if they haven't acknowledged/seen it once already
+      const hasSeen = localStorage.getItem("hasSeenSubscribedModal");
+      if (!hasSeen) {
+        setShowSubscriptionModal(true);
+      }
     } else {
       await registerPushSubscription();
     }
@@ -240,7 +250,7 @@ export default function ShopPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
             className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
-            onClick={() => setShowSubscriptionModal(false)}
+            onClick={handleDismissSubscriptionModal}
           />
           
           <div className="relative transform overflow-hidden rounded-3xl border border-amber-500/30 bg-gray-950 p-8 text-center shadow-2xl transition-all max-w-md w-full ring-1 ring-amber-500/10">
@@ -258,7 +268,7 @@ export default function ShopPage() {
             </p>
 
             <button
-              onClick={() => setShowSubscriptionModal(false)}
+              onClick={handleDismissSubscriptionModal}
               className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-extrabold py-3 px-6 rounded-xl transition-all shadow-md active:scale-95"
             >
               Awesome, Let's Go!
