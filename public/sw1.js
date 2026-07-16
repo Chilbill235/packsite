@@ -98,17 +98,23 @@ self.addEventListener('message', (event) => {
       new Promise((resolve) => {
         setTimeout(async () => {
           try {
+            // GRACE PERIOD: Wait an extra 3 seconds (3000ms) after the timer ends.
+            // This gives the React app's local code plenty of time to claim the coins,
+            // fire the "🎉 500 coins added!" toast, and lets the transitions settle.
+            await new Promise(r => setTimeout(r, 3000));
+
             // Check if any client tab of this origin is currently focused
             const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
             const isAnyClientFocused = clientList.some(client => client.focused);
 
-            // If a tab is already open and focused on the screen, skip the push notification!
+            // If they focused back on the tab during or right after the timer,
+            // we do NOT trigger the duplicate browser push notification.
             if (isAnyClientFocused) {
               resolve();
               return;
             }
 
-            // Otherwise, they're in another app or tab—notify them!
+            // Otherwise, they are still away, so we safely notify them!
             await self.registration.showNotification("Ad Completed! 🪙", {
               body: "Your countdown is done! Tap here to return and claim your 500 coins.",
               icon: APP_ICON,

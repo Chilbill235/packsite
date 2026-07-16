@@ -128,7 +128,7 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
-  // Wrapped in useCallback to prevent closure stale-state issues
+  // Wrap claim with useCallback to prevent stale closure dependencies
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
@@ -185,7 +185,7 @@ export default function ShopPage() {
     loadShopData();
   }, []);
 
-  // --- LOCAL UI COUNTDOWN LOGIC (Using robust setInterval to prevent background freezes) ---
+  // --- LOCAL COUNTDOWN TIMER ---
   useEffect(() => {
     if (!isWaiting) return;
 
@@ -201,14 +201,14 @@ export default function ShopPage() {
         clearInterval(intervalId);
         handleClaimReward();
       }
-    }, 250); // Run more frequently than 1s to keep the countdown fluid
+    }, 250); // Fluid refresh interval to ensure seamless UX
 
     return () => clearInterval(intervalId);
   }, [isWaiting, handleClaimReward]);
 
-  // --- BACKUP: IMMEDIATELY CLAIM IF RETURNING FROM BACKGROUND AFTER TIMER EXPIRED ---
+  // --- TAB RE-FOCUS MONITOR: Claims backgrounded progress instantly ---
   useEffect(() => {
-    const checkTimerProgress = () => {
+    const handleRefocusUpdate = () => {
       if (document.visibilityState === "visible" && isWaiting && targetTimeRef.current) {
         const now = Date.now();
         const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
@@ -221,12 +221,12 @@ export default function ShopPage() {
       }
     };
 
-    document.addEventListener("visibilitychange", checkTimerProgress);
-    window.addEventListener("focus", checkTimerProgress);
+    document.addEventListener("visibilitychange", handleRefocusUpdate);
+    window.addEventListener("focus", handleRefocusUpdate);
 
     return () => {
-      document.removeEventListener("visibilitychange", checkTimerProgress);
-      window.removeEventListener("focus", checkTimerProgress);
+      document.removeEventListener("visibilitychange", handleRefocusUpdate);
+      window.removeEventListener("focus", handleRefocusUpdate);
     };
   }, [isWaiting, handleClaimReward]);
 
