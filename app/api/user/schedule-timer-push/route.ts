@@ -1,56 +1,71 @@
 import { NextResponse } from 'next/server';
 import webpush from 'web-push';
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-// Lazily initialize VAPID details to prevent build-time crashes when env vars are absent
 function initWebPush() {
-  const privateKey = process.env.PRIVATE_VAPID_KEY;
-  const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
+  const publicKey = process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
 
-  if (!privateKey) {
-    throw new Error("PRIVATE_VAPID_KEY environment variable is not defined.");
+  if (!privateKey || !publicKey) {
+    throw new Error("VAPID Keys are missing from environment variables.");
   }
 
-  webpush.setVapidDetails(
-    'mailto:your-email@example.com', // Change to your actual email
-    publicKey,
-    privateKey
-  );
+  webpush.setVapidDetails('mailto:admin@packsite.com', publicKey, privateKey);
 }
 
 export async function POST(request: Request) {
   try {
-    const { subscription, delayMs, title, body, tag, url } = await request.json();
+    const session = await auth();
+    if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const bodyData = await request.json();
+    const { subscription } = bodyData;
 
     if (!subscription) {
       return NextResponse.json({ error: "No subscription details provided." }, { status: 400 });
     }
 
-    // Initialize only when a request runs (safeguards build step)
+    // Save the browser's push subscription directly to the database tied to the user!
+    await prisma.subscription.upsert({
+      where: {
+        // Assumes your schema has a unique constraint or lookup for subscriptions,
+        // otherwise a standard prisma.subscription.create matches your setup:
+        endpoint: subscription.endpoint, 
+      },
+      update: { data: subscription },
+      create: {
+        endpoint: subscription.endpoint,
+        data: subscription,
+        user: { connect: { email: session.user.email } }
+      }
+    });
+
     initWebPush();
 
-    // Server-side non-blocking delay
-    setTimeout(async () => {
-      try {
-        const payload = JSON.stringify({
-          title,
-          body,
-          tag,
-          url,
-          isAdTimer: true
-        });
+    // If a delay request is present (Safari backup fallback helper)
+    if (bodyData.delayMs) {
+      setTimeout(async () => {
+        try {
+          await webpush.sendNotification(
+            subscription,
+            JSON.stringify({
+              title: bodyData.title || "Alert",
+              body: bodyData.body || "Notification active!",
+              tag: bodyData.tag,
+              url: bodyData.url,
+              isAdTimer: true
+            })
+          );
+        } catch (err) {
+          console.error("Delayed push delivery failure:", err);
+        }
+      }, bodyData.delayMs);
+    }
 
-        await webpush.sendNotification(subscription, payload);
-      } catch (err) {
-        console.error("Failed to deliver scheduled background push to Safari:", err);
-      }
-    }, delayMs);
-
-    return NextResponse.json({ success: true, message: "Push notification scheduled." });
+    return NextResponse.json({ success: true, message: "Subscribed and saved successfully." });
   } catch (error: any) {
-    console.error("Error setting up scheduled push route:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal Server Error" }, 
-      { status: 500 }
-    );
+    console.error("Subscription endpoint error:", error);
+    return NextResponse.json({ error: error.message || "Internal Error" }, { status: 500 });
   }
 }

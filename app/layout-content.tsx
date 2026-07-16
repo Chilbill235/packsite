@@ -2,45 +2,69 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
-import Providers from "@/app/providers";
 import InstallPrompt from "@/components/InstallPrompt";
 import Script from "next/script";
 
-// Define the paths where the splash screen SHOULD show
-const APP_PATHS = ["/"]; 
-
-// Replace with your actual auth check logic
-const checkAuthStatus = () => {
-  return false; 
-};
-
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [loading, setLoading] = useState(true);
+  
+  // --- FIX: Initialize loading state based on the current page path ---
+  const [loading, setLoading] = useState(pathname === "/");
+  
   const router = useRouter();
+  const { status } = useSession(); // Access Next-Auth session state directly[cite: 3]
 
+  // --- 1. Service Worker Registration with Type: Module ---
   useEffect(() => {
-    // 1. If the current page is NOT in our APP_PATHS list, skip the splash
-    if (!APP_PATHS.includes(pathname)) {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw1.js', { 
+        scope: '/',
+        type: 'module' // <-- FIX: Resolves ES Module import/syntax errors
+      })
+      .catch((err) => console.error('SW1 registration failed:', err));
+    }
+  }, []);
+
+  // --- 2. Splash Screen & Force Redirect Logic ---
+  useEffect(() => {
+    if (pathname !== "/") {
       setLoading(false);
       return;
     }
 
-    // 2. Otherwise, run the splash timer for app pages
-    const timer = setTimeout(() => {
-      const isAuthenticated = checkAuthStatus();
+    setLoading(true);
 
-      if (!isAuthenticated) {
-        router.push("/login");
+    if (status === "loading") {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (status === "authenticated") {
+        router.replace("/shop");
       } else {
-        setLoading(false);
+        setLoading(false); 
       }
-    }, 2000);
+    }, 4000); 
 
     return () => clearTimeout(timer);
-  }, [router, pathname]);
+  }, [router, pathname, status]);
+
+  // --- 3. Handle Browser Back-Forward Cache (BFcache) ---
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (pathname === "/") {
+        setLoading(true);
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, [pathname]);
 
   return (
     <>
@@ -54,21 +78,20 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
         </div>
       ) : (
         <div className="animate-in fade-in duration-500 min-h-screen flex flex-col">
-          <Providers>
-            <InstallPrompt />
-            <Navbar />
-            <main className="flex-grow">{children}</main>
-          </Providers>
+          <InstallPrompt />
+          <Navbar />
+          <main className="flex-grow">{children}</main>
+          
+          <Analytics />
+          
+          <Script 
+            src="https://quge5.com/88/tag.min.js" 
+            strategy="afterInteractive" 
+            data-zone="258926" 
+            data-cfasync="false" 
+          />
         </div>
       )}
-
-      <Analytics />
-      
-      {/* Monetag Script */}
-      <Script src="https://quge5.com/88/tag.min.js" strategy="afterInteractive" data-zone="258926" data-cfasync="false" async />
-      
-      {/* NOTE: Google AdSense script has been completely removed from here. */}
-      {/* It now loads cleanly from your root layout's <head> to prevent the 'data-nscript' warning! */}
     </>
   );
 }

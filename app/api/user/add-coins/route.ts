@@ -26,10 +26,13 @@ export async function POST() {
 
       await Promise.all(subscriptions.map(async (sub) => {
         try {
+          // --- FIX: Include the exact payload flags expected by the Service Worker ---
           await webpush.sendNotification(sub.data as any, JSON.stringify({
             title: "💎 Coins Claimed! 💎",
             body: "🪙 You just received 500 coins. 🪙",
-            url: "/shop"
+            url: "/shop?ref=reward-claim",
+            tag: "reward-claim-ready",
+            isAdTimer: true
           }));
         } catch (err: any) {
           if (err.statusCode === 410) {

@@ -1,22 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
-
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-}
-
-interface ExtendedServiceWorkerRegistration extends ServiceWorkerRegistration {
-  periodicSync?: {
-    register(tag: string, options?: { minInterval: number }): Promise<void>;
-  };
-}
 
 export default function ShopPage() {
   const [packs, setPacks] = useState<PackWithItems[]>([]);
@@ -24,133 +12,88 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [wonItem, setWonItem] = useState<any>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
-  
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
+  // --- Notification State ---
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
 
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
-  const notify = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  // --- Hand off countdown to the Server (Safari Fix) or local Service Worker (Others) ---
-  const delegateCountdownToServiceWorker = async (msRemaining: number) => {
-    if (!('serviceWorker' in navigator)) return;
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      
-      // Check if browser is Safari (including iOS mobile Safari)
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-      if (isSafari) {
-        // Retrieve current active Push subscription
-        const subscription = await registration.pushManager.getSubscription();
-        if (!subscription) {
-          console.warn("No active push subscription found to schedule Safari background reward notification.");
-          return;
-        }
-
-        // Delegate the delay to the backend server to bypass Apple's background thread restrictions
-        await fetch('/api/user/schedule-timer-push', {
-          method: 'POST',
-          body: JSON.stringify({
-            subscription,
-            delayMs: msRemaining,
-            title: "Ad Completed! 🪙",
-            body: "Your countdown is done! Tap here to return and claim your 500 coins.",
-            tag: "reward-claim-ready",
-            url: window.location.href
-          }),
-          headers: { 'Content-Type': 'application/json' }
-        });
+  // Check current notification state on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (!("Notification" in window)) {
+        setPermission("unsupported");
       } else {
-        // Fallback for non-Safari browsers (Chrome, Firefox, Android Native) using a worker message timer
-        const messagePayload = {
-          type: "START_BACKGROUND_TIMER",
-          delay: msRemaining,
-          url: window.location.href
-        };
+        setPermission(Notification.permission);
+      }
+    }
+  }, []);
 
-        if (registration.active) {
-          registration.active.postMessage(messagePayload);
-        }
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage(messagePayload);
+  // Helper utility to convert base64 VAPID keys into Uint8Array
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  // --- Notification Request Trigger (Fixed to register with the Backend) ---
+  const handleEnableNotifications = async () => {
+    if (!("Notification" in window)) return;
+
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+
+      if (result === "granted") {
+        if ("serviceWorker" in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          
+          // Match the exact Public VAPID key used on your server
+          const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
+          const convertedKey = urlBase64ToUint8Array(publicKey);
+
+          const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedKey
+          });
+
+          // Save subscription in your database
+          await fetch("/api/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subscription })
+          });
+
+          console.log("Notifications enabled and saved to subscription database.");
         }
       }
     } catch (err) {
-      console.warn("Failed to delegate background countdown:", err);
+      console.error("Error requesting notification permission:", err);
     }
   };
 
-  async function checkSubscriptionStatus() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const existingSubscription = await registration.pushManager.getSubscription();
-      if (existingSubscription) {
-        setIsSubscribed(true);
-      }
-    } catch (err) {
-      console.warn("Could not check subscription status:", err);
-    }
-  }
-
-  async function registerPeriodicNotifications(registration: ServiceWorkerRegistration) {
-    const reg = registration as ExtendedServiceWorkerRegistration;
-    if (!reg.periodicSync) return;
-    try {
-      const status = await navigator.permissions.query({
-        name: 'periodic-background-sync' as any,
-      });
-      if (status.state === 'granted') {
-        await reg.periodicSync.register('random-shop-alert', {
-          minInterval: 20 * 60 * 1000, 
-        });
-      }
-    } catch (err) {
-      console.warn("Periodic sync registry skipped:", err);
-    }
-  }
-
-  async function registerPushSubscription() {
-    try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') return;
-      
-      const registration = await navigator.serviceWorker.ready;
-      const vapidKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
-      const sub = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey)
-      });
-
-      await fetch('/api/user/subscribe', {
-        method: 'POST',
-        body: JSON.stringify(sub),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      setIsSubscribed(true);
-      await registerPeriodicNotifications(registration);
-    } catch (err) {
-      console.error("Push subscription failed:", err);
-    }
-  }
-
+  // --- Logic Helpers ---
   async function loadShopData() {
     try {
-      const [userRes, packRes] = await Promise.all([
-        fetch("/api/user/profile"),
-        fetch("/api/packs")
-      ]);
-      if (userRes.ok) setUser(await userRes.json());
+      const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUser(userData);
+        document.dispatchEvent(new CustomEvent("balanceChanged", { detail: userData.balance, bubbles: true }));
+      }
       if (packRes.ok) setPacks(await packRes.json());
     } catch (err) { console.error(err); } 
     finally { setLoading(false); }
@@ -165,181 +108,181 @@ export default function ShopPage() {
       if (res.ok) {
         setUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
         document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
-        notify("🎉 500 coins added!");
-      } else {
-        throw new Error(data.error || "Failed to claim reward");
+        setShowAdModal(false);
+        
+        // Clean up URL parameters so they don't claim again on manual refreshes
+        if (typeof window !== "undefined") {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
-    } catch (err) {
-      setErrorDialog({ message: "Error claiming reward." });
-    }
+    } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, []);
-
-  const handleDismissSubscriptionModal = () => {
-    setShowSubscriptionModal(false);
-    localStorage.setItem("hasSeenSubscribedModal", "true");
-  };
 
   const handleWatchAdClick = async () => {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
 
-    if (isSubscribed) {
-      const hasSeen = localStorage.getItem("hasSeenSubscribedModal");
-      if (!hasSeen) {
-        setShowSubscriptionModal(true);
-      }
-    } else {
-      await registerPushSubscription();
-    }
+    // 1. Fire up the monetization ad
+    adService.current?.showAd(user?.email || "anon");
 
-    await delegateCountdownToServiceWorker(10000);
-    adService.current?.showAd(user?.email || "anon"); 
+    // 2. Alert the Service Worker to begin the background timer
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      if (registration.active) {
+        registration.active.postMessage({
+          type: "START_BACKGROUND_TIMER",
+          delay: 10000,
+          url: window.location.origin + "/shop?ref=reward-claim"
+        });
+      }
+    }
   };
 
+  // Listen for messages directly from the Service Worker
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw1.js')
-        .then((reg) => {
-          if (Notification.permission === 'granted') {
-            registerPeriodicNotifications(reg);
-          }
-          checkSubscriptionStatus();
-        })
-        .catch(console.error);
-    }
-    adService.current = new RewardedAdService();
-    loadShopData();
-  }, []);
+    if (!("serviceWorker" in navigator)) return;
 
-  // --- LOCAL COUNTDOWN TIMER (Only decrements & claims when active/visible) ---
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") {
+        handleClaimReward();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
+    };
+  }, [handleClaimReward]);
+
+  // --- FIXED: Check parameters on load and apply visual delay so modal doesn't immediately vanish ---
   useEffect(() => {
-    if (!isWaiting) return;
+    if (typeof window !== "undefined" && !loading) {
+      const params = new URLSearchParams(window.location.search);
+      
+      if (params.get("ref") === "reward-claim") {
+        setShowAdModal(true);
+        
+        // Give the UI 1 second to visually show "Boost Your Balance" before claiming and closing
+        const claimTimeout = setTimeout(() => {
+          handleClaimReward();
+        }, 1000);
+
+        return () => clearTimeout(claimTimeout);
+      } else if (params.get("open-ad") === "true") {
+        setShowAdModal(true);
+      }
+    }
+  }, [loading, handleClaimReward]);
+
+  // --- Effects ---
+  useEffect(() => {
+    loadShopData();
+    adService.current = new RewardedAdService();
+    
+    const openModal = () => setShowAdModal(true);
+    window.addEventListener("openBalanceModal", openModal);
 
     const intervalId = setInterval(() => {
-      if (!targetTimeRef.current) return;
-
-      // SAFETY SHIELD: Do not run any local logic or auto-claims if the tab is hidden!
-      if (document.visibilityState !== "visible") {
-        return; 
-      }
-
-      const now = Date.now();
-      const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
-
-      setCountdown(remainingSeconds);
-
-      if (remainingSeconds <= 0) {
-        clearInterval(intervalId);
-        handleClaimReward();
+      if (isWaiting && targetTimeRef.current) {
+        const remaining = Math.max(0, Math.ceil((targetTimeRef.current - Date.now()) / 1000));
+        setCountdown(remaining);
+        if (remaining <= 0) handleClaimReward();
       }
     }, 250);
 
-    return () => clearInterval(intervalId);
-  }, [isWaiting, handleClaimReward]);
-
-  // --- TAB RE-FOCUS MONITOR: Handles backgrounded timer completion upon return ---
-  useEffect(() => {
-    const handleRefocusUpdate = () => {
-      if (document.visibilityState === "visible" && isWaiting && targetTimeRef.current) {
-        const now = Date.now();
-        const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
-        
-        setCountdown(remainingSeconds);
-        
-        if (remainingSeconds <= 0) {
-          handleClaimReward();
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleRefocusUpdate);
-    window.addEventListener("focus", handleRefocusUpdate);
-
     return () => {
-      document.removeEventListener("visibilitychange", handleRefocusUpdate);
-      window.removeEventListener("focus", handleRefocusUpdate);
+      window.removeEventListener("openBalanceModal", openModal);
+      clearInterval(intervalId);
     };
   }, [isWaiting, handleClaimReward]);
 
-  if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
+  if (loading) return <div className="min-h-screen bg-black" />;
 
   return (
-    <div className="min-h-screen bg-black text-white p-6 relative">
-      {notification && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-600 px-6 py-3 rounded-full shadow-lg">
-          {notification}
-        </div>
-      )}
+    <div className="min-h-screen bg-black text-white p-6 md:p-12 font-sans">
+      
+      {/* --- Ad Reward Modal --- */}
+      <AnimatePresence>
+        {showAdModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="bg-[#111] border border-white/10 p-8 rounded-3xl w-full max-w-sm text-center">
+              <h3 className="text-xl font-bold mb-6">Boost Your Balance</h3>
+              <button onClick={handleWatchAdClick} disabled={isWaiting} className={`w-full py-4 rounded-xl font-black transition-all ${isWaiting ? 'bg-white/5 text-gray-500' : 'bg-amber-500 text-black hover:bg-amber-400'}`}>
+                {isWaiting ? `WATCHING (${countdown}s)` : "WATCH AD FOR 500 COINS"}
+              </button>
+              <button onClick={() => setShowAdModal(false)} className="mt-4 text-sm text-gray-500 hover:text-white">Cancel</button>
+            </motion.div>
+          </motion.div>
+        )}
 
-      {showSubscriptionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div 
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
-            onClick={handleDismissSubscriptionModal}
-          />
-          
-          <div className="relative transform overflow-hidden rounded-3xl border border-amber-500/30 bg-gray-950 p-8 text-center shadow-2xl transition-all max-w-md w-full ring-1 ring-amber-500/10">
-            <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* --- Pack Reveal Modal --- */}
+        {wonItem && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl" onClick={() => setWonItem(null)}>
+            <motion.div initial={{ scale: 0.5, rotate: -10 }} animate={{ scale: 1, rotate: 0 }} className="bg-gradient-to-b from-amber-500/20 to-transparent p-10 rounded-[3rem] border border-amber-500/30 text-center">
+              <div className="text-8xl mb-6">✨</div>
+              <h2 className="text-4xl font-black mb-2">YOU WON!</h2>
+              <p className="text-2xl text-amber-500 font-bold">{wonItem.name}</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20 mb-6 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-              <span className="text-3xl animate-bounce">🔔</span>
-            </div>
-
-            <h3 className="text-2xl font-black text-amber-400 tracking-tight mb-2">
-              Notifications Active!
-            </h3>
-            <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              You're already registered to receive background rewards, daily free coin codes, and flash deal updates. Thank you for staying connected!
-            </p>
-
-            <button
-              onClick={handleDismissSubscriptionModal}
-              className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-extrabold py-3 px-6 rounded-xl transition-all shadow-md active:scale-95"
-            >
-              Awesome, Let's Go!
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-12 text-center border border-gray-800 p-8 rounded-3xl bg-gray-900/30">
-          <button 
-            onClick={handleWatchAdClick}
-            disabled={isWaiting}
-            className={`px-8 py-4 rounded-full font-bold transition-all ${isWaiting ? 'bg-gray-700' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
+      {/* --- Main Shop Content --- */}
+      <div className="max-w-5xl mx-auto">
+        
+        {/* --- Dynamic Notification Banner --- */}
+        {permission === "default" && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="mb-8 p-6 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex flex-col md:flex-row justify-between items-center gap-4"
           >
-            {isWaiting ? `Watching... (${countdown}s)` : "Watch Ad for 500 Coins"}
-          </button>
-        </div>
+            <div className="text-center md:text-left">
+              <h4 className="font-bold text-amber-500 text-lg">Never miss a drop!</h4>
+              <p className="text-sm text-gray-400">Enable system alerts to get notified when new packs are ready.</p>
+            </div>
+            <button 
+              onClick={handleEnableNotifications} 
+              className="px-6 py-3 bg-amber-500 text-black rounded-xl font-bold hover:bg-amber-400 transition-all text-sm uppercase tracking-wider"
+            >
+              Enable Alerts
+            </button>
+          </motion.div>
+        )}
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {permission === "denied" && (
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-3xl text-center text-xs text-red-400">
+            Alerts are blocked. Please unlock notification permissions in your browser's site settings.
+          </div>
+        )}
+
+        <h1 className="text-4xl font-black mb-12 tracking-tighter">VAULT</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packs.map((pack) => (
-            <div key={pack.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-              <h2 className="text-xl font-bold mb-2">{pack.name}</h2>
-              <button
+            <motion.div whileHover={{ y: -5 }} key={pack.id} className="bg-[#0a0a0a] border border-white/5 p-8 rounded-3xl hover:border-amber-500/30 transition-all">
+              <div className="text-4xl mb-6">🎁</div>
+              <h3 className="font-bold text-lg mb-1">{pack.name}</h3>
+              <p className="text-gray-500 text-sm mb-8">Unlock rare items from this tier.</p>
+              <button 
                 onClick={async () => {
-                  const res = await fetch("/api/packs/open", { 
-                    method: "POST", 
-                    body: JSON.stringify({ packId: pack.id }),
-                    headers: {"Content-Type": "application/json"}
-                  });
+                  const res = await fetch("/api/packs/open", { method: "POST", body: JSON.stringify({ packId: pack.id }), headers: {"Content-Type": "application/json"} });
                   const data = await res.json();
                   if (res.ok) {
                     setUser(prev => prev ? {...prev, balance: data.newBalance} : null);
                     document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
-                    notify(`🎉 Won: ${data.wonItem.name}`);
+                    setWonItem(data.wonItem);
                   }
                 }}
-                className="w-full bg-amber-600 py-2 rounded-lg font-bold"
+                className="w-full py-4 bg-white/5 hover:bg-amber-500 hover:text-black rounded-xl font-black transition-all"
               >
-                {pack.price.toLocaleString()} Coins
+                {pack.price.toLocaleString()} COINS
               </button>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
+      
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
   );

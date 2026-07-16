@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -13,26 +13,40 @@ export default function Navbar() {
   const { data: session, status } = useSession();
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
-  // Local state to manage balance updates in real-time
   const [balance, setBalance] = useState<number>(0);
 
-  // Sync balance with session initially
-  useEffect(() => {
-    if (session?.user?.balance !== undefined) {
-      setBalance(Number(session.user.balance));
+  const refreshBalance = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/profile");
+      if (res.ok) {
+        const data = await res.json();
+        setBalance(Number(data.balance));
+      }
+    } catch (err) {
+      console.error("Failed to sync live balance:", err);
     }
-  }, [session?.user?.balance]);
+  }, []);
 
-  // Listen for global balance updates from other components
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshBalance();
+    }
+  }, [isAuthenticated, refreshBalance]);
+
   useEffect(() => {
     const handleBalanceChange = (event: Event) => {
       const customEvent = event as CustomEvent<number>;
       setBalance(customEvent.detail);
     };
 
-    document.addEventListener("balanceChanged", handleBalanceChange);
-    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
+    window.addEventListener("balanceChanged", handleBalanceChange);
+    return () => window.removeEventListener("balanceChanged", handleBalanceChange);
   }, []);
+
+  useEffect(() => {
+    window.addEventListener("focus", refreshBalance);
+    return () => window.removeEventListener("focus", refreshBalance);
+  }, [refreshBalance]);
 
   const navLinks = [
     { name: "Shop", href: "/shop" },
@@ -70,7 +84,13 @@ export default function Navbar() {
         <div className="flex items-center space-x-3">
           {isAuthenticated ? (
             <>
-              <Balance amount={balance} className="text-sm" />
+              {/* TRIGGER UPDATED HERE */}
+              <button 
+                onClick={() => window.dispatchEvent(new Event("openBalanceModal"))}
+                className="hover:opacity-80 transition-opacity"
+              >
+                <Balance amount={balance} className="text-sm" />
+              </button>
               <button
                 onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
                 className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-200 transition-colors"
@@ -83,12 +103,8 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link href="/login" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 hover:bg-white/5">
-                Sign In
-              </Link>
-              <Link href="/register" className="px-3 py-2 rounded-md text-sm font-medium bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 hover:text-amber-300 transition-all">
-                Register
-              </Link>
+              <Link href="/login" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 hover:bg-white/5">Sign In</Link>
+              <Link href="/register" className="px-3 py-2 rounded-md text-sm font-medium bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 hover:text-amber-300 transition-all">Register</Link>
             </>
           )}
         </div>
@@ -98,12 +114,7 @@ export default function Navbar() {
         <div className="md:hidden">
           <div className="px-4 pt-2 pb-3 space-y-1 sm:px-6">
             {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-md text-base font-medium text-white bg-amber-900/50 hover:bg-amber-900/70 hover:text-amber-300"
-              >
+              <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-white bg-amber-900/50 hover:bg-amber-900/70 hover:text-amber-300">
                 {link.name}
               </Link>
             ))}
@@ -112,12 +123,18 @@ export default function Navbar() {
             {isAuthenticated ? (
               <>
                 <div className="mt-3">
-                  <Balance amount={balance} className="w-full" />
+                  {/* MOBILE TRIGGER UPDATED HERE */}
+                  <button 
+                    onClick={() => {
+                      window.dispatchEvent(new Event("openBalanceModal"));
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left"
+                  >
+                    <Balance amount={balance} className="w-full" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => { signOut({ callbackUrl: `${window.location.origin}/login` }); setMobileMenuOpen(false); }}
-                  className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-200 hover:bg-red-900/20"
-                >
+                <button onClick={() => { signOut({ callbackUrl: `${window.location.origin}/login` }); setMobileMenuOpen(false); }} className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-200 hover:bg-red-900/20">
                   Logout
                 </button>
               </>
