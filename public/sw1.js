@@ -127,23 +127,28 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'close') return;
 
+  // 1. Convert any relative target URL safely into an absolute path
   const targetUrl = event.notification.data?.url || '/shop';
+  const destinationUrl = new URL(targetUrl, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // 2. Search for any open tab belonging to your domain
       for (const client of clientList) {
         if ('focus' in client) {
           const clientUrl = new URL(client.url);
-          const redirectUrl = new URL(targetUrl, self.location.origin);
           
-          if (clientUrl.origin === redirectUrl.origin) {
-            client.navigate(targetUrl);
+          if (clientUrl.origin === self.location.origin) {
+            // Force-navigate the tab to the exact query-param destination and pull it into focus!
+            client.navigate(destinationUrl);
             return client.focus();
           }
         }
       }
+      
+      // 3. If the user doesn't have your site open at all, launch a fresh window
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(destinationUrl);
       }
     })
   );
