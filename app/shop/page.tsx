@@ -128,7 +128,6 @@ export default function ShopPage() {
     finally { setLoading(false); }
   }
 
-  // Wrap claim with useCallback to prevent stale closure dependencies
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
@@ -185,12 +184,17 @@ export default function ShopPage() {
     loadShopData();
   }, []);
 
-  // --- LOCAL COUNTDOWN TIMER ---
+  // --- LOCAL COUNTDOWN TIMER (Only decrements & claims when active/visible) ---
   useEffect(() => {
     if (!isWaiting) return;
 
     const intervalId = setInterval(() => {
       if (!targetTimeRef.current) return;
+
+      // SAFETY SHIELD: Do not run any logic or auto-claims if the tab is hidden!
+      if (document.visibilityState !== "visible") {
+        return; 
+      }
 
       const now = Date.now();
       const remainingSeconds = Math.max(0, Math.ceil((targetTimeRef.current - now) / 1000));
@@ -201,12 +205,12 @@ export default function ShopPage() {
         clearInterval(intervalId);
         handleClaimReward();
       }
-    }, 250); // Fluid refresh interval to ensure seamless UX
+    }, 250);
 
     return () => clearInterval(intervalId);
   }, [isWaiting, handleClaimReward]);
 
-  // --- TAB RE-FOCUS MONITOR: Claims backgrounded progress instantly ---
+  // --- TAB RE-FOCUS MONITOR: Handles backgrounded timer completion upon return ---
   useEffect(() => {
     const handleRefocusUpdate = () => {
       if (document.visibilityState === "visible" && isWaiting && targetTimeRef.current) {
