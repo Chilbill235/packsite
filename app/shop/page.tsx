@@ -5,7 +5,6 @@ import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
 
-// Helper: Converts the VAPID string to the required Uint8Array format
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -13,7 +12,6 @@ function urlBase64ToUint8Array(base64String: string) {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
-// 1. Define custom interface to make TypeScript compile the experimental API cleanly
 interface ExtendedServiceWorkerRegistration extends ServiceWorkerRegistration {
   periodicSync?: {
     register(tag: string, options?: { minInterval: number }): Promise<void>;
@@ -29,11 +27,9 @@ export default function ShopPage() {
   const [notification, setNotification] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   
-  // States for Subscription Checking & Beautiful Modal UI
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
-  // Background-safe countdown target reference
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
@@ -42,26 +38,23 @@ export default function ShopPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // --- Send local Push Notification when Timer is done ---
-  const sendClaimNotification = async () => {
-    if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
+  // --- Hand off countdown to the Service Worker ---
+  const delegateCountdownToServiceWorker = async (msRemaining: number) => {
+    if (!('serviceWorker' in navigator)) return;
     try {
       const registration = await navigator.serviceWorker.ready;
-      registration.showNotification("Ad Completed! 🪙", {
-        body: "Your countdown is done! Tap here to return and claim your 500 coins.",
-        icon: "/splash/apple-icon-180.png",
-        badge: "/splash/apple-icon-180.png",
-        tag: "reward-claim-ready",
-        renotify: true,
-        vibrate: [200, 100, 200], // Double vibration alert
-        data: { url: window.location.origin + "/shop" }
-      } as any); // "as any" cast bypasses the strict TypeScript DOM environment types block
+      if (registration.active) {
+        // Sends a signal to sw1.js to schedule a background-safe system notification
+        registration.active.postMessage({
+          type: "START_BACKGROUND_TIMER",
+          delay: msRemaining
+        });
+      }
     } catch (err) {
-      console.warn("Failed to deliver local push notification:", err);
+      console.warn("Failed to delegate background countdown to Service Worker:", err);
     }
   };
 
-  // --- Check if already Subscribed ---
   async function checkSubscriptionStatus() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     try {
@@ -75,44 +68,31 @@ export default function ShopPage() {
     }
   }
 
-  // --- Register Background Periodic Reminders ---
   async function registerPeriodicNotifications(registration: ServiceWorkerRegistration) {
     const reg = registration as ExtendedServiceWorkerRegistration;
-    
     if (!reg.periodicSync) return;
-    
     try {
       const status = await navigator.permissions.query({
         name: 'periodic-background-sync' as any,
       });
-
       if (status.state === 'granted') {
         await reg.periodicSync.register('random-shop-alert', {
           minInterval: 20 * 60 * 1000, 
         });
-        console.log("Successfully registered dynamic background notifications.");
       }
     } catch (err) {
-      console.warn("Periodic sync registry skipped (requires installed PWA to run):", err);
+      console.warn("Periodic sync registry skipped:", err);
     }
   }
 
-  // --- Setup Main Push Subscription ---
   async function registerPushSubscription() {
     try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        console.warn("Push messaging not supported");
-        return;
-      }
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
       const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        console.warn("Permission denied for notifications");
-        return;
-      }
+      if (permission !== 'granted') return;
       
       const registration = await navigator.serviceWorker.ready;
-      
       const vapidKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
@@ -124,11 +104,8 @@ export default function ShopPage() {
         body: JSON.stringify(sub),
         headers: { 'Content-Type': 'application/json' }
       });
-      console.log("Successfully subscribed");
       setIsSubscribed(true);
-
       await registerPeriodicNotifications(registration);
-      
     } catch (err) {
       console.error("Push subscription failed:", err);
     }
@@ -148,7 +125,7 @@ export default function ShopPage() {
 
   const handleClaimReward = async () => {
     setIsWaiting(false);
-    targetTimeRef.current = null; // Clean up target timestamp
+    targetTimeRef.current = null;
     try {
       const res = await fetch("/api/user/add-coins", { method: "POST" });
       const data = await res.json();
@@ -165,7 +142,6 @@ export default function ShopPage() {
   };
 
   const handleWatchAdClick = async () => {
-    // Set target time: current system time + 10 seconds
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
@@ -175,6 +151,10 @@ export default function ShopPage() {
     } else {
       await registerPushSubscription();
     }
+
+    // Tell the Service Worker to run a guaranteed 10s background clock right now
+    await delegateCountdownToServiceWorker(10000);
+
     adService.current?.showAd(user?.email || "anon"); 
   };
 
@@ -193,7 +173,7 @@ export default function ShopPage() {
     loadShopData();
   }, []);
 
-  // --- BACKGROUND-SAFE COUNTDOWN LOGIC ---
+  // --- LOCAL UI COUNTDOWN LOGIC ---
   useEffect(() => {
     let animationFrameId: number;
 
@@ -206,7 +186,6 @@ export default function ShopPage() {
       setCountdown(remainingSeconds);
 
       if (remainingSeconds <= 0) {
-        sendClaimNotification(); // Send system push notification!
         handleClaimReward();
       } else {
         animationFrameId = requestAnimationFrame(updateTimer);
@@ -222,7 +201,7 @@ export default function ShopPage() {
     };
   }, [isWaiting]);
 
-  // Listen to visibility transitions (e.g., returning to tab after clicking ad)
+  // Listen to visibility transitions
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && isWaiting && targetTimeRef.current) {
@@ -232,7 +211,6 @@ export default function ShopPage() {
         setCountdown(remainingSeconds);
         
         if (remainingSeconds <= 0) {
-          sendClaimNotification(); // Send system push notification!
           handleClaimReward();
         }
       }
@@ -252,7 +230,6 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* --- BEAUTIFULLY CUSTOMIZED MODAL FOR EXISTING SUBSCRIBERS --- */}
       {showSubscriptionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
@@ -271,7 +248,7 @@ export default function ShopPage() {
               Notifications Active!
             </h3>
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
-              You're already registered to receive background rewards, dynamic daily free coin codes, and flash deal updates. Thank you for staying connected!
+              You're already registered to receive background rewards, daily free coin codes, and flash deal updates. Thank you for staying connected!
             </p>
 
             <button
