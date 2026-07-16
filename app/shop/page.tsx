@@ -42,6 +42,25 @@ export default function ShopPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // --- Send local Push Notification when Timer is done ---
+  const sendClaimNotification = async () => {
+    if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      registration.showNotification("Ad Completed! 🪙", {
+        body: "Your countdown is done! Tap here to return and claim your 500 coins.",
+        icon: "/splash/apple-icon-180.png",
+        badge: "/splash/apple-icon-180.png",
+        tag: "reward-claim-ready",
+        renotify: true,
+        vibrate: [200, 100, 200], // Double vibration alert
+        data: { url: window.location.origin + "/shop" }
+      });
+    } catch (err) {
+      console.warn("Failed to deliver local push notification:", err);
+    }
+  };
+
   // --- Check if already Subscribed ---
   async function checkSubscriptionStatus() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -187,9 +206,9 @@ export default function ShopPage() {
       setCountdown(remainingSeconds);
 
       if (remainingSeconds <= 0) {
+        sendClaimNotification(); // Send system push notification!
         handleClaimReward();
       } else {
-        // Keeps updating smoothly even if the browser slows down the tab
         animationFrameId = requestAnimationFrame(updateTimer);
       }
     };
@@ -213,6 +232,7 @@ export default function ShopPage() {
         setCountdown(remainingSeconds);
         
         if (remainingSeconds <= 0) {
+          sendClaimNotification(); // Send system push notification!
           handleClaimReward();
         }
       }
