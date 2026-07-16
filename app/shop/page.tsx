@@ -28,6 +28,10 @@ export default function ShopPage() {
   const [countdown, setCountdown] = useState(10);
   const [notification, setNotification] = useState<string | null>(null);
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
+  
+  // New States for Subscription Checking & Beautiful Modal UI
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const adService = useRef<RewardedAdService | null>(null);
 
@@ -36,9 +40,22 @@ export default function ShopPage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // --- Check if already Subscribed ---
+  async function checkSubscriptionStatus() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        setIsSubscribed(true);
+      }
+    } catch (err) {
+      console.warn("Could not check subscription status:", err);
+    }
+  }
+
   // --- Register Background Periodic Reminders ---
   async function registerPeriodicNotifications(registration: ServiceWorkerRegistration) {
-    // 2. Cast registration to our extended interface so periodicSync is recognized
     const reg = registration as ExtendedServiceWorkerRegistration;
     
     if (!reg.periodicSync) return;
@@ -49,9 +66,9 @@ export default function ShopPage() {
       });
 
       if (status.state === 'granted') {
-        // Register the background reminder task (runs roughly every 12 hours)
+        // Register the background reminder task (20 minutes)
         await reg.periodicSync.register('random-shop-alert', {
-          minInterval: 20 * 60 * 1000,
+          minInterval: 20 * 60 * 1000, 
         });
         console.log("Successfully registered dynamic background notifications.");
       }
@@ -91,6 +108,7 @@ export default function ShopPage() {
         headers: { 'Content-Type': 'application/json' }
       });
       console.log("Successfully subscribed");
+      setIsSubscribed(true);
 
       // 4. Fire off dynamic background notification scheduling if supported
       await registerPeriodicNotifications(registration);
@@ -129,7 +147,18 @@ export default function ShopPage() {
     }
   };
 
-  // Register SW and initialize components
+  const handleWatchAdClick = async () => {
+    setIsWaiting(true);
+    if (isSubscribed) {
+      // Already subscribed! Directly show the gorgeous modal instead of subscribing again
+      setShowSubscriptionModal(true);
+    } else {
+      await registerPushSubscription();
+    }
+    adService.current?.showAd(user?.email || "anon"); 
+  };
+
+  // Register SW, check subscription status, and initialize components
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw1.js')
@@ -138,6 +167,8 @@ export default function ShopPage() {
           if (Notification.permission === 'granted') {
             registerPeriodicNotifications(reg);
           }
+          // Scan for pre-existing active subscriptions
+          checkSubscriptionStatus();
         })
         .catch(console.error);
     }
@@ -166,21 +197,53 @@ export default function ShopPage() {
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-black text-white p-6 relative">
       {notification && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-600 px-6 py-3 rounded-full shadow-lg">
           {notification}
         </div>
       )}
 
+      {/* --- BEAUTIFULLY CUSTOMIZED MODAL FOR EXISTING SUBSCRIBERS --- */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop Blur overlay */}
+          <div 
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" 
+            onClick={() => setShowSubscriptionModal(false)}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative transform overflow-hidden rounded-3xl border border-amber-500/30 bg-gray-950 p-8 text-center shadow-2xl transition-all max-w-md w-full ring-1 ring-amber-500/10">
+            {/* Ambient Background Glow */}
+            <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Glowing Bell Icon */}
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/10 border border-amber-500/20 mb-6 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+              <span className="text-3xl animate-bounce">🔔</span>
+            </div>
+
+            <h3 className="text-2xl font-black text-amber-400 tracking-tight mb-2">
+              Notifications Active!
+            </h3>
+            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              You're already registered to receive background rewards, dynamic daily free coin codes, and flash deal updates. Thank you for staying connected!
+            </p>
+
+            <button
+              onClick={() => setShowSubscriptionModal(false)}
+              className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-extrabold py-3 px-6 rounded-xl transition-all shadow-md active:scale-95"
+            >
+              Awesome, Let's Go!
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         <div className="mb-12 text-center border border-gray-800 p-8 rounded-3xl bg-gray-900/30">
           <button 
-            onClick={async () => { 
-              setIsWaiting(true);
-              await registerPushSubscription();
-              adService.current?.showAd(user?.email || "anon"); 
-            }}
+            onClick={handleWatchAdClick}
             disabled={isWaiting}
             className={`px-8 py-4 rounded-full font-bold transition-all ${isWaiting ? 'bg-gray-700' : 'bg-amber-500 hover:bg-amber-400 text-black'}`}
           >

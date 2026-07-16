@@ -63,8 +63,12 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
       )}
 
       <Analytics />
+      
+      {/* Monetag Script */}
       <Script src="https://quge5.com/88/tag.min.js" strategy="afterInteractive" data-zone="258926" data-cfasync="false" async />
-      <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777" crossOrigin="anonymous" strategy="afterInteractive" />
+      
+      {/* NOTE: Google AdSense script has been completely removed from here. */}
+      {/* It now loads cleanly from your root layout's <head> to prevent the 'data-nscript' warning! */}
     </>
   );
 }
