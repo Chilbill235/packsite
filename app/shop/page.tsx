@@ -32,7 +32,8 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
-  // --- Data Fetching ---
+  // --- Core Logic ---
+
   const fetchUserData = useCallback(async () => {
     try {
       const res = await fetch(`/api/user/profile?t=${Date.now()}`);
@@ -44,16 +45,16 @@ export default function ShopPage() {
     } catch (err) { console.error("Failed to refresh user:", err); }
   }, []);
 
-  async function loadShopData() {
+  const loadShopData = useCallback(async () => {
     try {
+      setLoading(true);
       const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
       if (userRes.ok) setUser(await userRes.json());
       if (packRes.ok) setPacks(await packRes.json());
     } catch (err) { console.error(err); } 
     finally { setLoading(false); }
-  }
+  }, []);
 
-  // --- Ad & Reward Logic ---
   const handleClaimReward = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
@@ -76,32 +77,33 @@ export default function ShopPage() {
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, [fetchUserData]);
 
-  // --- Notification Router ---
+  const handleTimerComplete = useCallback(async () => {
+    setIsWaiting(false);
+    targetTimeRef.current = null;
+    setHasDispatchedPush(true);
+    try { await fetch("/api/user/ad-complete", { method: "POST" }); } catch (e) { console.error("Failed to sync ad completion."); }
+  }, []);
+
   const handleNotificationRouting = useCallback(async (ref: string) => {
-    // 1. Flash Sale Group
+    // Exact requested routing logic
     if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
       setIsFlashSaleActive(true);
-    }
-    // 2. Bonus Group
-    else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
+    } else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
       try {
         await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
         await fetchUserData();
       } catch (e) { console.error("Auto-claim failed"); }
-    }
-    // 3. Ad/Reward Group (Restored Logic)
-    else if (["reward-claim", "vault-drop", "mystery-box", "surprise"].includes(ref)) {
+    } else if (["reward-claim", "vault-drop", "mystery-box", "surprise"].includes(ref)) {
       setShowAdModal(true);
       if (ref === "reward-claim") {
-         setTimeout(() => handleClaimReward(), 500);
+          setTimeout(() => handleClaimReward(), 500);
       }
-    }
-    // 4. Refresh Group
-    else if (["new-item", "best-seller", "refresh", "seasonal"].includes(ref)) {
+    } else if (["new-item", "best-seller", "refresh", "seasonal"].includes(ref)) {
       loadShopData();
     }
-  }, [fetchUserData, handleClaimReward]);
+  }, [fetchUserData, handleClaimReward, loadShopData]);
 
+  // --- Utilities ---
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -155,13 +157,6 @@ export default function ShopPage() {
     }
   };
 
-  const handleTimerComplete = useCallback(async () => {
-    setIsWaiting(false);
-    targetTimeRef.current = null;
-    setHasDispatchedPush(true);
-    try { await fetch("/api/user/ad-complete", { method: "POST" }); } catch (e) { console.error("Failed to sync ad completion."); }
-  }, []);
-
   const handleOpenPack = async (packId: string) => {
     try {
       const res = await fetch("/api/packs/open", { 
@@ -212,9 +207,8 @@ export default function ShopPage() {
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       window.removeEventListener("openBalanceModal", openModal);
     };
-  }, [handleTimerComplete]);
+  }, [loadShopData, handleTimerComplete]);
 
-  // Handle URL Notification Routing (The core fix)
   useEffect(() => {
     if (!loading) {
       const params = new URLSearchParams(window.location.search);
@@ -387,8 +381,10 @@ export default function ShopPage() {
         {/* Pack Grid */}
         <div className="flex flex-wrap justify-center gap-6 w-full max-w-5xl">
           {packs.map((pack) => {
-            const finalPrice = isFlashSaleActive ? Math.floor(pack.price * 0.5) : pack.price;
+            const basePrice = typeof pack.price === 'string' ? parseInt(pack.price) : pack.price;
+            const finalPrice = isFlashSaleActive ? Math.floor(basePrice * 0.5) : basePrice;
             const totalCost = finalPrice * openQuantity;
+            
             return (
               <motion.div 
                 key={pack.id} 
