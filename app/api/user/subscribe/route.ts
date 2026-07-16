@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     }
 
     const publicKey = process.env.VAPID_PUBLIC_KEY;
-    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY || process.env.PRIVATE_VAPID_KEY;
 
     if (!publicKey || !privateKey) {
       console.error("VAPID keys missing in environment variables");
@@ -21,18 +21,25 @@ export async function POST(req: Request) {
 
     webpush.setVapidDetails('mailto:admin@packsite.com', publicKey, privateKey);
 
-    const sub = await req.json();
+    const body = await req.json();
+    // Safely extract the nested subscription object if it exists, otherwise use the top level
+    const subscriptionData = body.subscription || body; 
     
-    // This will now pass the build because userId is @unique in the schema
+    if (!subscriptionData || !subscriptionData.endpoint) {
+      return NextResponse.json({ error: "No valid subscription object received" }, { status: 400 });
+    }
+
+    // Save/update the subscription matched against the authenticated user's ID
     await prisma.subscription.upsert({
       where: { userId: session.user.id },
-      update: { data: sub },
+      update: { data: subscriptionData },
       create: { 
         userId: session.user.id, 
-        data: sub 
+        data: subscriptionData 
       }
     });
     
+    console.log(`[Subscription DB] Saved subscription for user ID: ${session.user.id}`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Subscription error:", error);
