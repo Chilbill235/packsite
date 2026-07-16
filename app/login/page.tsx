@@ -12,7 +12,8 @@ function LoginForm() {
   // Get the callbackUrl from the URL, default to "/" if it doesn't exist
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
-  const [email, setEmail] = useState("");
+  // State updated from 'email' to 'identifier' (handles email or username)
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -26,12 +27,15 @@ function LoginForm() {
     try {
       const res = await signIn("credentials", {
         redirect: false,
-        email,
+        // Passing the identifier value as both 'email' and 'username'
+        // so your NextAuth backend authorize() function can inspect whichever is provided.
+        email: identifier,
+        username: identifier,
         password,
       });
 
       if (res?.error) {
-        setError("Invalid email or password combination");
+        setError("Invalid username/email or password combination");
       } else {
         // Redirect to the captured callbackUrl
         router.push(callbackUrl);
@@ -76,14 +80,14 @@ function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-              Email Address
+              Username or Email
             </label>
             <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text" 
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full px-4 py-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl text-white placeholder-zinc-600 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 focus:outline-none transition-all duration-200 text-sm" 
-              placeholder="you@example.com"
+              placeholder="you@example.com or LuckyCollector"
               required
             />
           </div>
