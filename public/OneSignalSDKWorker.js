@@ -119,7 +119,6 @@ self.addEventListener('message', function (event) {
             badge: '/images/apple-pay.png',
             tag: "reward-claim-" + Date.now(),
             renotify: true,
-            requireInteraction: true,
             vibrate: [200, 100, 200],
             data: { url: targetUrl, amount: amount }
           })

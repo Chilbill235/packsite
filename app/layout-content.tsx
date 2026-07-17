@@ -15,16 +15,20 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const [showNotifBanner, setShowNotifBanner] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
-  
-  // Use a ref to track if we have already triggered the init process
-  const isInitializing = useRef(false);
 
-  // --- 1. Sequential & Safe OneSignal Lifecycle ---
+  // Use refs to track OneSignal initialization state
+  const oneSignalInitialized = useRef(false);
+  const initRetries = useRef(0);
+  const MAX_INIT_RETRIES = 3;
+
+  // --- 1. OneSignal Initialization (with retry mechanism) ---
   useEffect(() => {
-    if (typeof window === "undefined" || isInitializing.current) return;
-    isInitializing.current = true;
+    if (typeof window === "undefined") return;
 
-    const initAndSyncOneSignal = async () => {
+    const initializeOneSignal = async () => {
+      // Don't initialize if already successful
+      if (oneSignalInitialized.current) return;
+
       try {
         // Initialize OneSignal
         // notifyButton configuration removed to resolve TypeScript build errors
@@ -35,26 +39,87 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
           serviceWorkerPath: 'OneSignalSDKWorker.js',
         });
 
-        // Identity Sync & Check Notification Status (Only when Authenticated)
-        if (status === "authenticated" && session?.user?.id) {
-          await OneSignal.login(session.user.id);
-
-          // Show prompt banner if notifications are supported and set to default (unprompted)
-          if (
-            "Notification" in window &&
-            Notification.permission === "default"
-          ) {
-            setShowNotifBanner(true);
+        // Mark as initialized
+        oneSignalInitialized.current = true;
+        console.log("OneSignal initialized successfully");
+      } catch (error) {
+        console.error("OneSignal initialization failed:", error);
+        // Retry after delay if not already initialized
+        if (!oneSignalInitialized.current) {
+          // Exponential backoff: 1s, 2s, 4s, 8s, max 5 attempts
+          const delay = Math.min(1000 * Math.pow(2, initRetries.current), 8000);
+          if (initRetries.current < 5) {
+            console.log(`Retrying OneSignal initialization in ${delay}ms... (attempt ${initRetries.current + 1}/5)`);
+            initRetries.current++;
+            setTimeout(initializeOneSignal, delay);
+          } else {
+            console.error("OneSignal failed to initialize after 5 attempts");
           }
         }
-      } catch (error) {
-        console.error("OneSignal lifecycle error:", error);
-        isInitializing.current = false; // Allow retry on failure
       }
     };
 
-    initAndSyncOneSignal();
+    // Start the initialization process
+    initializeOneSignal();
+  }, []); // Empty deps - run once on mount
+
+  // --- 2. OneSignal Login/Logout (Run on auth changes) ---
+  useEffect(() => {
+    // Only attempt login if OneSignal is initialized
+    if (!oneSignalInitialized.current || typeof window === "undefined") return;
+
+    // Identity Sync & Check Notification Status (Only when Authenticated)
+    if (status === "authenticated" && session?.user?.id) {
+      // Validate user ID is a non-empty string
+      const userId = session.user.id;
+      if (typeof userId === 'string' && userId.length > 0) {
+        // Attempt login with retries
+        const attemptLogin = async (retryCount = 0) => {
+          try {
+            await OneSignal.login(userId);
+            console.log("OneSignal login successful");
+          } catch (loginError) {
+            console.warn(`Login attempt ${retryCount + 1} failed:`, loginError);
+            // Retry up to 3 times with exponential backoff
+            if (retryCount < 3) {
+              setTimeout(() => attemptLogin(retryCount + 1), 1000 * Math.pow(2, retryCount));
+            } else {
+              console.error("Login failed after 3 attempts");
+            }
+          }
+        };
+
+        attemptLogin();
+      } else {
+        console.warn("OneLogin skipped: invalid or empty user ID:", userId);
+      }
+    } else if (status !== "authenticated") {
+      // Logout from OneSignal when user signs out
+      const handleLogout = async () => {
+        try {
+          await OneSignal.logout();
+          console.log("User logged out of OneSignal");
+        } catch (logoutError) {
+          console.warn("OneLogout failed:", logoutError);
+        }
+      };
+
+      handleLogout();
+    }
   }, [status, session]);
+
+  // --- 3. Notification Permission Banner ---
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const shouldShowBanner =
+      "Notification" in window && Notification.permission === "default";
+
+    // Only update state if it actually needs to change
+    if (shouldShowBanner !== showNotifBanner) {
+      setShowNotifBanner(shouldShowBanner);
+    }
+  }); // Runs on every render to keep state in sync with permission changes
 
   // --- 2. iOS-Compliant Click Handler ---
   const handleEnableNotifications = async () => {

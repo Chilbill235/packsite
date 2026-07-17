@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { rollItem } from "@/lib/openingEngine";
 
-// 1. GET: Fetches available packs
+// 1. GET: Fetches available packs (without items for performance)
+// Items are fetched separately when opening a pack via POST /api/packs/open
 export async function GET() {
   try {
-    const packs = await prisma.pack.findMany({ include: { items: true } });
+    const packs = await prisma.pack.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        price: true,
+        image: true,
+        category: true,
+      }
+    });
     return NextResponse.json(packs);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch packs" }, { status: 500 });
