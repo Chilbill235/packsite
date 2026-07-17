@@ -14,7 +14,7 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     self.clients.claim().then(function() {
-      // This will still run to show local loops *while the web app is actively open*
+      // Start the local loop when the service worker is activated
       startPeriodicNotificationLoop();
     })
   );
@@ -47,7 +47,7 @@ var CAMPAIGN_POOL = [
   { title: "🔄 Pack Refresh!", body: "The entire shop inventory has been refreshed.", tag: "refresh", url: "/shop?ref=refresh" }
 ];
 
-// --- 4. PERIODIC 10 MINUTE TIMER LOOP LOGIC (Only runs in foreground/active background) ---
+// --- 4. PERIODIC 10 MINUTE TIMER LOOP LOGIC ---
 var loopTimeoutId = null;
 
 function getIntervalMs() {
@@ -76,6 +76,12 @@ function triggerPeriodicAlert() {
     data: { url: self.location.origin + campaign.url }
   }).catch(function(err) { console.error("[SW Loop] Failed to show periodic alert:", err); });
 }
+
+self.addEventListener('periodicsync', function (event) {
+  if (event.tag === 'periodic-drops') {
+    event.waitUntil(new Promise(function(resolve) { triggerPeriodicAlert(); resolve(); }));
+  }
+});
 
 // --- 5. MESSAGE EVENT LISTENER (TIMER MANAGEMENT) ---
 self.addEventListener('message', function (event) {
@@ -124,13 +130,13 @@ self.addEventListener('push', function (event) {
   try {
     payload = event.data ? event.data.json() : {};
   } catch (e) {
-    return; // Let OneSignal handle silent/unparsable payloads
+    // If the payload fails to parse as JSON, it is likely an encrypted OneSignal payload.
+    // We return early to let the imported OneSignal SDK automatically parse and show it.
+    return; 
   }
 
-  // Safety Check: If the push is a OneSignal payload, IGNORE it in this custom event.
-  // This prevents displaying duplicate notifications, as the imported OneSignal SDK 
-  // will automatically parse and display its own notifications.
-  if (payload.custom && payload.custom.i) {
+  // Safety Check: If the push is a OneSignal payload, IGNORE it.
+  if (payload.custom || (payload.data && payload.data.custom)) {
     return; 
   }
 
@@ -152,7 +158,7 @@ self.addEventListener('push', function (event) {
 // --- 7. NOTIFICATION CLICK ROUTING ---
 self.addEventListener('notificationclick', function (event) {
   // Let OneSignal handle its own clicks if they contain a OneSignal identifier
-  if (event.notification.data && event.notification.data.custom) {
+  if (event.notification.data && (event.notification.data.custom || event.notification.data.OS_DATA)) {
     return; 
   }
   

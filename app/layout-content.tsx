@@ -7,29 +7,26 @@ import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
 import InstallPrompt from "@/components/InstallPrompt";
 import Script from "next/script";
+import OneSignal from "react-onesignal";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  
-  // --- FIX: Initialize loading state based on the current page path ---
   const [loading, setLoading] = useState(pathname === "/");
-  
   const router = useRouter();
-  const { status } = useSession(); // Access Next-Auth session state directly[cite: 3]
+  const { status } = useSession();
 
-  // --- 1. Service Worker Registration with Fallback for Safari ---
+  // --- 1. Service Worker & OneSignal Initialization ---
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      // Try registering as an ES module (modern browsers)
-      navigator.serviceWorker.register('/serviceWorker.js', { scope: '/', type: 'module' })
-        .then(reg => console.log('Service Worker registered (module):', reg.scope))
-        .catch(err => {
-          console.warn('Service Worker module registration failed:', err);
-          // Fallback to classic registration for Safari and older browsers
-          navigator.serviceWorker.register('/serviceWorker.js', { scope: '/' })
-            .then(reg => console.log('Service Worker registered (classic):', reg.scope))
-            .catch(err2 => console.error('Service Worker registration failed:', err2));
-        });
+    // Initialize OneSignal
+    OneSignal.init({
+      appId: "7ae5defc-0bad-40c9-9af7-871b24bae250", // REPLACE WITH YOUR ACTUAL APP ID
+      allowLocalhostAsSecureOrigin: true,
+    });
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/serviceWorker.js", { scope: "/" })
+        .then(reg => console.log("Service Worker registered globally:", reg.scope))
+        .catch(err => console.error("Global Service Worker registration failed:", err));
     }
   }, []);
 
@@ -89,11 +86,19 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
           
           <Analytics />
           
+          {/* --- Monetag Integration --- */}
           <Script 
             src="https://quge5.com/88/tag.min.js" 
             strategy="afterInteractive" 
             data-zone="258926" 
             data-cfasync="false" 
+          />
+
+          {/* --- Optimized Google AdSense Integration --- */}
+          <Script
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
           />
         </div>
       )}

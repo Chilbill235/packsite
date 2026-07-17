@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import webpush from 'web-push';
+import webpush from "web-push";
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +11,6 @@ export async function POST(req: Request) {
     }
 
     // 1. Double check the user ID from the database using email 
-    // This acts as a robust backup if the client-side session ID is missing
     const dbUser = await prisma.user.findUnique({
       where: { email: session.user.email }
     });
@@ -37,10 +36,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No valid subscription object received" }, { status: 400 });
     }
 
-    // 2. Upsert using the verified DB user ID to avoid schema collisions
+    // 2. Clean Upsert matching your 'data' Json schema perfectly
     await prisma.subscription.upsert({
       where: { userId: dbUser.id },
-      update: { data: subscriptionData },
+      update: { 
+        data: subscriptionData // Handled as raw Json by Prisma
+      },
       create: { 
         userId: dbUser.id, 
         data: subscriptionData 

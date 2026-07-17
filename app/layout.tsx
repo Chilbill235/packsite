@@ -32,13 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* --- PWA Splash Screens --- */}
         <link rel="apple-touch-startup-image" href="/splash/apple-splash-2048-2732.jpg" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" />
-
-        {/* --- Standard AdSense Script --- */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
-          crossOrigin="anonymous"
-        />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Providers>

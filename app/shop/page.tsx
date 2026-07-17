@@ -6,6 +6,7 @@ import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { PackWithItems } from "@/types";
+import OneSignal from "react-onesignal";
 
 export default function ShopPage() {
   // --- States ---
@@ -49,9 +50,20 @@ export default function ShopPage() {
     try {
       setLoading(true);
       const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
-      if (userRes.ok) setUser(await userRes.json());
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUser(userData);
+        // Map user login with OneSignal External ID
+        if (userData?.id) {
+          try {
+            OneSignal.login(userData.id);
+          } catch (e) {
+            console.error("OneSignal Login Error:", e);
+          }
+        }
+      }
       if (packRes.ok) setPacks(await packRes.json());
-    } catch (err) { console.error(err); } 
+    } catch (err) { console.error(err); }  
     finally { setLoading(false); }
   }, []);
 
@@ -85,7 +97,6 @@ export default function ShopPage() {
   }, []);
 
   const handleNotificationRouting = useCallback(async (ref: string) => {
-    // Exact requested routing logic
     if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
       setIsFlashSaleActive(true);
     } else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
@@ -103,37 +114,35 @@ export default function ShopPage() {
     }
   }, [fetchUserData, handleClaimReward, loadShopData]);
 
-  // --- Utilities ---
-  const urlBase64ToUint8Array = (base64String: string) => {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-    return outputArray;
-  };
-
+  // --- OneSignal Push Opt-In ---
   const handleEnableNotifications = async () => {
-    if (!("Notification" in window)) return;
+    console.log("Button clicked: Attempting to request permission...");
+
+    if (!("Notification" in window)) {
+      console.error("Notifications are not supported in this browser.");
+      return;
+    }
+
     try {
-      const result = await Notification.requestPermission();
-      setPermission(result);
-      if (result === "granted") {
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.ready;
-          const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicKey)
-          });
-          await fetch("/api/user/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ subscription })
-          });
+      // Direct call to the OneSignal object
+      if (typeof OneSignal !== 'undefined') {
+        console.log("OneSignal detected, requesting permission...");
+        await OneSignal.Notifications.requestPermission();
+        
+        const currentPermission = Notification.permission;
+        setPermission(currentPermission);
+        console.log("Permission Status:", currentPermission);
+        
+        if (currentPermission === "granted" && user?.id) {
+          await OneSignal.login(user.id);
+          console.log("Login successful");
         }
+      } else {
+        console.error("OneSignal object is undefined. Ensure it is initialized in layout.tsx");
       }
-    } catch (err: any) { console.error("Permission Error: " + err.message); }
+    } catch (err: any) { 
+      console.error("OneSignal Permission Request Error: ", err); 
+    }
   };
 
   const handleWatchAdClick = async (amount: number) => {
@@ -144,15 +153,27 @@ export default function ShopPage() {
     setHasDispatchedPush(false);
     adService.current?.showAd(user?.email || "anon");
 
+    // Fix: Ensure Service Worker controller is active before posting message
     if ("serviceWorker" in navigator) {
-      const registration = await navigator.serviceWorker.ready;
-      if (registration.active) {
-        registration.active.postMessage({ 
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ 
           type: "START_BACKGROUND_TIMER", 
           delay: 10000, 
           amount: amount, 
           url: window.location.origin + "/shop?ref=reward-claim" 
         });
+      } else {
+        // Fallback to waiting for registration
+        navigator.serviceWorker.ready.then((registration) => {
+            if (registration.active) {
+                registration.active.postMessage({ 
+                    type: "START_BACKGROUND_TIMER", 
+                    delay: 10000, 
+                    amount: amount, 
+                    url: window.location.origin + "/shop?ref=reward-claim" 
+                });
+            }
+        }).catch(err => console.error("SW registration error", err));
       }
     }
   };
@@ -182,16 +203,14 @@ export default function ShopPage() {
       setIsIOS(is_ios);
       setIsStandalone(is_standalone);
 
-      if (!("Notification" in window)) setPermission("unsupported");
-      else setPermission(Notification.permission);
+      if (!("Notification" in window)) {
+        setPermission("unsupported");
+      } else {
+        setPermission(Notification.permission);
+      }
     }
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/serviceWorker.js")
-        .then((reg) => console.log("Service Worker registered: ", reg.scope))
-        .catch((err) => console.error("Service Worker registration failed: ", err));
-    }
-
+    // Load data
     loadShopData();
     adService.current = new RewardedAdService();
     
@@ -268,7 +287,7 @@ export default function ShopPage() {
               </div>
             </div>
             <div className="flex items-center gap-3 relative z-10 w-full md:w-auto">
-              <button onClick={handleEnableNotifications} className="flex-1 md:flex-none px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]">ALLOW ALERTS</button>
+              <button onClick={handleEnableNotifications} className="w-full md:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)]">ALLOW ALERTS</button>
               <button onClick={() => setShowBanner(false)} className="p-3 text-gray-500 hover:text-white transition-colors"><X size={20} /></button>
             </div>
           </motion.div>
