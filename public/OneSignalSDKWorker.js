@@ -1,8 +1,9 @@
 // 1. IMPORT ONESIGNAL (Must remain the first line)
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
-// 2. THE 20 UNIQUE CAMPAIGN NOTIFICATIONS WITH GAMEPLAY BUFFS
+// 2. THE 35 UNIQUE CAMPAIGN NOTIFICATIONS WITH GAMEPLAY BUFFS
 var campaigns = [
+  // --- Modern Gameplay Buff Notifications ---
   { title: "🎁 Surprise Drop!", body: "A random drop just landed in the shop. Check it out!", url: "/shop?ref=periodic-alert-1&buff=exclusive_pack" },
   { title: "⚡ Claim Your Free Coins!", body: "Coins are waiting for you! Don't miss out.", url: "/shop?ref=periodic-alert-2&buff=coin_grant_250" },
   { title: "📦 Restock Alert!", body: "The vault has been freshly restocked with new packs!", url: "/shop?ref=periodic-alert-3&buff=exclusive_pack" },
@@ -22,7 +23,24 @@ var campaigns = [
   { title: "🎮 Ready Player One?", body: "The pack opening arena is waiting for you.", url: "/shop?ref=periodic-alert-17&buff=luck_boost_1.5x" },
   { title: "🦄 Mythic Hunt!", body: "A mythic card has been spotted. Can you pull it?", url: "/shop?ref=periodic-alert-18&buff=luck_boost_3x" },
   { title: "🚀 Lift Off!", body: "Launch into today's events and boost your balance!", url: "/shop?ref=periodic-alert-19&buff=coin_grant_300" },
-  { title: "🤫 Secret Stash!", body: "We hid a special pack in the store. Can you find it?", url: "/shop?ref=periodic-alert-20&buff=exclusive_pack" }
+  { title: "🤫 Secret Stash!", body: "We hid a special pack in the store. Can you find it?", url: "/shop?ref=periodic-alert-20&buff=exclusive_pack" },
+
+  // --- Classic Retention Notifications ---
+  { title: "🔥 Streak At Risk!", body: "Keep your consecutive daily streak alive! Log in to claim your daily bonus.", url: "/shop?ref=classic-streak&buff=coin_grant_100" },
+  { title: "👋 We Miss You!", body: "It's been a minute! Drop back in to receive a welcome back luck multiplier.", url: "/shop?ref=classic-comeback&buff=luck_boost_1.5x" },
+  { title: "🏷️ Weekly Special!", body: "The weekly shop catalog has refreshed. Enjoy 10% off your next pack!", url: "/shop?ref=classic-weekly&buff=discount_10" },
+  { title: "🎲 Free Roll Active!", body: "Your daily free coin allotment has finished generating. Claim them now!", url: "/shop?ref=classic-freeroll&buff=coin_grant_200" },
+  { title: "⚡ Flash Sale Event!", body: "Limited-time deals are active right now. Secure an extra discount!", url: "/shop?ref=classic-flash&buff=discount_15" },
+  { title: "📦 Hidden Chest Found!", body: "A mysterious unopened chest has drifted into the vault!", url: "/shop?ref=classic-mystery&buff=exclusive_pack" },
+  { title: "🌙 Midnight Frenzy!", body: "Are you a night owl? Midnight luck is active for the next hour!", url: "/shop?ref=classic-midnight&buff=luck_boost_2x" },
+  { title: "⚔️ Weekend Warrior!", body: "Double XP weekend is officially starting. Speed up your level rewards!", url: "/shop?ref=classic-weekend&buff=xp_boost_2x" },
+  { title: "📈 Level Up Push!", body: "You are so close to your next rank. Grab this XP boost to push through!", url: "/shop?ref=classic-level&buff=xp_boost_2x" },
+  { title: "🌞 Golden Hour!", body: "The sun is setting, but the drop rates are rising. 3x Luck is live!", url: "/shop?ref=classic-golden&buff=luck_boost_3x" },
+  { title: "☔ Coin Rain!", body: "A passing storm just dropped a coin stash on the main page!", url: "/shop?ref=classic-rain&buff=coin_grant_500" },
+  { title: "🔑 Lost Key Located!", body: "You found a lost key! Use it to bypass security and open the exclusive vault.", url: "/shop?ref=classic-key&buff=exclusive_pack" },
+  { title: "💼 Clean Out the Store!", body: "Your inventory is looking empty. Let's fill it up with some fresh coins!", url: "/shop?ref=classic-inventory&buff=coin_grant_150" },
+  { title: "✨ Collector's Edition!", body: "An extremely rare pack variant has appeared. Unlock it before it fades!", url: "/shop?ref=classic-collector&buff=exclusive_pack" },
+  { title: "🎰 High Roller Club!", body: "Step up to the tables. A temporary luck multiplier has been credited to you!", url: "/shop?ref=classic-highroller&buff=luck_boost_2x" }
 ];
 
 // 3. INITIALIZATION & LOOP MANAGEMENT

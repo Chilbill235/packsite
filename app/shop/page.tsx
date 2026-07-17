@@ -20,6 +20,7 @@ const BUFF_MAP: Record<string, BuffDetails> = {
   // Coin Grants
   coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
   coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
+  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
   coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
   coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
   coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop! Coins added to your account.", icon: "💎", color: "text-blue-400" },
@@ -140,19 +141,20 @@ export default function ShopPage() {
   }, []);
 
   const handleNotificationRouting = useCallback(async (ref: string) => {
-    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
+    // Standardizes check of references from all 35 service-worker push routes
+    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
       setIsFlashSaleActive(true);
-    } else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
+    } else if (["daily-bonus", "level-up", "streak", "classic-streak", "classic-level", "classic-freeroll", "classic-rain"].includes(ref)) {
       try {
         await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
         await fetchUserData();
       } catch (e) { console.error("Auto-claim failed"); }
-    } else if (["reward-claim", "vault-drop", "mystery-box", "surprise"].includes(ref)) {
+    } else if (["reward-claim", "vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
       setShowAdModal(true);
       if (ref === "reward-claim") {
           setTimeout(() => handleClaimReward(), 500);
       }
-    } else if (["new-item", "best-seller", "refresh", "seasonal"].includes(ref)) {
+    } else if (["new-item", "best-seller", "refresh", "seasonal", "classic-weekly", "classic-collector", "classic-inventory"].includes(ref)) {
       loadShopData();
     }
   }, [fetchUserData, handleClaimReward, loadShopData]);
@@ -344,7 +346,7 @@ export default function ShopPage() {
 
     const triggerNotification = () => {
       // Pick a random event reference type
-      const refs = ["flash-deal", "reward-claim", "daily-bonus", "new-item", "vault-drop"];
+      const refs = ["flash-deal", "reward-claim", "daily-bonus", "new-item", "vault-drop", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"];
       const randomRef = refs[Math.floor(Math.random() * refs.length)];
       
       // Select a random gameplay buff

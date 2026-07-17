@@ -40,6 +40,13 @@ model User {
   createdAt     DateTime       @default(now())
   lastAdWatched DateTime?
   pendingReward Boolean        @default(false)
+
+  // --- NEW: Gameplay & Chance Modifiers ---
+  activeLuck       Float          @default(1.0)   // Multiplier for rare item drop rates (e.g., 2.0 for 2x, 3.0 for 3x)
+  activeDiscount   Float          @default(0.0)   // Percentage discount off store prices (e.g., 0.20 for 20% off)
+  hasExclusivePack Boolean        @default(false) // Grants access to pull from the limited-time secret vaults
+  activeXpBoost    Boolean        @default(false) // Doubles level progression speed when active
+
   accounts      Account[]
   inventory     Inventory[]
   openings      Opening[]

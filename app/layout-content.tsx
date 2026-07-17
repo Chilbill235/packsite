@@ -17,7 +17,6 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
 
   // --- 1. OneSignal Initialization ---
   useEffect(() => {
-    // Wrap in a try-catch to ensure it doesn't crash the render
     try {
       OneSignal.init({
         appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
@@ -29,35 +28,41 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     }
   }, []);
 
-  // --- 2. OneSignal Identity Sync ---
+  // --- 2. OneSignal Identity Sync & Notification Prompt ---
   useEffect(() => {
     if (status === "authenticated" && session?.user?.id) {
-      OneSignal.login(session.user.id).catch((err) => {
-        console.warn("OneSignal login failed:", err);
-      });
+      OneSignal.login(session.user.id)
+        .then(() => {
+          // iOS strictly requires verifying if the Notification interface exists.
+          // It will only be present if opened as an installed PWA on iOS 16.4+.
+          if (typeof window !== "undefined" && "Notification" in window) {
+            // Trigger the native/browser permission prompt interface
+            OneSignal.Notifications?.requestPermission();
+          } else {
+            console.log("Push notifications not supported in this browser context (Likely non-PWA iOS Safari).");
+          }
+        })
+        .catch((err) => {
+          console.warn("OneSignal login/permission sequence failed:", err);
+        });
     }
   }, [status, session]);
 
   // --- 3. Splash Screen & Force Redirect Logic ---
-  // Simplified and made more robust to prevent "stuck" states
   useEffect(() => {
-    // If we are not on the root, stop loading immediately
     if (pathname !== "/") {
       setLoading(false);
       return;
     }
 
-    // While session is loading, keep the splash screen
     if (status === "loading") {
       setLoading(true);
       return;
     }
 
-    // Once status is resolved, handle the redirect
     if (status === "authenticated") {
       router.replace("/shop");
     } else {
-      // If unauthenticated, stop showing the splash so they can see the login page
       setLoading(false);
     }
   }, [pathname, status, router]);
