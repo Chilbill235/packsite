@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { rollItem } from "@/lib/engine";
+import { rollItem } from "@/lib/openingEngine";
 
 // 1. GET: Fetches available packs
 export async function GET() {
