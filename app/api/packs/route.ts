@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { rollItem } from "@/lib/engine";
 
 // 1. GET: Fetches available packs
 export async function GET() {
@@ -22,19 +23,22 @@ export async function POST(req: Request) {
 
     const { packId } = await req.json();
     
-    // Fetch user
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    // Fetch user including the luck stat
+    const user = await prisma.user.findUnique({ 
+      where: { email: session.user.email } 
+    });
+    
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    // --- YOUR OPENING LOGIC ---
+    // Pack logic
     let pack;
     let cost = 0;
 
     if (packId === "exclusive_vault_pack") {
-      const vaultItems = await prisma.item.findMany({ 
+      const items = await prisma.item.findMany({ 
         where: { rarity: { in: ['Legendary', 'Mythical'] } } 
       });
-      pack = { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", items: vaultItems };
+      pack = { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", items };
       cost = 0;
     } else {
       pack = await prisma.pack.findUnique({
@@ -47,26 +51,28 @@ export async function POST(req: Request) {
     if (!pack || pack.items.length === 0) return NextResponse.json({ error: "Pack not found" }, { status: 404 });
     if (user.balance < cost) return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
 
-    // Weighted selection
-    const totalChance = pack.items.reduce((sum: number, item: any) => sum + (Number(item.chance) || 1), 0);
-    let random = Math.random() * totalChance;
-    let wonItem = pack.items[0];
+    // Roll using our engine (Luck defaults to 1 if not defined on user)
+    const wonItem = rollItem(pack.items, (user as any).luck || 1.0);
 
-    for (const item of pack.items) {
-      random -= (Number(item.chance) || 1);
-      if (random <= 0) {
-        wonItem = item;
-        break;
-      }
-    }
-
-    // Transaction
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: user.id }, data: { balance: { decrement: cost } } }),
-      prisma.inventory.create({ data: { userId: user.id, itemId: wonItem.id } })
+    // Atomic Transaction
+    const [updatedUser] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: cost } }
+      }),
+      prisma.inventory.create({
+        data: {
+          userId: user.id,
+          itemId: wonItem.id
+        }
+      })
     ]);
 
-    return NextResponse.json({ success: true, reward: wonItem, newBalance: user.balance - cost });
+    return NextResponse.json({ 
+      success: true, 
+      reward: wonItem, 
+      newBalance: updatedUser.balance 
+    });
 
   } catch (error: any) {
     console.error("PACK_OPEN_ERROR", error);

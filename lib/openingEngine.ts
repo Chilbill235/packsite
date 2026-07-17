@@ -1,17 +1,33 @@
 import { Item } from "@prisma/client";
 import crypto from "crypto";
 
-export function rollItem(items: Item[]): Item {
+// Adjusts the impact of luck on different rarities
+const RARITY_MULTIPLIERS: Record<string, number> = {
+  'Common': 1.0,
+  'Rare': 1.2,
+  'Legendary': 1.5,
+  'Mythical': 2.0
+};
+
+export function rollItem(items: Item[], luck: number = 1.0): Item {
   if (items.length === 0) throw new Error("No items found in this pack.");
 
-  const totalWeight = items.reduce((sum, item) => sum + item.chance, 0);
-  const randomBytes = crypto.randomBytes(4);
-  const randomNumber = randomBytes.readUInt32BE(0) / 0xffffffff;
-  let target = randomNumber * totalWeight;
+  // Calculate weighted chances based on luck
+  const weightedItems = items.map(item => ({
+    ...item,
+    adjustedChance: (Number(item.chance) || 1) * (1 + (luck - 1) * (RARITY_MULTIPLIERS[item.rarity] || 1))
+  }));
 
-  for (const item of items) {
-    target -= item.chance;
+  const totalWeight = weightedItems.reduce((sum, item) => sum + item.adjustedChance, 0);
+  
+  // Cryptographic random number between 0 and 1
+  const random = crypto.randomBytes(4).readUInt32BE(0) / 0xffffffff;
+  let target = random * totalWeight;
+
+  for (const item of weightedItems) {
+    target -= item.adjustedChance;
     if (target <= 0) return item;
   }
-  return items[items.length - 1];
+  
+  return weightedItems[weightedItems.length - 1];
 }
