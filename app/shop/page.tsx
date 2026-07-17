@@ -62,6 +62,8 @@ export default function ShopPage() {
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
 
+  // --- Refs ---
+  const userIdRef = useRef<string | undefined>(undefined); // Added: Ref for User ID
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
@@ -72,6 +74,7 @@ export default function ShopPage() {
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
+        userIdRef.current = userData?.id; // Fix: Sync ref with state
         window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: userData.balance } }));
         return userData;
       }
@@ -105,23 +108,36 @@ export default function ShopPage() {
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, [fetchUserData]);
 
-  const handleTimerComplete = useCallback(() => {
+  const handleTimerComplete = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
 
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Ad Reward Ready!", {
-        body: "Click here to claim your 500 coins!",
-        icon: "/favicon.ico",
-        tag: "ad-reward"
-      }).onclick = () => {
-        window.focus();
-        window.location.href = "/shop?ref=claim-500";
-      };
+    // Fix: Use Ref instead of React state for immediate access
+    const currentUserId = userIdRef.current;
+
+    if (!currentUserId) {
+      console.error("Cannot send notification: User ID not found");
+      return;
+    }
+
+    try {
+      await fetch("/api/send-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUserId,
+          title: "Ad Reward Ready!",
+          message: "Your 500 coins are waiting. Click to claim!",
+          ref: "claim-500"
+        }),
+      });
+    } catch (e) {
+      console.error("Push notification trigger failed:", e);
     }
     
+    // Keep your existing sync logic
     fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error("Ad completion sync failed", e));
-  }, []);
+  }, []); // Dependencies cleared
 
   const loadShopData = useCallback(async () => {
     try {
@@ -131,6 +147,7 @@ export default function ShopPage() {
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
+        userIdRef.current = userData?.id; // Fix: Sync ref with initial load
         if (userData?.id) {
           try { await OneSignal.login(userData.id); } catch (e) { console.error("OneSignal Login Error:", e); }
         }
@@ -168,7 +185,7 @@ export default function ShopPage() {
     try {
       const status = await OneSignal.Notifications.requestPermission();
       setPermission(status ? "granted" : "denied");
-      if (status && user?.id) await OneSignal.login(user.id);
+      if (status && userIdRef.current) await OneSignal.login(userIdRef.current);
     } catch (err) { console.error("OneSignal Permission Request Error: ", err); }
   };
 
