@@ -413,6 +413,9 @@ export default function ShopPage() {
           id: "exclusive_vault_pack", 
           name: "🔥 Secret Vault Pack", 
           price: 0, 
+          description: "An exclusive pack hidden away.",
+          image: "/images/vault-pack.png", // Ensure this path exists or matches your requirements
+          category: "exclusive",
           items: [] 
         } as PackWithItems
       ] 

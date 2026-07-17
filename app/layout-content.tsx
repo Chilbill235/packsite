@@ -27,7 +27,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     const initAndSyncOneSignal = async () => {
       try {
         // Initialize OneSignal
-        // notifyButton removed to resolve TypeScript build errors
+        // notifyButton configuration removed to resolve TypeScript build errors
         await OneSignal.init({
           appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
           safari_web_id: "web.onesignal.auto.5dcf04a7-d9b5-4793-8717-b5ec1870e3bb",
@@ -139,6 +139,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
           <Navbar />
           <main className="flex-grow">{children}</main>
           
+          {/* Vercel Analytics added back here */}
           <Analytics />
           
           <Script 
