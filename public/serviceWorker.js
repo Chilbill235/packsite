@@ -3,6 +3,8 @@
  * Full code: Includes all logic for periodic loops, push notifications, and dynamic ad timers.
  * Fully compatible with iOS, Safari, Chrome, and desktop platforms.
  */
+// Import OneSignal SDK Worker (must be first line)
+importScripts('/OneSignalSDKWorker.js');
 
 // --- 1. LIFE-CYCLE EVENTS ---
 self.addEventListener('install', function (event) {
