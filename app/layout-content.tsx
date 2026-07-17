@@ -17,18 +17,20 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
 
   // --- 1. OneSignal Initialization ---
   useEffect(() => {
-    // Only initialize once
-    OneSignal.init({
-      appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
-      allowLocalhostAsSecureOrigin: true,
-      serviceWorkerPath: 'OneSignalSDKWorker.js',
-    });
+    // Wrap in a try-catch to ensure it doesn't crash the render
+    try {
+      OneSignal.init({
+        appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath: 'OneSignalSDKWorker.js',
+      });
+    } catch (error) {
+      console.log("OneSignal: Already initialized.");
+    }
   }, []);
 
-  // --- 2. OneSignal Identity Sync (Cleaned) ---
+  // --- 2. OneSignal Identity Sync ---
   useEffect(() => {
-    // We simply call login. OneSignal handles the internal queueing, 
-    // so it doesn't matter if the SDK is still finishing initialization.
     if (status === "authenticated" && session?.user?.id) {
       OneSignal.login(session.user.id).catch((err) => {
         console.warn("OneSignal login failed:", err);
@@ -37,28 +39,28 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   }, [status, session]);
 
   // --- 3. Splash Screen & Force Redirect Logic ---
+  // Simplified and made more robust to prevent "stuck" states
   useEffect(() => {
+    // If we are not on the root, stop loading immediately
     if (pathname !== "/") {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-
+    // While session is loading, keep the splash screen
     if (status === "loading") {
+      setLoading(true);
       return;
     }
 
-    const timer = setTimeout(() => {
-      if (status === "authenticated") {
-        router.replace("/shop");
-      } else {
-        setLoading(false); 
-      }
-    }, 4000); 
-
-    return () => clearTimeout(timer);
-  }, [router, pathname, status]);
+    // Once status is resolved, handle the redirect
+    if (status === "authenticated") {
+      router.replace("/shop");
+    } else {
+      // If unauthenticated, stop showing the splash so they can see the login page
+      setLoading(false);
+    }
+  }, [pathname, status, router]);
 
   // --- 4. Handle Browser Back-Forward Cache (BFcache) ---
   useEffect(() => {
