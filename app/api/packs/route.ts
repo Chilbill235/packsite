@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth"; // Ensure this path is correct
+import { auth } from "@/lib/auth"; // Ensure this points to your Auth.js v5 config
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    // 1. Authenticate the user using Auth.js v5 'auth()'
+    const session = await auth();
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
     const { packId } = await req.json();
     
-    // Fetch user from database
+    // Fetch the user from the database
     const user = await prisma.user.findUnique({ 
       where: { email: session.user.email } 
     });
@@ -22,12 +22,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // 1. Define the Pack Logic (Virtual or Database)
+    // 2. Define the Pack Logic (Virtual or Database)
     let pack;
     let cost = 0;
 
     if (packId === "exclusive_vault_pack") {
-      // Fetch high-value items from your DB
+      // Fetch high-value items from your DB for the vault pack
       const vaultItems = await prisma.item.findMany({ 
         where: { rarity: { in: ['Legendary', 'Mythical'] } } 
       });
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
       };
       cost = 0; // Vault pack is free
     } else {
+      // Fetch standard pack
       pack = await prisma.pack.findUnique({
         where: { id: packId },
         include: { items: true },
@@ -50,25 +51,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Pack not found or empty" }, { status: 404 });
     }
 
-    // 2. Check Balance
+    // 3. Check Balance
     if (user.balance < cost) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
     }
 
-    // 3. Weighted Random Selection Algorithm
-    const totalChance = pack.items.reduce((sum, item) => sum + (item.chance || 1), 0);
+    // 4. Weighted Random Selection Algorithm
+    // Uses the 'chance' property from your database items
+    const totalChance = pack.items.reduce((sum, item) => sum + (Number(item.chance) || 1), 0);
     let random = Math.random() * totalChance;
     let wonItem = pack.items[0];
 
     for (const item of pack.items) {
-      random -= (item.chance || 1);
+      random -= (Number(item.chance) || 1);
       if (random <= 0) {
         wonItem = item;
         break;
       }
     }
 
-    // 4. Execute Transaction
+    // 5. Execute Transaction: Deduct cost and add to inventory
     const result = await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
