@@ -146,37 +146,34 @@ export default function ShopPage() {
   };
 
   const handleWatchAdClick = async (amount: number) => {
-    sessionStorage.setItem('pendingRewardAmount', amount.toString());
-    targetTimeRef.current = Date.now() + 10000;
-    setCountdown(10);
-    setIsWaiting(true);
-    setHasDispatchedPush(false);
-    adService.current?.showAd(user?.email || "anon");
+  sessionStorage.setItem('pendingRewardAmount', amount.toString());
+  targetTimeRef.current = Date.now() + 10000;
+  setCountdown(10);
+  setIsWaiting(true);
+  setHasDispatchedPush(false);
+  
+  // Show Ad
+  adService.current?.showAd(user?.email || "anon");
 
-    // Fix: Ensure Service Worker controller is active before posting message
-    if ("serviceWorker" in navigator) {
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ 
+  // Robust Service Worker communication
+  if ("serviceWorker" in navigator) {
+    try {
+      // Wait for the SW to be ready
+      const registration = await navigator.serviceWorker.ready;
+      
+      if (registration.active) {
+        registration.active.postMessage({ 
           type: "START_BACKGROUND_TIMER", 
           delay: 10000, 
           amount: amount, 
           url: window.location.origin + "/shop?ref=reward-claim" 
         });
-      } else {
-        // Fallback to waiting for registration
-        navigator.serviceWorker.ready.then((registration) => {
-            if (registration.active) {
-                registration.active.postMessage({ 
-                    type: "START_BACKGROUND_TIMER", 
-                    delay: 10000, 
-                    amount: amount, 
-                    url: window.location.origin + "/shop?ref=reward-claim" 
-                });
-            }
-        }).catch(err => console.error("SW registration error", err));
       }
+    } catch (err) {
+      console.error("Service Worker not ready for messaging:", err);
     }
-  };
+  }
+};
 
   const handleOpenPack = async (packId: string) => {
     try {
