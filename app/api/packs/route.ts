@@ -1,28 +1,41 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth"; // Ensure this path is correct
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
+    
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { packId } = await req.json();
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    
+    // Fetch user from database
+    const user = await prisma.user.findUnique({ 
+      where: { email: session.user.email } 
+    });
+    
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
     // 1. Define the Pack Logic (Virtual or Database)
     let pack;
     let cost = 0;
 
     if (packId === "exclusive_vault_pack") {
+      // Fetch high-value items from your DB
+      const vaultItems = await prisma.item.findMany({ 
+        where: { rarity: { in: ['Legendary', 'Mythical'] } } 
+      });
+      
       pack = {
         id: "exclusive_vault_pack",
         name: "🔥 Secret Vault Pack",
-        // Vault items: high rarity selection
-        items: await prisma.item.findMany({ where: { rarity: { in: ['Legendary', 'Mythical'] } } })
+        items: vaultItems
       };
       cost = 0; // Vault pack is free
     } else {
@@ -55,7 +68,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4. Execute Transaction: Deduct cost, update balance, and add to inventory
+    // 4. Execute Transaction
     const result = await prisma.$transaction([
       prisma.user.update({
         where: { id: user.id },
