@@ -81,6 +81,34 @@ export default function ShopPage() {
     return null;
   }, []);
 
+  // --- Buff Application Logic ---
+  const applyBuff = useCallback(async (buff: string) => {
+    if (!buff) return;
+    console.log("Applying buff from URL:", buff);
+
+    if (buff.startsWith('discount_')) {
+      const val = parseInt(buff.split('_')[1]) / 100;
+      setActiveDiscount(val);
+    } else if (buff.startsWith('luck_boost_')) {
+      const val = parseFloat(buff.replace('luck_boost_', '').replace('x', ''));
+      setActiveLuck(val || 1);
+    } else if (buff === 'exclusive_pack') {
+      setHasExclusivePack(true);
+    } else if (buff === 'xp_boost_2x') {
+      setActiveXpBoost(true);
+    } else if (buff.startsWith('coin_grant_')) {
+      const amount = parseInt(buff.split('_')[2]);
+      try {
+        await fetch("/api/user/add-coins", { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json" }, 
+          body: JSON.stringify({ amount }) 
+        });
+        await fetchUserData();
+      } catch (err) { console.error("Failed to grant coins from buff:", err); }
+    }
+  }, [fetchUserData]);
+
   const handleClaimReward = useCallback(async (amount: number = 500) => {
     try {
       const verifyRes = await fetch("/api/user/verify-ad-claim");
@@ -272,19 +300,22 @@ export default function ShopPage() {
     };
   }, [loadShopData, handleTimerComplete]);
 
+  // COMBINED URL PARAMETER HANDLER
   useEffect(() => {
     if (!loading) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
-      if (ref) {
-        handleNotificationRouting(ref);
-        const cleanParams = new URLSearchParams(window.location.search);
-        cleanParams.delete("ref");
-        const cleanPath = window.location.pathname + (cleanParams.toString() ? `?${cleanParams.toString()}` : "");
-        window.history.replaceState({}, document.title, cleanPath);
+      const buff = params.get("buff");
+
+      if (ref) handleNotificationRouting(ref);
+      if (buff) applyBuff(buff);
+
+      // Clean URL if parameters existed
+      if (ref || buff) {
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
-  }, [loading, handleNotificationRouting]);
+  }, [loading, handleNotificationRouting, applyBuff]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
