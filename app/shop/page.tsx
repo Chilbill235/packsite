@@ -319,7 +319,7 @@ export default function ShopPage() {
         {isOpening && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/95 backdrop-blur-xl"
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/95 backdrop-blur-xl pointer-events-auto"
           >
             <motion.div 
               animate={{ 
@@ -346,17 +346,25 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* WINNING ANIMATION OVERLAY */}
+      {/* WINNING ANIMATION OVERLAY - FIXED FOR IOS */}
       <AnimatePresence>
         {wonItems.length > 0 && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl p-6 overflow-hidden" 
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl p-6 overflow-hidden cursor-pointer pointer-events-auto" 
             onClick={() => setWonItems([])}
           >
+            {/* Added an explicit X close button for reliability on mobile */}
+            <button 
+                onClick={(e) => { e.stopPropagation(); setWonItems([]); }}
+                className="absolute top-6 right-6 p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all"
+            >
+                <X size={24} />
+            </button>
+
             <motion.div 
               initial={{ scale: 0 }} animate={{ scale: 1 }}
-              className="absolute w-[600px] h-[600px] bg-indigo-500/20 blur-[150px] rounded-full" 
+              className="absolute w-[600px] h-[600px] bg-indigo-500/20 blur-[150px] rounded-full pointer-events-none" 
             />
 
             <motion.div 
@@ -377,7 +385,6 @@ export default function ShopPage() {
                       initial={{ rotateX: -90, opacity: 0 }} 
                       animate={{ rotateX: 0, opacity: 1 }} 
                       transition={{ delay: idx * 0.15, type: "spring", stiffness: 200 }}
-                      whileHover={{ y: -10, scale: 1.02 }}
                       className={`group relative w-full max-w-[280px] bg-black/40 border border-white/10 backdrop-blur-xl p-6 rounded-3xl flex flex-col items-center text-center shadow-2xl overflow-hidden ${theme.border}`}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${theme.glow} opacity-20 group-hover:opacity-40 transition-opacity`} />
