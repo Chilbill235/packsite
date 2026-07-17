@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/send-drop",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
+
+
+
+
