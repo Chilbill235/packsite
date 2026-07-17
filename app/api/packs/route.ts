@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
+
+// Re-add auth import to ensure it's properly recognized
+import { auth } from "@/lib/auth";
 
 // 1. GET: Fetches available packs (without items for performance)
 // Items are fetched separately when opening a pack via POST /api/packs/open

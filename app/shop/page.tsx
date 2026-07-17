@@ -64,6 +64,7 @@ export default function ShopPage() {
   // --- Refs ---
   const userIdRef = useRef<string | undefined>(undefined);
   const targetTimeRef = useRef<number | null>(null);
+  const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
 
   // --- Core Logic ---
@@ -136,8 +137,10 @@ export default function ShopPage() {
   }, [fetchUserData]);
 
   const handleTimerComplete = useCallback(async () => {
+    if (timerCompletedRef.current) return;
     // Guard against multiple calls
     if (!isWaiting || !targetTimeRef.current) return;
+    timerCompletedRef.current = true;
 
     setIsWaiting(false);
     let currentUserId = userIdRef.current;
@@ -228,6 +231,7 @@ export default function ShopPage() {
   };
 
   const handleWatchAdClick = async (amount: number) => {
+    timerCompletedRef.current = false;
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
