@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
@@ -110,31 +111,8 @@ export default function ShopPage() {
     }
   }, [fetchUserData]);
 
-  const handleClaimReward = useCallback(async (amount: number = 500) => {
-    try {
-      const verifyRes = await fetch("/api/user/verify-ad-claim");
-      const verifyData = await verifyRes.json();
-      
-      if (!verifyRes.ok || !verifyData.eligible) {
-        setErrorDialog({ message: "Reward not available or already claimed." });
-        return;
-      }
-      
-      const res = await fetch("/api/user/add-coins", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ amount }) 
-      });
-      
-      if (res.ok) {
-        setShowAdModal(false);
-        await fetchUserData();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else {
-        setErrorDialog({ message: "Failed to credit coins." });
-      }
-    } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
-  }, [fetchUserData]);
+  // Note: The reward claiming flow now uses the direct "reward-claim" path
+  // which provides immediate feedback without a second notification
 
   const handleTimerComplete = useCallback(async () => {
     if (timerCompletedRef.current) return;
@@ -163,16 +141,18 @@ export default function ShopPage() {
     }
 
     try {
-      await fetch("/api/send-notification", {
+      console.log("Sending ad reward notification with ref: reward-claim");
+      const response = await fetch("/api/send-notification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: currentUserId,
           title: "Ad Reward Ready!",
           message: "Your 500 coins are waiting. Click to claim!",
-          ref: "claim-500"
+          ref: "reward-claim"
         }),
       });
+      console.log("Ad reward notification sent:", response);
     } catch (e) {
       console.error("Push notification trigger failed:", e);
     }
@@ -202,21 +182,42 @@ export default function ShopPage() {
     const currentUser = user || await fetchUserData();
     if (!currentUser) return;
 
-    if (ref === "claim-500") {
-        await handleClaimReward(500);
-    } else if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
+    // Note: The old "claim-500" flow has been removed to prevent duplicate notifications
+    // All reward claims now go through the "reward-claim" path below for immediate gratification
+    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
       setIsFlashSaleActive(true);
     } else if (["daily-bonus", "level-up", "streak", "classic-streak", "classic-level", "classic-freeroll", "classic-rain"].includes(ref)) {
       try {
         await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
         await fetchUserData();
       } catch (e) { console.error("Auto-claim failed"); }
-    } else if (["reward-claim", "vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
+    } else if (ref === "reward-claim") {
+      // Handle reward claim from notification
+      try {
+        console.log("Attempting to claim reward via notification click");
+        const response = await fetch("/api/user/add-coins", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: 500, suppressNotification: true })
+        });
+        console.log("Reward claim response:", response);
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Reward claim failed with error:", errorData);
+          throw new Error(errorData.error || "Failed to claim reward");
+        }
+        await fetchUserData();
+        console.log("Reward claimed successfully");
+      } catch (e) {
+        console.error("Reward claim failed:", e);
+        setErrorDialog({ message: "Failed to claim reward: " + (e.message || "Unknown error") });
+      }
+    } else if (["vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
       setShowAdModal(true);
     } else if (["new-item", "best-seller", "refresh", "seasonal", "classic-weekly", "classic-collector", "classic-inventory"].includes(ref)) {
       loadShopData();
     }
-  }, [fetchUserData, handleClaimReward, loadShopData, user]);
+  }, [fetchUserData, loadShopData, user]);
 
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) {
@@ -249,7 +250,7 @@ export default function ShopPage() {
         const registration = await navigator.serviceWorker.ready;
         if (registration.active) {
           registration.active.postMessage({
-            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=claim-500`
+            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=reward-claim`
           });
         }
       } catch (err) { console.error("Service Worker not ready for messaging:", err); }
@@ -286,8 +287,8 @@ export default function ShopPage() {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       if (res.ok) {
-        setWonItems(data.wonItems || [data.wonItem]); 
-        await fetchUserData(); 
+        setWonItems(data.wonItems);
+        await fetchUserData();
         if (activeDiscount > 0) setActiveDiscount(0);
         if (activeLuck > 1) setActiveLuck(1);
         if (packId === "exclusive_vault_pack") setHasExclusivePack(false);
@@ -325,21 +326,44 @@ export default function ShopPage() {
   }, [loadShopData, handleTimerComplete]);
 
   // COMBINED URL PARAMETER HANDLER
+  const [searchParamsState, setSearchParams] = useSearchParams();
+
   useEffect(() => {
-    if (!loading) {
-      const params = new URLSearchParams(window.location.search);
-      const ref = params.get("ref");
-      const buff = params.get("buff");
+    if (!loading && searchParamsState) {
+      const ref = searchParamsState.get("ref");
+      const buff = searchParamsState.get("buff");
 
-      if (ref) handleNotificationRouting(ref);
-      if (buff) applyBuff(buff);
+      // Process ref parameter if present
+      if (ref) {
+        handleNotificationRouting(ref);
+        // Remove the ref parameter from URL
+        const params = new URLSearchParams(searchParamsState);
+        params.delete('ref');
+        if (params.toString()) {
+          // Update URL with remaining params
+          window.history.replaceState({}, document.title, `${window.location.pathname}?${params.toString()}`);
+        } else {
+          // No params left, clean URL completely
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
 
-      // Clean URL if parameters existed
-      if (ref || buff) {
-        window.history.replaceState({}, document.title, window.location.pathname);
+      // Process buff parameter if present (independent of ref)
+      if (buff) {
+        applyBuff(buff);
+        // Remove the buff parameter from URL
+        const params = new URLSearchParams(searchParamsState);
+        params.delete('buff');
+        if (params.toString()) {
+          // Update URL with remaining params
+          window.history.replaceState({}, document.title, `${window.location.pathname}?${params.toString()}`);
+        } else {
+          // No params left, clean URL completely
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
     }
-  }, [loading, handleNotificationRouting, applyBuff]);
+  }, [loading, searchParamsState, handleNotificationRouting, applyBuff]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {

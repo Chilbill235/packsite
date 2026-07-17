@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const amount = typeof body.amount === 'number' ? body.amount : 500;
+    const suppressNotification = body.suppressNotification === true;
     const userId = session.user.id;
 
     // 1. Update DB
@@ -25,12 +26,15 @@ export async function POST(request: NextRequest) {
     });
 
     // 2. Trigger notification directly (No internal network fetch needed!)
-    await sendPushNotification(
-      userId,
-      "💎 Coins Claimed! 💎",
-      `🪙 You just received ${amount} coins.`,
-      "reward-claim"
-    );
+    // Unless suppressed (e.g., when claiming reward via notification click)
+    if (!suppressNotification) {
+      await sendPushNotification(
+        userId,
+        "💎 Coins Claimed! 💎",
+        `🪙 You just received ${amount} coins.`,
+        "reward-claim"
+      );
+    }
 
     return NextResponse.json({ newBalance: updatedUser.balance });
   } catch (error) {

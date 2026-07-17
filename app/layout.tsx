@@ -2,6 +2,7 @@ import { Metadata, Viewport } from "next";
 import "./globals.css";
 import LayoutContent from "./layout-content";
 import Providers from "@/app/providers";
+import InstallPrompt from "@/components/InstallPrompt";
 
 export const metadata: Metadata = {
   title: "PackSite",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
     apple: "/splash/apple-icon-180.png",
     icon: "/favicon.ico" 
   },
-  manifest: "/manifest.json", // Ensure you have this file in your public folder
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
@@ -30,11 +31,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" style={{ backgroundColor: '#000000' }}>
       <head>
-        {/* AdSense & Monetag Tags */}
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
-
-        {/* PWA Splash Screen */}
         <link 
           rel="apple-touch-startup-image" 
           href="/splash/apple-splash-2048-2732.jpg" 
@@ -43,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         <Providers>
+          <InstallPrompt />
           <LayoutContent>
             {children}
           </LayoutContent>

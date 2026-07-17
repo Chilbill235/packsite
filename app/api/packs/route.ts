@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
+import type { Item } from "@prisma/client";
 
 // Re-add auth import to ensure it's properly recognized
 import { auth } from "@/lib/auth";
@@ -26,7 +27,6 @@ export async function GET() {
 }
 
 // 2. POST: Handles the pack opening logic
-// Added comment to trigger TypeScript recheck
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -34,57 +34,81 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { packId } = await req.json();
-    
-    // Fetch user including the luck stat
-    const user = await prisma.user.findUnique({ 
-      where: { email: session.user.email } 
+    const { packId, quantity = 1, isFlashSale = false, activeDiscount = 0, activeLuck = 1 } = await req.json();
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
     });
-    
+
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    // Pack logic
+    // Fetch the pack
     let pack;
-    let cost = 0;
+    let basePrice = 0;
 
     if (packId === "exclusive_vault_pack") {
-      const items = await prisma.item.findMany({ 
-        where: { rarity: { in: ['Legendary', 'Mythical'] } } 
+      // For exclusive vault pack, we don't use the pack table, we define it on the fly
+      const items = await prisma.item.findMany({
+        where: { rarity: { in: ['Legendary', 'Mythical'] } }
       });
       pack = { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", items };
-      cost = 0;
+      basePrice = 0;
     } else {
       pack = await prisma.pack.findUnique({
         where: { id: packId },
         include: { items: true },
       });
-      cost = pack?.price || 0;
+      if (!pack) return NextResponse.json({ error: "Pack not found" }, { status: 404 });
+      basePrice = pack.price;
     }
 
     if (!pack || pack.items.length === 0) return NextResponse.json({ error: "Pack not found" }, { status: 404 });
-    if (user.balance < cost) return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
 
-    // Roll using our engine (Luck defaults to 1 if not defined on user)
-    const wonItem = rollItem(pack.items, (user as any).luck || 1.0);
+    // Calculate price per pack after discounts
+    let pricePerPack = basePrice;
+    if (isFlashSale && packId !== "exclusive_vault_pack") {
+      pricePerPack = Math.floor(basePrice * 0.5); // 50% off
+    }
+    if (activeDiscount > 0 && packId !== "exclusive_vault_pack") {
+      pricePerPack = Math.floor(basePrice * (1 - activeDiscount));
+    }
 
-    // Atomic Transaction
-    const [updatedUser] = await prisma.$transaction([
-      prisma.user.update({
+    const totalCost = pricePerPack * quantity;
+    if (user.balance < totalCost) return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
+
+    // We'll roll for each pack
+    const wonItems: Item[] = [];
+    // We'll update the user's balance and create inventory entries in a transaction
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // First, deduct the total cost
+      await tx.user.update({
         where: { id: user.id },
-        data: { balance: { decrement: cost } }
-      }),
-      prisma.inventory.create({
-        data: {
-          userId: user.id,
-          itemId: wonItem.id
-        }
-      })
-    ]);
+        data: { balance: { decrement: totalCost } }
+      });
 
-    return NextResponse.json({ 
-      success: true, 
-      reward: wonItem, 
-      newBalance: updatedUser.balance 
+      // Then, for each pack, roll an item and create an inventory entry
+      for (let i = 0; i < quantity; i++) {
+        // Use the activeLuck from the request (client-sent)
+        const wonItem = rollItem(pack.items, activeLuck);
+        wonItems.push(wonItem);
+        await tx.inventory.create({
+          data: {
+            userId: user.id,
+            itemId: wonItem.id
+          }
+        });
+      }
+
+      // Fetch the updated user to return the new balance
+      return await tx.user.findUnique({
+        where: { id: user.id },
+        select: { balance: true }
+      });
+    });
+
+    return NextResponse.json({
+      success: true,
+      wonItems,
+      newBalance: updatedUser.balance
     });
 
   } catch (error: any) {
