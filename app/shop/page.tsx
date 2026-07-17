@@ -42,7 +42,7 @@ export default function ShopPage() {
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isOpening, setIsOpening] = useState(false); 
+  const [isOpening, setIsOpening] = useState(false);  
   
   const [isStandalone, setIsStandalone] = useState(true);
   const [isIOS, setIsIOS] = useState(false);
@@ -63,7 +63,7 @@ export default function ShopPage() {
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
 
   // --- Refs ---
-  const userIdRef = useRef<string | undefined>(undefined); // Added: Ref for User ID
+  const userIdRef = useRef<string | undefined>(undefined);
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
@@ -74,7 +74,7 @@ export default function ShopPage() {
       if (res.ok) {
         const userData = await res.json();
         setUser(userData);
-        userIdRef.current = userData?.id; // Fix: Sync ref with state
+        userIdRef.current = userData?.id;
         window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: userData.balance } }));
         return userData;
       }
@@ -111,8 +111,6 @@ export default function ShopPage() {
   const handleTimerComplete = useCallback(async () => {
     setIsWaiting(false);
     targetTimeRef.current = null;
-
-    // Fix: Use Ref instead of React state for immediate access
     const currentUserId = userIdRef.current;
 
     if (!currentUserId) {
@@ -135,9 +133,8 @@ export default function ShopPage() {
       console.error("Push notification trigger failed:", e);
     }
     
-    // Keep your existing sync logic
     fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error("Ad completion sync failed", e));
-  }, []); // Dependencies cleared
+  }, []);
 
   const loadShopData = useCallback(async () => {
     try {
@@ -147,13 +144,13 @@ export default function ShopPage() {
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
-        userIdRef.current = userData?.id; // Fix: Sync ref with initial load
+        userIdRef.current = userData?.id;
         if (userData?.id) {
           try { await OneSignal.login(userData.id); } catch (e) { console.error("OneSignal Login Error:", e); }
         }
       }
       if (packRes.ok) setPacks(await packRes.json());
-    } catch (err) { console.error(err); }   
+    } catch (err) { console.error(err); }    
     finally { setLoading(false); }
   }, []);
 
@@ -301,7 +298,6 @@ export default function ShopPage() {
     return () => clearInterval(intervalId);
   }, [isWaiting, handleTimerComplete]);
 
-  // --- Rarity Styles ---
   const getRarityStyles = (rarity?: string) => {
     const r = rarity?.toLowerCase() || "common";
     if (r.includes("legend") || r.includes("mythic") || r.includes("omega")) return { bg: "bg-yellow-500/10", border: "border-yellow-400", text: "text-yellow-400", glow: "from-yellow-400/40", shadow: "shadow-[0_0_40px_rgba(250,204,21,0.4)]" };
