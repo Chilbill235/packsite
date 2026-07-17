@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
@@ -12,41 +12,63 @@ import OneSignal from "react-onesignal";
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [loading, setLoading] = useState(pathname === "/");
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
+  
+  // Use a ref to track if we have already triggered the init process
+  const isInitializing = useRef(false);
 
-  // --- 1. OneSignal Initialization ---
+  // --- 1. Sequential & Safe OneSignal Lifecycle ---
   useEffect(() => {
-    try {
-      OneSignal.init({
-        appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
-        allowLocalhostAsSecureOrigin: true,
-        serviceWorkerPath: 'OneSignalSDKWorker.js',
-      });
-    } catch (error) {
-      console.log("OneSignal: Already initialized.");
-    }
-  }, []);
+    if (typeof window === "undefined" || isInitializing.current) return;
+    isInitializing.current = true;
 
-  // --- 2. OneSignal Identity Sync & Notification Prompt ---
-  useEffect(() => {
-    if (status === "authenticated" && session?.user?.id) {
-      OneSignal.login(session.user.id)
-        .then(() => {
-          // iOS strictly requires verifying if the Notification interface exists.
-          // It will only be present if opened as an installed PWA on iOS 16.4+.
-          if (typeof window !== "undefined" && "Notification" in window) {
-            // Trigger the native/browser permission prompt interface
-            OneSignal.Notifications?.requestPermission();
-          } else {
-            console.log("Push notifications not supported in this browser context (Likely non-PWA iOS Safari).");
-          }
-        })
-        .catch((err) => {
-          console.warn("OneSignal login/permission sequence failed:", err);
+    const initAndSyncOneSignal = async () => {
+      try {
+        // Initialize OneSignal with your specific configuration
+        await OneSignal.init({
+          appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
+          safari_web_id: "web.onesignal.auto.5dcf04a7-d9b5-4793-8717-b5ec1870e3bb",
+          notifyButton: {
+            enable: true,
+          },
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
         });
-    }
+
+        // Identity Sync & Check Notification Status (Only when Authenticated)
+        if (status === "authenticated" && session?.user?.id) {
+          await OneSignal.login(session.user.id);
+
+          // Show prompt banner if notifications are supported and set to default (unprompted)
+          if (
+            "Notification" in window &&
+            Notification.permission === "default"
+          ) {
+            setShowNotifBanner(true);
+          }
+        }
+      } catch (error) {
+        console.error("OneSignal lifecycle error:", error);
+        isInitializing.current = false; // Allow retry on failure
+      }
+    };
+
+    initAndSyncOneSignal();
   }, [status, session]);
+
+  // --- 2. iOS-Compliant Click Handler ---
+  const handleEnableNotifications = async () => {
+    try {
+      if (OneSignal.Notifications) {
+        await OneSignal.Notifications.requestPermission();
+      }
+      setShowNotifBanner(false);
+    } catch (error) {
+      console.error("Failed to request notification permission:", error);
+    }
+  };
 
   // --- 3. Splash Screen & Force Redirect Logic ---
   useEffect(() => {
@@ -94,6 +116,28 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
       ) : (
         <div className="animate-in fade-in duration-500 min-h-screen flex flex-col">
           <InstallPrompt />
+          
+          {/* Custom Notification Opt-in Banner */}
+          {showNotifBanner && (
+            <div className="bg-blue-600 text-white text-sm py-2 px-4 flex justify-between items-center z-50">
+              <span>Want to get notified when new packs drop?</span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={handleEnableNotifications}
+                  className="bg-white text-blue-600 px-3 py-1 rounded font-semibold text-xs hover:bg-blue-50 transition"
+                >
+                  Enable
+                </button>
+                <button 
+                  onClick={() => setShowNotifBanner(false)}
+                  className="text-white opacity-80 hover:opacity-100 text-xs px-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           <Navbar />
           <main className="flex-grow">{children}</main>
           
