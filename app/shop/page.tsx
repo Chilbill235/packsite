@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
-import type { PackWithItems } from "@/types";
+import type { Pack } from "@prisma/client";
 import OneSignal from "react-onesignal";
 
 // --- Notification Buff Definitions ---
@@ -36,7 +36,13 @@ const BUFF_MAP: Record<string, BuffDetails> = {
 
 export default function ShopPage() {
   // --- States ---
-  const [packs, setPacks] = useState<PackWithItems[]>([]);
+  interface PackBasic {
+    id: string;
+    name: string;
+    price: number;
+  }
+
+  const [packs, setPacks] = useState<PackBasic[]>([]);
   const [user, setUser] = useState<{ id?: string; email?: string; balance?: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isWaiting, setIsWaiting] = useState(false);
@@ -60,6 +66,7 @@ export default function ShopPage() {
   const [activeDiscount, setActiveDiscount] = useState<number>(0); 
   const [activeLuck, setActiveLuck] = useState<number>(1); 
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
+  const [packError, setPackError] = useState<string | null>(null);
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
 
   // --- Refs ---
@@ -161,10 +168,11 @@ export default function ShopPage() {
   }, [isWaiting, fetchUserData]);
 
   const loadShopData = useCallback(async () => {
+    setPackError(null);
     try {
       setLoading(true);
       const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
-      
+
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
@@ -173,9 +181,62 @@ export default function ShopPage() {
           try { await OneSignal.login(userData.id); } catch (e) { console.error("OneSignal Login Error:", e); }
         }
       }
-      if (packRes.ok) setPacks(await packRes.json());
-    } catch (err) { console.error(err); }    
-    finally { setLoading(false); }
+      // Try fetching packs up to 3 times if we get an empty array
+      let packData = null;
+      let fetchSucceeded = false;
+      let fetchError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await fetch("/api/packs");
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            if (data.length > 0) {
+              packData = data;
+              fetchSucceeded = true;
+              break; // success with data
+            } else {
+              // Empty array, maybe retry after a short delay
+              if (attempt < 3) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // wait 500ms
+                continue;
+              } else {
+                packData = [];
+                fetchSucceeded = true;
+                break;
+              }
+            }
+          } else {
+            throw new Error("Expected array");
+          }
+        } catch (err) {
+          fetchError = err;
+          // If not the last attempt, wait and retry
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (fetchSucceeded && Array.isArray(packData)) {
+        console.log("[Shop] Fetched packs (after retries):", packData.length, packData);
+        setPacks(packData);
+      } else {
+        console.error("Failed to fetch packs after retries:", fetchError);
+        setPacks([]);
+        setPackError(fetchError ? `Failed to load packs: ${fetchError.message}` : "Unknown error");
+      }
+    } catch (err) {
+      console.error("Error in loadShopData:", err);
+      setPackError("An error occurred while loading packs");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleNotificationRouting = useCallback(async (ref: string) => {
@@ -258,40 +319,67 @@ export default function ShopPage() {
   };
 
   const handleOpenPack = async (packId: string) => {
+    // Handle exclusive vault pack as a special case
+    if (packId === "exclusive_vault_pack") {
+      // Exclusive vault pack is always free
+      setIsOpening(true);
+      try {
+        const res = await fetch("/api/packs/open", {
+          method: "POST",
+          body: JSON.stringify({ packId, quantity: openQuantity, isFlashSale: false, activeDiscount: 0, activeLuck: 1 }),
+          headers: {"Content-Type": "application/json"}
+        });
+        const data = await res.json();
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        if (res.ok) {
+          setWonItems(data.wonItems);
+          await fetchUserData();
+          setHasExclusivePack(false);
+        } else {
+          setErrorDialog({ message: data.error || "Failed to open pack" });
+        }
+      } catch (err) { setErrorDialog({ message: "Network error occurred" }); }
+      finally { setIsOpening(false); }
+      return;
+    }
+
+    // Handle regular packs
     const pack = packs.find(p => p.id === packId);
-    if (!pack && packId !== "exclusive_vault_pack") return;
+    if (!pack) return;
 
     const basePrice = pack ? (typeof pack.price === 'string' ? parseInt(pack.price) : pack.price) : 0;
-    
+
     let discountMultiplier = 1;
-    if (isFlashSaleActive && packId !== "exclusive_vault_pack") discountMultiplier = 0.5;
-    else if (activeDiscount > 0 && packId !== "exclusive_vault_pack") discountMultiplier = 1 - activeDiscount;
+    if (isFlashSaleActive && pack.id !== "exclusive_vault_pack") discountMultiplier = 0.5;
+    else if (activeDiscount > 0 && pack.id !== "exclusive_vault_pack") discountMultiplier = 1 - activeDiscount;
 
     const finalPrice = Math.floor(basePrice * discountMultiplier);
     const totalCost = finalPrice * openQuantity;
 
     if (user && (user.balance ?? 0) < totalCost) {
-      setErrorDialog({ message: "Insufficient coins! Watch an ad or wait for drops." });
+      setErrorDialog({ message: "Insufficient coins! Wait for drops." });
       return;
     }
 
-    setIsOpening(true); 
+    setIsOpening(true);
     try {
-      const res = await fetch("/api/packs/open", { 
-        method: "POST", 
-        body: JSON.stringify({ packId, quantity: openQuantity, isFlashSale: isFlashSaleActive, activeDiscount, activeLuck }), 
-        headers: {"Content-Type": "application/json"} 
+      const res = await fetch("/api/packs/open", {
+        method: "POST",
+        body: JSON.stringify({ packId, quantity: openQuantity, isFlashSale: isFlashSaleActive, activeDiscount, activeLuck }),
+        headers: {"Content-Type": "application/json"}
       });
       const data = await res.json();
-      
+
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       if (res.ok) {
         setWonItems(data.wonItems);
         await fetchUserData();
         if (activeDiscount > 0) setActiveDiscount(0);
         if (activeLuck > 1) setActiveLuck(1);
-        if (packId === "exclusive_vault_pack") setHasExclusivePack(false);
+        // Note: exclusive_vault_pack check is handled above, so not needed here
       } else {
         setErrorDialog({ message: data.error || "Failed to open pack" });
       }
@@ -384,15 +472,19 @@ export default function ShopPage() {
     return { bg: "bg-zinc-800/50", border: "border-zinc-500/50", text: "text-zinc-300", glow: "from-zinc-500/20", shadow: "shadow-xl" };
   };
 
-  const displayPacks = hasExclusivePack 
-    ? [ ...packs, { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0, description: "An exclusive pack hidden away.", image: "/images/vault-pack.png", category: "exclusive", items: [] } as PackWithItems ] 
+  const displayPacks = hasExclusivePack
+    ? [ ...packs, { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0, description: "An exclusive pack hidden away.", image: "/images/vault-pack.png", category: "exclusive" } as PackBasic ]
     : packs;
 
   if (loading) return <div className="min-h-screen bg-[#070707]" />;
+  if (packError) return <div className="min-h-screen flex h-[64vh] items-center justify-center bg-[#070707] text-red-400 text-center p-4">{packError}</div>;
 
   return (
     <div className="min-h-screen bg-[#070707] text-white p-2 md:p-6 font-sans relative pb-24 overflow-hidden">
-      
+      <div className="mb-4 text-center text-xs text-gray-400">
+        Debug: {displayPacks.length} packs to display (hasExclusivePack: {hasExclusivePack ? 'true' : 'false'})
+      </div>
+
       {/* PACK OPENING ANIMATION OVERLAY */}
       <AnimatePresence>
         {isOpening && (
@@ -615,15 +707,20 @@ export default function ShopPage() {
         
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 w-full">
           {displayPacks.map((pack, idx) => {
+            // Guard against invalid pack data
+            if (!pack || typeof pack !== 'object' || !pack.id) {
+              return null;
+            }
+
             const basePrice = typeof pack.price === 'string' ? parseInt(pack.price) : pack.price;
-            
+
             let discountMultiplier = 1;
             if (isFlashSaleActive && pack.id !== "exclusive_vault_pack") discountMultiplier = 0.5;
             else if (activeDiscount > 0 && pack.id !== "exclusive_vault_pack") discountMultiplier = 1 - activeDiscount;
 
             const finalPrice = Math.floor(basePrice * discountMultiplier);
             const totalCost = finalPrice * openQuantity;
-            
+
             return (
               <motion.div 
                 key={pack.id} 

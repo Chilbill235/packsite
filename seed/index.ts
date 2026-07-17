@@ -7,10 +7,10 @@ import { Pool } from "pg";
 import { v4 as uuidv4 } from "uuid";
 
 // Imports
-import { TIER_CONFIG, PACK_METADATA } from "./config.js";
-import { generateItem } from "./engine.js";
-import { logger } from "./utils.js";
-import { AuditService } from "./audit.js";
+import { TIER_CONFIG, PACK_METADATA } from "./config.ts";
+import { generateItem } from "./engine.ts";
+import { logger } from "./utils.ts";
+import { AuditService } from "./audit.ts";
 
 // 2. Initialize the Postgres Pool and Prisma Adapter
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
