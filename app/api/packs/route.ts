@@ -79,10 +79,11 @@ export async function POST(req: Request) {
     const wonItems: Item[] = [];
     // We'll update the user's balance and create inventory entries in a transaction
     const updatedUser = await prisma.$transaction(async (tx) => {
-      // First, deduct the total cost
-      await tx.user.update({
+      // First, deduct the total cost and get the updated user
+      const updated = await tx.user.update({
         where: { id: user.id },
-        data: { balance: { decrement: totalCost } }
+        data: { balance: { decrement: totalCost } },
+        select: { balance: true }
       });
 
       // Then, for each pack, roll an item and create an inventory entry
@@ -98,11 +99,7 @@ export async function POST(req: Request) {
         });
       }
 
-      // Fetch the updated user to return the new balance
-      return await tx.user.findUnique({
-        where: { id: user.id },
-        select: { balance: true }
-      });
+      return updated;
     });
 
     return NextResponse.json({
