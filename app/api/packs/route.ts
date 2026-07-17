@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
 
@@ -23,6 +24,7 @@ export async function GET() {
 }
 
 // 2. POST: Handles the pack opening logic
+// Added comment to trigger TypeScript recheck
 export async function POST(req: Request) {
   try {
     const session = await auth();
