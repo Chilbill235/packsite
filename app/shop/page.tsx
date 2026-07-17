@@ -77,12 +77,8 @@ export default function ShopPage() {
     } catch (err) { console.error("Failed to refresh user:", err); }
   }, []);
 
-  const handleClaimReward = useCallback(async () => {
-    setIsWaiting(false);
-    targetTimeRef.current = null;
-    const storedAmount = sessionStorage.getItem('pendingRewardAmount');
-    const amount = storedAmount ? parseInt(storedAmount) : 500;
-    
+  // Updated to explicitly handle the 500 coin reward
+  const handleClaimReward = useCallback(async (amount: number = 500) => {
     try {
       // 1. Verify eligibility
       const verifyRes = await fetch("/api/user/verify-ad-claim");
@@ -101,30 +97,38 @@ export default function ShopPage() {
       });
       
       if (res.ok) {
-        sessionStorage.removeItem('pendingRewardAmount');
         setShowAdModal(false);
         await fetchUserData(); // Update Balance
-        // Optional: Trigger celebration
+        // Clean URL after claim
+        window.history.replaceState({}, document.title, window.location.pathname);
       } else {
         setErrorDialog({ message: "Failed to credit coins." });
       }
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, [fetchUserData]);
 
-  const handleTimerComplete = useCallback(async () => {
-    // 1. Notify the user
-    if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("Ad Reward Ready!", {
-            body: "Your 500 coin reward is ready to be claimed!",
-            icon: "/favicon.ico"
-        });
-    }
+  // NEW: Timer just triggers notification
+  const handleTimerComplete = useCallback(() => {
+    setIsWaiting(false);
+    targetTimeRef.current = null;
 
-    // 2. Automatically trigger the claim flow
-    await handleClaimReward();
+    if ("Notification" in window && Notification.permission === "granted") {
+      const notification = new Notification("Ad Reward Ready!", {
+        body: "Click here to claim your 500 coins!",
+        icon: "/favicon.ico",
+        tag: "ad-reward"
+      });
+
+      // Notification click handler redirects to claim
+      notification.onclick = () => {
+        window.focus();
+        window.location.href = "/shop?ref=claim-500";
+      };
+    }
     
-    try { await fetch("/api/user/ad-complete", { method: "POST" }); } catch (e) { console.error("Failed to sync ad completion."); }
-  }, [handleClaimReward]);
+    // Sync completion status without giving coins yet
+    fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error(e));
+  }, []);
 
   const loadShopData = useCallback(async () => {
     try {
@@ -144,7 +148,9 @@ export default function ShopPage() {
   }, []);
 
   const handleNotificationRouting = useCallback(async (ref: string) => {
-    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
+    if (ref === "claim-500") {
+        await handleClaimReward(500);
+    } else if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
       setIsFlashSaleActive(true);
     } else if (["daily-bonus", "level-up", "streak", "classic-streak", "classic-level", "classic-freeroll", "classic-rain"].includes(ref)) {
       try {
@@ -153,9 +159,6 @@ export default function ShopPage() {
       } catch (e) { console.error("Auto-claim failed"); }
     } else if (["reward-claim", "vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
       setShowAdModal(true);
-      if (ref === "reward-claim") {
-          setTimeout(() => handleClaimReward(), 500);
-      }
     } else if (["new-item", "best-seller", "refresh", "seasonal", "classic-weekly", "classic-collector", "classic-inventory"].includes(ref)) {
       loadShopData();
     }
@@ -203,7 +206,6 @@ export default function ShopPage() {
   };
 
   const handleWatchAdClick = async (amount: number) => {
-    sessionStorage.setItem('pendingRewardAmount', amount.toString());
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
@@ -215,7 +217,7 @@ export default function ShopPage() {
         const registration = await navigator.serviceWorker.ready;
         if (registration.active) {
           registration.active.postMessage({ 
-            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=reward-claim` 
+            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=claim-500` 
           });
         }
       } catch (err) { console.error("Service Worker not ready for messaging:", err); }
@@ -294,9 +296,9 @@ export default function ShopPage() {
     if (!loading) {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get("ref");
-      const buff = params.get("buff");
-      if (ref && !buff) {
+      if (ref) {
         handleNotificationRouting(ref);
+        // Clear param after handling
         const cleanParams = new URLSearchParams(window.location.search);
         cleanParams.delete("ref");
         const cleanPath = window.location.pathname + (cleanParams.toString() ? `?${cleanParams.toString()}` : "");
@@ -366,6 +368,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
+      {/* WINNING ANIMATION OVERLAY */}
       <AnimatePresence>
         {wonItems.length > 0 && (
           <motion.div 
