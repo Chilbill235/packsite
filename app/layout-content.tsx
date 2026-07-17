@@ -17,14 +17,19 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const router = useRouter();
   const { status } = useSession(); // Access Next-Auth session state directly[cite: 3]
 
-  // --- 1. Service Worker Registration with Type: Module ---
+  // --- 1. Service Worker Registration with Fallback for Safari ---
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw1.js', { 
-        scope: '/',
-        type: 'module' // <-- FIX: Resolves ES Module import/syntax errors
-      })
-      .catch((err) => console.error('SW1 registration failed:', err));
+      // Try registering as an ES module (modern browsers)
+      navigator.serviceWorker.register('/serviceWorker.js', { scope: '/', type: 'module' })
+        .then(reg => console.log('Service Worker registered (module):', reg.scope))
+        .catch(err => {
+          console.warn('Service Worker module registration failed:', err);
+          // Fallback to classic registration for Safari and older browsers
+          navigator.serviceWorker.register('/serviceWorker.js', { scope: '/' })
+            .then(reg => console.log('Service Worker registered (classic):', reg.scope))
+            .catch(err2 => console.error('Service Worker registration failed:', err2));
+        });
     }
   }, []);
 

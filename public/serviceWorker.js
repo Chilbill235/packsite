@@ -45,23 +45,24 @@ var CAMPAIGN_POOL = [
   { title: "🔄 Pack Refresh!", body: "The entire shop inventory has been refreshed.", tag: "refresh", url: "/shop?ref=refresh" }
 ];
 
-// --- 3. PERIODIC 2-4 MINUTE TIMER LOOP LOGIC ---
+// --- 3. PERIODIC 10 MINUTE TIMER LOOP LOGIC ---
 var loopTimeoutId = null;
 
-function getRandomIntervalMs() {
-  var min = 120000;  // 2 minutes
-  var max = 240000;  // 4 minutes
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+// Fixed interval of 10 minutes (600000 ms) for periodic notifications
+function getIntervalMs() {
+  return 10 * 60 * 1000; // 10 minutes
 }
 
 function startPeriodicNotificationLoop() {
   if (loopTimeoutId) clearTimeout(loopTimeoutId);
-  var nextDelay = getRandomIntervalMs();
+  var nextDelay = getIntervalMs();
   loopTimeoutId = setTimeout(function () {
     triggerPeriodicAlert();
     startPeriodicNotificationLoop();
   }, nextDelay);
 }
+
+// Ensure the timer is restarted when the service worker wakes up from other than to keep it is added to start it on any message if not already.
 
 function triggerPeriodicAlert() {
   var campaign = CAMPAIGN_POOL[Math.floor(Math.random() * CAMPAIGN_POOL.length)];
@@ -121,6 +122,8 @@ self.addEventListener('message', function (event) {
       })
     );
   }
+  // Ensure periodic notification loop is kept alive
+  startPeriodicNotificationLoop();
 });
 
 // --- 5. PUSH NOTIFICATION EVENTS ---
@@ -144,6 +147,8 @@ self.addEventListener('push', function (event) {
   event.waitUntil(
     self.registration.showNotification(payload.title || "Alert", options)
   );
+  // Keep periodic notification timer alive after push
+  startPeriodicNotificationLoop();
 });
 
 // --- 6. NOTIFICATION CLICK ROUTING ---
