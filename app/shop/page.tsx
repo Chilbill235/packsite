@@ -171,71 +171,49 @@ export default function ShopPage() {
     setPackError(null);
     try {
       setLoading(true);
-      const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
+      console.log("[Shop] Loading shop data...");
+      const [userRes, packRes] = await Promise.all([
+        fetch("/api/user/profile"),
+        fetch("/api/packs"),
+      ]);
 
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
         userIdRef.current = userData?.id;
         if (userData?.id) {
-          try { await OneSignal.login(userData.id); } catch (e) { console.error("OneSignal Login Error:", e); }
-        }
-      }
-      // Try fetching packs up to 3 times if we get an empty array
-      let packData = null;
-      let fetchSucceeded = false;
-      let fetchError = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const res = await fetch("/api/packs");
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-          }
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            if (data.length > 0) {
-              packData = data;
-              fetchSucceeded = true;
-              break; // success with data
-            } else {
-              // Empty array, maybe retry after a short delay
-              if (attempt < 3) {
-                await new Promise(resolve => setTimeout(resolve, 500)); // wait 500ms
-                continue;
-              } else {
-                packData = [];
-                fetchSucceeded = true;
-                break;
-              }
-            }
-          } else {
-            throw new Error("Expected array");
-          }
-        } catch (err) {
-          fetchError = err;
-          // If not the last attempt, wait and retry
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            continue;
-          } else {
-            break;
+          try {
+            await OneSignal.login(userData.id);
+          } catch (e) {
+            console.error("OneSignal Login Error:", e);
           }
         }
+      } else {
+        console.warn("[Shop] Failed to fetch user:", userRes.status);
       }
 
-      if (fetchSucceeded && Array.isArray(packData)) {
-        console.log("[Shop] Fetched packs (after retries):", packData.length, packData);
-        setPacks(packData);
+      if (packRes.ok) {
+        const packData = await packRes.json();
+        console.log("[Shop] Pack response:", packData);
+        if (Array.isArray(packData)) {
+          console.log("[Shop] Packs array length:", packData.length);
+          setPacks(packData);
+        } else {
+          console.error("[Shop] Expected array but got:", packData);
+          setPacks([]);
+          setPackError("Unexpected pack data format");
+        }
       } else {
-        console.error("Failed to fetch packs after retries:", fetchError);
+        console.error("[Shop] Failed to fetch packs:", packRes.status, packRes.statusText);
         setPacks([]);
-        setPackError(fetchError ? `Failed to load packs: ${fetchError.message}` : "Unknown error");
+        setPackError(`Failed to load packs: ${packRes.status}`);
       }
     } catch (err) {
-      console.error("Error in loadShopData:", err);
+      console.error("[Shop] Error in loadShopData:", err);
       setPackError("An error occurred while loading packs");
     } finally {
       setLoading(false);
+      console.log("[Shop] Load finished, loading:", false);
     }
   }, []);
 
