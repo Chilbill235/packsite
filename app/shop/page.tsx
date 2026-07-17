@@ -136,9 +136,23 @@ export default function ShopPage() {
   }, [fetchUserData]);
 
   const handleTimerComplete = useCallback(async () => {
+    // Guard against multiple calls
+    if (!isWaiting || !targetTimeRef.current) return;
+
     setIsWaiting(false);
+    let currentUserId = userIdRef.current;
     targetTimeRef.current = null;
-    const currentUserId = userIdRef.current;
+
+    // If we don't have a user ID, try to fetch fresh user data
+    if (!currentUserId) {
+      try {
+        const userData = await fetchUserData();
+        currentUserId = userData?.id;
+        userIdRef.current = currentUserId;
+      } catch (err) {
+        console.error("Failed to fetch user data for notification:", err);
+      }
+    }
 
     if (!currentUserId) {
       console.error("Cannot send notification: User ID not found");
@@ -159,9 +173,9 @@ export default function ShopPage() {
     } catch (e) {
       console.error("Push notification trigger failed:", e);
     }
-    
+
     fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error("Ad completion sync failed", e));
-  }, []);
+  }, [isWaiting, fetchUserData]);
 
   const loadShopData = useCallback(async () => {
     try {
@@ -217,15 +231,21 @@ export default function ShopPage() {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
-    
-    adService.current?.showAd(user?.email || "anon");
+
+    if (!adService.current) {
+      console.error("Ad service not initialized");
+      setIsWaiting(false);
+      return;
+    }
+
+    adService.current.showAd(user?.email || "anon");
 
     if ("serviceWorker" in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready;
         if (registration.active) {
-          registration.active.postMessage({ 
-            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=claim-500` 
+          registration.active.postMessage({
+            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=claim-500`
           });
         }
       } catch (err) { console.error("Service Worker not ready for messaging:", err); }

@@ -185,7 +185,8 @@ self.addEventListener('notificationclick', function (event) {
         var client = clientList[i];
         if ('focus' in client && new URL(client.url).origin === self.location.origin) {
           client.navigate(destinationUrl);
-          client.postMessage({ type: 'BACKGROUND_TIMER_COMPLETE' });
+          var amount = event.notification.data && event.notification.data.amount ? event.notification.data.amount : 500;
+          client.postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
           return client.focus();
         }
       }
