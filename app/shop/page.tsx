@@ -197,7 +197,44 @@ export default function ShopPage() {
         console.log("[Shop] Pack response:", packData);
         if (Array.isArray(packData)) {
           console.log("[Shop] Packs array length:", packData.length);
-          setPacks(packData);
+          // Debug: log first pack
+          if (packData.length > 0) {
+            console.log("[Shop] First pack:", packData[0]);
+          }
+          // If no packs returned from DB, use fallback sample data
+          if (packData.length === 0) {
+            console.warn("[Shop] No packs found in DB, using fallback sample data");
+            const fallbackPacks = [
+              {
+                id: "76796f88-c7d0-442a-bfeb-380c3863c8b7",
+                name: "Cosmic Vault",
+                price: 1000,
+              },
+              {
+                id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f",
+                name: "Starter Cache",
+                price: 100,
+              },
+              {
+                id: "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f",
+                name: "Event Crate",
+                price: 500,
+              },
+              {
+                id: "02ada6c5-4bb7-4d2c-953d-3228f28855eb",
+                name: "Void Box",
+                price: 2000,
+              },
+              {
+                id: "5fd47c89-8fd5-4946-9f09-00d90055c6e5",
+                name: "Promo Bundle",
+                price: 0,
+              },
+            ];
+            setPacks(fallbackPacks);
+          } else {
+            setPacks(packData);
+          }
         } else {
           console.error("[Shop] Expected array but got:", packData);
           setPacks([]);
@@ -451,7 +488,7 @@ export default function ShopPage() {
   };
 
   const displayPacks = hasExclusivePack
-    ? [ ...packs, { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0, description: "An exclusive pack hidden away.", image: "/images/vault-pack.png", category: "exclusive" } as PackBasic ]
+    ? [ ...packs, { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic ]
     : packs;
 
   if (loading) return <div className="min-h-screen bg-[#070707]" />;
