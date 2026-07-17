@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
 
+// Configure maximum packs a user can open in a single click
+const MAX_PACKS_PER_REQUEST = 10;
+
 export async function POST(req: Request) {
   try {
     const session = await auth();
@@ -10,14 +13,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Get quantity from body (default to 1)
-    const { packId, isFlashSale, quantity = 1 } = await req.json();
+    // 1. Get request body
+    const body = await req.json();
+    const packId = body.packId;
+    const isFlashSale = body.isFlashSale === true;
+    
+    // Parse quantity securely to ensure it's a valid integer
+    const quantity = parseInt(body.quantity || "1", 10);
+
+    // SECURITY CHECK: Prevent infinite free pack rolling
+    if (isNaN(quantity) || quantity < 1 || quantity > MAX_PACKS_PER_REQUEST) {
+      return NextResponse.json({ 
+        error: `Invalid quantity. You can only open between 1 and ${MAX_PACKS_PER_REQUEST} packs at a time.` 
+      }, { status: 400 });
+    }
 
     return await prisma.$transaction(async (tx) => {
       const pack = await tx.pack.findUnique({ 
         where: { id: packId }, 
         include: { items: true } 
       });
+      
       const user = await tx.user.findUnique({ 
         where: { email: session.user.email as string } 
       });
@@ -26,7 +42,6 @@ export async function POST(req: Request) {
       if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
       
       // 2. CHECK EXCLUSIVE PACK RESTRICTION
-      // Gatekeeps the pack if it's marked as "exclusive" and user doesn't have the key unlocked
       if (pack.category.toLowerCase() === "exclusive" && !user.hasExclusivePack) {
         return NextResponse.json({ 
           error: "This exclusive pack is locked! Open a secret vault drop notification to access it." 
@@ -34,7 +49,6 @@ export async function POST(req: Request) {
       }
 
       // 3. CALCULATE PRICE WITH DISCOUNTS
-      // Combines flash sale discounts (50%) with the user's active custom shop discount
       let unitPrice = isFlashSale ? Math.floor(pack.price * 0.5) : pack.price;
       
       if (user.activeDiscount > 0) {
@@ -48,7 +62,6 @@ export async function POST(req: Request) {
       }
 
       // 4. APPLY LUCK BUFF TO DROP ODDS
-      // Temporarily scales up the rolling chances of non-common items based on activeLuck multiplier
       let itemsToRoll = pack.items;
       if (user.activeLuck > 1.0) {
         itemsToRoll = pack.items.map(item => {
@@ -67,14 +80,13 @@ export async function POST(req: Request) {
       }
       
       // 6. PERFORM UPDATES & CONSUME SINGLE-USE BUFFS
-      // Resets active luck, active discounts, exclusive keys, and active XP boosts back to default state
       const updatedUser = await tx.user.update({
         where: { id: user.id },
         data: { 
           balance: { decrement: totalPrice },
           activeLuck: 1.0,         // Reset back to normal 1x luck
           activeDiscount: 0.0,     // Reset discount back to normal 0%
-          hasExclusivePack: false, // Consume the key so they have to earn another
+          hasExclusivePack: false, // Consume the key
           activeXpBoost: false,    // Consume active double XP buff
         },
       });
@@ -91,9 +103,9 @@ export async function POST(req: Request) {
 
       return NextResponse.json({ 
         success: true, 
-        wonItems, // Returning the array of won items
+        wonItems, 
         newBalance: updatedUser.balance,
-        xpBoostActive: user.activeXpBoost // Return XP state to frontend to calculate double-progression displays
+        xpBoostActive: user.activeXpBoost 
       });
     });
   } catch (error) {
