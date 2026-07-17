@@ -56,7 +56,6 @@ export default function ShopPage() {
   const [showBanner, setShowBanner] = useState(true);
 
   // --- Active Gameplay Buff States ---
-  const [activeReward, setActiveReward] = useState<BuffDetails | null>(null);
   const [activeDiscount, setActiveDiscount] = useState<number>(0); 
   const [activeLuck, setActiveLuck] = useState<number>(1); 
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
