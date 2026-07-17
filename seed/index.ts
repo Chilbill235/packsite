@@ -45,17 +45,20 @@ async function main() {
     }
     logger.info("Packs created successfully.");
 
-    // Generate and Insert Items
+    // Generate and Insert Items for ALL packs
     const itemBatch = [];
-    for (const [key, tier] of Object.entries(TIER_CONFIG)) {
-      for (let i = 0; i < tier.qty; i++) {
-        itemBatch.push(generateItem(key, packIds['Cosmic Vault'], i));
+    for (const [packName, packId] of Object.entries(packIds)) {
+      for (const [key, tier] of Object.entries(TIER_CONFIG)) {
+        for (let i = 0; i < tier.qty; i++) {
+          // Now passing the dynamic packId instead of hardcoding 'Cosmic Vault'
+          itemBatch.push(generateItem(key, packId, i));
+        }
       }
     }
     
     // Batch insert items
     await prisma.item.createMany({ data: itemBatch });
-    logger.info(`Inserted ${itemBatch.length} items.`);
+    logger.info(`Inserted ${itemBatch.length} items across all packs.`);
 
     // Audit
     const auditor = new AuditService(prisma);
