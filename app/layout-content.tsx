@@ -13,24 +13,30 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [loading, setLoading] = useState(pathname === "/");
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
-  // --- 1. Service Worker & OneSignal Initialization ---
+  // --- 1. OneSignal Initialization ---
   useEffect(() => {
-    // Initialize OneSignal
+    // Only initialize once
     OneSignal.init({
-      appId: "7ae5defc-0bad-40c9-9af7-871b24bae250", // REPLACE WITH YOUR ACTUAL APP ID
+      appId: "7ae5defc-0bad-40c9-9af7-871b24bae250",
       allowLocalhostAsSecureOrigin: true,
+      serviceWorkerPath: 'OneSignalSDKWorker.js',
     });
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/serviceWorker.js", { scope: "/" })
-        .then(reg => console.log("Service Worker registered globally:", reg.scope))
-        .catch(err => console.error("Global Service Worker registration failed:", err));
-    }
   }, []);
 
-  // --- 2. Splash Screen & Force Redirect Logic ---
+  // --- 2. OneSignal Identity Sync (Cleaned) ---
+  useEffect(() => {
+    // We simply call login. OneSignal handles the internal queueing, 
+    // so it doesn't matter if the SDK is still finishing initialization.
+    if (status === "authenticated" && session?.user?.id) {
+      OneSignal.login(session.user.id).catch((err) => {
+        console.warn("OneSignal login failed:", err);
+      });
+    }
+  }, [status, session]);
+
+  // --- 3. Splash Screen & Force Redirect Logic ---
   useEffect(() => {
     if (pathname !== "/") {
       setLoading(false);
@@ -54,7 +60,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     return () => clearTimeout(timer);
   }, [router, pathname, status]);
 
-  // --- 3. Handle Browser Back-Forward Cache (BFcache) ---
+  // --- 4. Handle Browser Back-Forward Cache (BFcache) ---
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
       if (pathname === "/") {
@@ -86,7 +92,6 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
           
           <Analytics />
           
-          {/* --- Monetag Integration --- */}
           <Script 
             src="https://quge5.com/88/tag.min.js" 
             strategy="afterInteractive" 
@@ -94,7 +99,6 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
             data-cfasync="false" 
           />
 
-          {/* --- Optimized Google AdSense Integration --- */}
           <Script
             src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1167000799645777"
             strategy="afterInteractive"

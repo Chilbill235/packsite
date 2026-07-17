@@ -50,13 +50,16 @@ export default function ShopPage() {
     try {
       setLoading(true);
       const [userRes, packRes] = await Promise.all([fetch("/api/user/profile"), fetch("/api/packs")]);
+      
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData);
-        // Map user login with OneSignal External ID
+        
+        // --- OneSignal v3 Login ---
         if (userData?.id) {
           try {
-            OneSignal.login(userData.id);
+            await OneSignal.login(userData.id);
+            console.log("OneSignal: Logged in with ID:", userData.id);
           } catch (e) {
             console.error("OneSignal Login Error:", e);
           }
@@ -114,66 +117,50 @@ export default function ShopPage() {
     }
   }, [fetchUserData, handleClaimReward, loadShopData]);
 
-  // --- OneSignal Push Opt-In ---
+  // --- OneSignal Push Opt-In (v3) ---
   const handleEnableNotifications = async () => {
-    console.log("Button clicked: Attempting to request permission...");
-
     if (!("Notification" in window)) {
-      console.error("Notifications are not supported in this browser.");
+      setPermission("unsupported");
       return;
     }
 
     try {
-      // Direct call to the OneSignal object
-      if (typeof OneSignal !== 'undefined') {
-        console.log("OneSignal detected, requesting permission...");
-        await OneSignal.Notifications.requestPermission();
-        
-        const currentPermission = Notification.permission;
-        setPermission(currentPermission);
-        console.log("Permission Status:", currentPermission);
-        
-        if (currentPermission === "granted" && user?.id) {
-          await OneSignal.login(user.id);
-          console.log("Login successful");
-        }
-      } else {
-        console.error("OneSignal object is undefined. Ensure it is initialized in layout.tsx");
+      const status = await OneSignal.Notifications.requestPermission();
+      setPermission(status ? "granted" : "denied");
+      
+      if (status && user?.id) {
+        await OneSignal.login(user.id);
       }
-    } catch (err: any) { 
+    } catch (err) { 
       console.error("OneSignal Permission Request Error: ", err); 
     }
   };
 
   const handleWatchAdClick = async (amount: number) => {
-  sessionStorage.setItem('pendingRewardAmount', amount.toString());
-  targetTimeRef.current = Date.now() + 10000;
-  setCountdown(10);
-  setIsWaiting(true);
-  setHasDispatchedPush(false);
-  
-  // Show Ad
-  adService.current?.showAd(user?.email || "anon");
+    sessionStorage.setItem('pendingRewardAmount', amount.toString());
+    targetTimeRef.current = Date.now() + 10000;
+    setCountdown(10);
+    setIsWaiting(true);
+    setHasDispatchedPush(false);
+    
+    adService.current?.showAd(user?.email || "anon");
 
-  // Robust Service Worker communication
-  if ("serviceWorker" in navigator) {
-    try {
-      // Wait for the SW to be ready
-      const registration = await navigator.serviceWorker.ready;
-      
-      if (registration.active) {
-        registration.active.postMessage({ 
-          type: "START_BACKGROUND_TIMER", 
-          delay: 10000, 
-          amount: amount, 
-          url: window.location.origin + "/shop?ref=reward-claim" 
-        });
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.active) {
+          registration.active.postMessage({ 
+            type: "START_BACKGROUND_TIMER", 
+            delay: 10000, 
+            amount: amount, 
+            url: `${window.location.origin}/shop?ref=reward-claim` 
+          });
+        }
+      } catch (err) {
+        console.error("Service Worker not ready for messaging:", err);
       }
-    } catch (err) {
-      console.error("Service Worker not ready for messaging:", err);
     }
-  }
-};
+  };
 
   const handleOpenPack = async (packId: string) => {
     try {
@@ -207,7 +194,6 @@ export default function ShopPage() {
       }
     }
 
-    // Load data
     loadShopData();
     adService.current = new RewardedAdService();
     

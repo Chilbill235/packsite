@@ -1,7 +1,29 @@
 // 1. IMPORT ONESIGNAL (Must remain the first line)
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
-// 2. LISTENERS (Must be at the TOP level for initial evaluation)
+// 2. INITIALIZATION & LOOP MANAGEMENT
+var loopTimeoutId = null;
+
+function startPeriodicNotificationLoop() {
+  if (loopTimeoutId) clearTimeout(loopTimeoutId);
+  loopTimeoutId = setTimeout(function () {
+    triggerPeriodicAlert();
+    startPeriodicNotificationLoop();
+  }, 10 * 60 * 1000); // 10 minutes
+}
+
+function triggerPeriodicAlert() {
+  var campaign = { title: "🎁 Surprise!", body: "Tap to visit the shop!", url: "/shop" };
+  self.registration.showNotification(campaign.title, {
+    body: campaign.body,
+    icon: '/images/cup.png',
+    badge: '/images/apple-pay.png',
+    tag: 'periodic-alert-' + Date.now(), // Unique tag per trigger
+    data: { url: self.location.origin + campaign.url }
+  }).catch(function(err) { console.error("[SW] Periodic alert error:", err); });
+}
+
+// 3. EVENT LISTENERS
 self.addEventListener('install', function (event) {
   event.waitUntil(self.skipWaiting());
 });
@@ -9,20 +31,21 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     self.clients.claim().then(function() {
+      // Start the loop only once on activation
       startPeriodicNotificationLoop();
     })
   );
 });
 
 self.addEventListener('message', function (event) {
-  console.log("[SW] Message received:", event.data); // Debug: Check if the message actually arrives
   if (!event.data) return;
 
+  // Handle manual trigger
   if (event.data.type === 'FORCE_DEV_LOOP_TRIGGER') {
     triggerPeriodicAlert();
-    startPeriodicNotificationLoop();
   }
 
+  // Handle Ad Timer
   if (event.data.type === 'START_BACKGROUND_TIMER') {
     var delayMs = event.data.delay || 10000;
     var targetUrl = event.data.url || (self.location.origin + "/shop");
@@ -35,24 +58,29 @@ self.addEventListener('message', function (event) {
             body: "Your countdown is finished! Tap here to claim your " + amount + " coins.",
             icon: '/images/cup.png',
             badge: '/images/apple-pay.png',
-            tag: "reward-claim-ready",
+            tag: "reward-claim-" + Date.now(), // UNIQUE TAG
             renotify: true,
             requireInteraction: true,
             vibrate: [200, 100, 200],
             data: { url: targetUrl, amount: amount }
-          }).then(function() {
+          })
+          .then(function() {
             return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-          }).then(function(clientList) {
+          })
+          .then(function(clientList) {
             for (var i = 0; i < clientList.length; i++) {
               clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
             }
             resolve();
-          }).catch(resolve);
+          })
+          .catch(function(err) {
+            console.error("[SW] Notification display error:", err);
+            resolve();
+          });
         }, delayMs);
       })
     );
   }
-  startPeriodicNotificationLoop();
 });
 
 self.addEventListener('push', function (event) {
@@ -64,12 +92,11 @@ self.addEventListener('push', function (event) {
     body: payload.body || "Tap to return to the app!",
     icon: '/images/cup.png',
     badge: '/images/apple-pay.png',
-    tag: payload.tag || 'general-broadcast',
+    tag: payload.tag || 'general-broadcast-' + Date.now(),
     renotify: true,
     data: { url: payload.url || '/shop' }
   };
   event.waitUntil(self.registration.showNotification(payload.title || "Alert", options));
-  startPeriodicNotificationLoop();
 });
 
 self.addEventListener('notificationclick', function (event) {
@@ -85,7 +112,7 @@ self.addEventListener('notificationclick', function (event) {
         var client = clientList[i];
         if ('focus' in client && new URL(client.url).origin === self.location.origin) {
           client.navigate(destinationUrl);
-          setTimeout(function () { client.postMessage({ type: 'BACKGROUND_TIMER_COMPLETE' }); }, 800);
+          client.postMessage({ type: 'BACKGROUND_TIMER_COMPLETE' });
           return client.focus();
         }
       }
@@ -99,24 +126,3 @@ self.addEventListener('periodicsync', function (event) {
     event.waitUntil(new Promise(function(resolve) { triggerPeriodicAlert(); resolve(); }));
   }
 });
-
-// 3. VARIABLES & FUNCTIONS (Defined at the bottom)
-var loopTimeoutId = null;
-
-function startPeriodicNotificationLoop() {
-  if (loopTimeoutId) clearTimeout(loopTimeoutId);
-  loopTimeoutId = setTimeout(function () {
-    triggerPeriodicAlert();
-    startPeriodicNotificationLoop();
-  }, 10 * 60 * 1000);
-}
-
-function triggerPeriodicAlert() {
-  var campaign = { title: "🎁 Surprise!", body: "Tap to visit the shop!", url: "/shop" }; // Simplified for testing
-  self.registration.showNotification(campaign.title, {
-    body: campaign.body,
-    icon: '/images/cup.png',
-    badge: '/images/apple-pay.png',
-    data: { url: self.location.origin + campaign.url }
-  }).catch(function(err) { console.error("[SW] Notification error:", err); });
-}

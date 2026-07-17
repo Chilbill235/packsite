@@ -8,7 +8,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Forward the callbackUrl if they register, so they get back to where they wanted to go post-login
+  // Forward the callbackUrl so the user returns to their destination after authentication
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [username, setUsername] = useState("");
@@ -36,7 +36,7 @@ function RegisterForm() {
         throw new Error(data.error || "Registration failed.");
       }
 
-      // On success, redirect to login with registered=true and pass along the callback URL
+      // Redirect to login upon success
       router.push(`/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";
@@ -48,12 +48,9 @@ function RegisterForm() {
 
   return (
     <div className="w-full max-w-md mx-auto relative group">
-      {/* Decorative Glow Ring */}
       <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 rounded-3xl blur-xl opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
       
       <div className="relative w-full p-8 sm:p-10 bg-zinc-950/80 border border-zinc-800/80 rounded-3xl shadow-2xl backdrop-blur-xl transition-all duration-300">
-        
-        {/* Header Badge & Title */}
         <div className="mb-8 text-center sm:text-left">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 mb-4 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
             <span className="text-xl">✨</span>
@@ -66,7 +63,6 @@ function RegisterForm() {
           </p>
         </div>
 
-        {/* Error Notification */}
         {error && (
           <div className="p-4 mb-6 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-light flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
             <span>⚠️</span>
@@ -74,7 +70,6 @@ function RegisterForm() {
           </div>
         )}
 
-        {/* Input Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
@@ -127,7 +122,6 @@ function RegisterForm() {
             </div>
           </div>
 
-          {/* Premium Amber Sign-up Button */}
           <button 
             type="submit" 
             disabled={loading}
@@ -144,7 +138,6 @@ function RegisterForm() {
           </button>
         </form>
 
-        {/* Footer Navigation link */}
         <p className="mt-8 text-center text-xs text-zinc-500 font-light">
           Already have an account?{" "}
           <Link href={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="text-white hover:text-amber-400 font-medium transition duration-200 underline underline-offset-4 decoration-zinc-800 hover:decoration-amber-500/50">
@@ -159,10 +152,7 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col justify-center bg-gradient-to-b from-zinc-950 to-black text-white px-6 py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background Amber Ambience overlay */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-      
-      {/* Suspense Wrapper to handle search parameter checking on static builds safely */}
       <Suspense fallback={
         <div className="flex flex-col items-center justify-center space-y-4">
           <div className="animate-spin h-8 w-8 border-4 border-amber-500 border-t-transparent rounded-full" />
