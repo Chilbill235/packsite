@@ -73,14 +73,14 @@ export default function ShopPage() {
         const userData = await res.json();
         setUser(userData);
         window.dispatchEvent(new CustomEvent('balanceUpdated', { detail: { balance: userData.balance } }));
+        return userData;
       }
     } catch (err) { console.error("Failed to refresh user:", err); }
+    return null;
   }, []);
 
-  // Updated to explicitly handle the 500 coin reward
   const handleClaimReward = useCallback(async (amount: number = 500) => {
     try {
-      // 1. Verify eligibility
       const verifyRes = await fetch("/api/user/verify-ad-claim");
       const verifyData = await verifyRes.json();
       
@@ -89,7 +89,6 @@ export default function ShopPage() {
         return;
       }
       
-      // 2. Add Coins
       const res = await fetch("/api/user/add-coins", { 
         method: "POST", 
         headers: { "Content-Type": "application/json" }, 
@@ -98,8 +97,7 @@ export default function ShopPage() {
       
       if (res.ok) {
         setShowAdModal(false);
-        await fetchUserData(); // Update Balance
-        // Clean URL after claim
+        await fetchUserData();
         window.history.replaceState({}, document.title, window.location.pathname);
       } else {
         setErrorDialog({ message: "Failed to credit coins." });
@@ -107,27 +105,22 @@ export default function ShopPage() {
     } catch (err) { setErrorDialog({ message: "Error claiming reward." }); }
   }, [fetchUserData]);
 
-  // NEW: Timer just triggers notification
   const handleTimerComplete = useCallback(() => {
     setIsWaiting(false);
     targetTimeRef.current = null;
 
     if ("Notification" in window && Notification.permission === "granted") {
-      const notification = new Notification("Ad Reward Ready!", {
+      new Notification("Ad Reward Ready!", {
         body: "Click here to claim your 500 coins!",
         icon: "/favicon.ico",
         tag: "ad-reward"
-      });
-
-      // Notification click handler redirects to claim
-      notification.onclick = () => {
+      }).onclick = () => {
         window.focus();
         window.location.href = "/shop?ref=claim-500";
       };
     }
     
-    // Sync completion status without giving coins yet
-    fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error(e));
+    fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error("Ad completion sync failed", e));
   }, []);
 
   const loadShopData = useCallback(async () => {
@@ -143,11 +136,14 @@ export default function ShopPage() {
         }
       }
       if (packRes.ok) setPacks(await packRes.json());
-    } catch (err) { console.error(err); }  
+    } catch (err) { console.error(err); }   
     finally { setLoading(false); }
   }, []);
 
   const handleNotificationRouting = useCallback(async (ref: string) => {
+    const currentUser = user || await fetchUserData();
+    if (!currentUser) return;
+
     if (ref === "claim-500") {
         await handleClaimReward(500);
     } else if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
@@ -162,36 +158,7 @@ export default function ShopPage() {
     } else if (["new-item", "best-seller", "refresh", "seasonal", "classic-weekly", "classic-collector", "classic-inventory"].includes(ref)) {
       loadShopData();
     }
-  }, [fetchUserData, handleClaimReward, loadShopData]);
-
-  const applyBuffEffect = useCallback(async (ref: string, buff: string) => {
-    if (!BUFF_MAP[buff]) return;
-    const selectedBuff = BUFF_MAP[buff];
-
-    if (buff.startsWith("discount_")) {
-      const val = parseInt(buff.split("_")[1]);
-      setActiveDiscount(val / 100);
-    } else if (buff.startsWith("luck_boost_")) {
-      const valStr = buff.replace("luck_boost_", "").replace("x", "");
-      setActiveLuck(parseFloat(valStr));
-    } else if (buff === "exclusive_pack") {
-      setHasExclusivePack(true);
-    } else if (buff === "xp_boost_2x") {
-      setActiveXpBoost(true);
-    }
-
-    try {
-      const res = await fetch("/api/rewards/apply-buff", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buffType: buff, refSource: ref })
-      });
-      if (res.ok) {
-        setActiveReward(selectedBuff);
-        await fetchUserData(); 
-      }
-    } catch (err) { console.error("Failed to apply notification reward:", err); }
-  }, [fetchUserData]);
+  }, [fetchUserData, handleClaimReward, loadShopData, user]);
 
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) {
@@ -298,7 +265,6 @@ export default function ShopPage() {
       const ref = params.get("ref");
       if (ref) {
         handleNotificationRouting(ref);
-        // Clear param after handling
         const cleanParams = new URLSearchParams(window.location.search);
         cleanParams.delete("ref");
         const cleanPath = window.location.pathname + (cleanParams.toString() ? `?${cleanParams.toString()}` : "");
