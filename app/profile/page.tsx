@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Bell, X, ChevronDown, Smartphone, PackagePlus, RefreshCw, TrendingUp, TrendingDown, Activity, Zap, Layout, List, Clock, PieChart, BarChart } from "lucide-react";
 
 // --- Types ---
 type Rarity = "common" | "rare" | "epic" | "legendary";

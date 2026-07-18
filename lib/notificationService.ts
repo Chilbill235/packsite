@@ -12,7 +12,7 @@ export class OneSignalNotificationService implements NotificationService {
   constructor() {
     this.appId = process.env.ONESIGNAL_APP_ID || process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '';
     this.apiKey = process.env.ONESIGNAL_REST_API_KEY || '';
-    this.baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://packsite.vercel.app';
+    this.baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000/';
   }
 
   async requestPermission(): Promise<NotificationPermission> {

@@ -98,6 +98,14 @@ export default function ShopPage() {
   const [openQuantity, setOpenQuantity] = useState(1);
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
 
+  // Helper to determine grid columns based on number of won items
+  const getGridCols = (count: number): number => {
+    if (count <= 1) return 1;
+    if (count <= 4) return 2;
+    if (count <= 9) return 3;
+    return 4;
+  };
+
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getInitialNotificationPermission);
@@ -327,25 +335,30 @@ export default function ShopPage() {
         await fetchUserData();
       } catch { console.error("Auto-claim failed"); }
     } else if (ref === "reward-claim") {
-      // Handle reward claim from notification
+      // Handle reward claim from notification click - trigger ad completion flow
       try {
-        console.log("Attempting to claim reward via notification click");
-        const response = await fetch("/api/user/add-coins", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: 500, suppressNotification: true })
-        });
-        console.log("Reward claim response:", response);
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Reward claim failed with error:", errorData);
-          throw new Error(errorData.error || "Failed to claim reward");
-        }
-        await fetchUserData();
-        console.log("Reward claimed successfully");
+        console.log("Handling reward claim notification - triggering ad completion flow");
+        // Simulate ad completion by setting ad status to completed
+        // This will show the success UI and handle the actual reward giving
+        setAdStatus('completed');
+
+        // Give the coins through the proper ad completion flow
+        await fetch("/api/user/ad-complete", { method: "POST" });
+        await fetchUserData(); // Refresh user data
+
+        // Show success feedback briefly
+        setTimeout(() => {
+          setAdStatus('idle');
+        }, 3000);
+
+        console.log("Reward processed via ad completion flow");
       } catch (e) {
         console.error("Reward claim failed:", e);
-        setErrorDialog({ message: "Failed to claim reward: " + (e instanceof Error ? e.message : "Unknown error") });
+        setAdStatus('error');
+        setTimeout(() => {
+          setAdStatus('idle');
+        });
+        setErrorDialog({ message: "Failed to process reward: " + (e instanceof Error ? e.message : "Unknown error") });
       }
     } else if (["vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
       setShowAdModal(true);
@@ -721,7 +734,7 @@ export default function ShopPage() {
               </h2>
 
               {/* Responsive grid: 1 column on mobile (row by row), 3 columns on desktop */}
-              <div className="grid w-full gap-4 sm:gap-6 px-1 sm:px-4 sm:grid-cols-1 lg:grid-cols-3">
+              <div className={`grid w-full gap-4 sm:gap-6 px-1 sm:px-4 sm:grid-cols-1 md:grid-cols-${getGridCols(wonItems.length)}`}>
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
                   // Determine size based on number of items - smaller for more items
