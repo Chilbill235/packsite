@@ -7,16 +7,32 @@ export async function sendPushNotification(
 ) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://packsite.vercel.app";
+    const appId = process.env.ONESIGNAL_APP_ID || process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+    const apiKey = process.env.ONESIGNAL_REST_API_KEY;
     const notificationUrl = `${baseUrl}/shop${ref ? `?ref=${ref}` : ""}`;
 
-    const response = await fetch("https://onesignal.com/api/v1/notifications", {
+    if (!appId || !apiKey) {
+      console.error("[OneSignal Config Error]: Missing app id or REST API key.");
+      return {
+        success: false,
+        data: {
+          error: "Missing OneSignal configuration",
+          missing: {
+            appId: !appId,
+            apiKey: !apiKey,
+          },
+        },
+      };
+    }
+
+    const response = await fetch("https://api.onesignal.com/notifications", {
       method: "POST",
       headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`,
+        "Content-Type": "application/json; charset=utf-8",
+        "Authorization": `Key ${apiKey}`,
       },
       body: JSON.stringify({
-        app_id: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID,
+        app_id: appId,
         target_channel: "push",
         include_aliases: { "external_id": [userId] },
         headings: { en: title },

@@ -79,6 +79,11 @@ const getNotificationPermission = (): NotificationPermission | "unsupported" => 
   return Notification.permission;
 };
 
+const isOneSignalAllowedOrigin = () => {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname === "packsite.vercel.app";
+};
+
 export default function ShopPage() {
   // --- States ---
   const searchParams = useSearchParams();
@@ -113,6 +118,74 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
+  const oneSignalInitRef = useRef(false);
+  const oneSignalPermissionListenerRef = useRef(false);
+
+  const isOneSignalAlreadyInitializedError = (err: unknown) => {
+    return err instanceof Error && err.message.toLowerCase().includes("already initialized");
+  };
+
+  const initOneSignal = useCallback(async (userId?: string) => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setPermission("unsupported");
+      return false;
+    }
+
+    const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
+    if (!appId) {
+      console.warn("OneSignal app id is missing. Set NEXT_PUBLIC_ONESIGNAL_APP_ID.");
+      setPermission(Notification.permission);
+      return false;
+    }
+
+    if (!isOneSignalAllowedOrigin()) {
+      setPermission(Notification.permission);
+      return false;
+    }
+
+    try {
+      if (!oneSignalInitRef.current) {
+        try {
+          await OneSignal.init({
+            appId,
+            serviceWorkerPath: "/OneSignalSDKWorker.js",
+            serviceWorkerParam: { scope: "/" },
+            allowLocalhostAsSecureOrigin: true,
+            welcomeNotification: { disable: true, message: "" },
+          });
+        } catch (err) {
+          if (!isOneSignalAlreadyInitializedError(err)) {
+            throw err;
+          }
+        }
+        oneSignalInitRef.current = true;
+
+        if (!oneSignalPermissionListenerRef.current) {
+          OneSignal.Notifications.addEventListener("permissionChange", (isGranted) => {
+            setPermission(isGranted ? "granted" : Notification.permission);
+          });
+          oneSignalPermissionListenerRef.current = true;
+        }
+        await OneSignal.Notifications.setDefaultUrl(`${window.location.origin}/shop`);
+      } else if (!oneSignalPermissionListenerRef.current) {
+        OneSignal.Notifications.addEventListener("permissionChange", (isGranted) => {
+          setPermission(isGranted ? "granted" : Notification.permission);
+        });
+        oneSignalPermissionListenerRef.current = true;
+      }
+
+      if (userId) {
+        await OneSignal.login(userId);
+      }
+
+      setPermission(Notification.permission);
+      return true;
+    } catch (err) {
+      console.error("OneSignal init error:", err);
+      setPermission(Notification.permission);
+      return false;
+    }
+  }, []);
 
   // --- Core Logic ---
   const syncUserState = useCallback((userData: UserProfile) => {
@@ -122,10 +195,13 @@ export default function ShopPage() {
     setActiveDiscount(userData.activeDiscount ?? 0);
     setHasExclusivePack(userData.hasExclusivePack ?? false);
     setActiveXpBoost(userData.activeXpBoost ?? false);
+    if (userData.id) {
+      initOneSignal(userData.id);
+    }
     if (typeof userData.balance === "number") {
       window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: userData.balance } }));
     }
-  }, []);
+  }, [initOneSignal]);
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -246,13 +322,6 @@ export default function ShopPage() {
         if (userRes.ok) {
           const userData = await userRes.json() as UserProfile;
           syncUserState(userData);
-          if (userData?.id) {
-            try {
-              OneSignal.login(userData.id).catch((e) => console.error("OneSignal Login Error:", e));
-            } catch (e) {
-              console.error("OneSignal Login Error:", e);
-            }
-          }
         }
       } catch (userErr) {
         console.warn("[Shop] Failed to fetch user:", userErr);
@@ -313,9 +382,12 @@ export default function ShopPage() {
       return;
     }
     try {
-      const status = await OneSignal.Notifications.requestPermission();
-      setPermission(status ? "granted" : "denied");
-      if (status && userIdRef.current) await OneSignal.login(userIdRef.current);
+      const isOneSignalReady = await initOneSignal(userIdRef.current);
+      const status = isOneSignalReady
+        ? await OneSignal.Notifications.requestPermission()
+        : await Notification.requestPermission();
+      setPermission(status === true || status === "granted" ? "granted" : "denied");
+      if ((status === true || status === "granted") && userIdRef.current) await initOneSignal(userIdRef.current);
     } catch (err) { console.error("OneSignal Permission Request Error: ", err); };
   };
 
@@ -393,6 +465,7 @@ export default function ShopPage() {
   // --- Effects ---
   useEffect(() => {
     Promise.resolve().then(loadShopData);
+    Promise.resolve().then(() => initOneSignal(userIdRef.current));
     adService.current = new RewardedAdService();
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
@@ -406,7 +479,7 @@ export default function ShopPage() {
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       window.removeEventListener("openBalanceModal", openModal);
     };
-  }, [loadShopData, handleTimerComplete]);
+  }, [loadShopData, handleTimerComplete, initOneSignal]);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -455,10 +528,6 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-[#070707] text-white p-2 md:p-6 font-sans relative pb-24 overflow-hidden">
-      <div className="mb-4 text-center text-xs text-gray-400">
-        Debug: {displayPacks.length} packs to display (hasExclusivePack: {hasExclusivePack ? 'true' : 'false'})
-      </div>
-
       {/* PACK OPENING ANIMATION OVERLAY */}
       <AnimatePresence>
         {isOpening && (
@@ -496,15 +565,15 @@ export default function ShopPage() {
         {wonItems.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl p-6 overflow-hidden cursor-pointer pointer-events-auto"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl px-3 py-5 sm:p-6 overflow-y-auto cursor-pointer pointer-events-auto"
             onClick={() => setWonItems([])}
           >
             {/* Added an explicit X close button for reliability on mobile */}
             <button
                 onClick={(e) => { e.stopPropagation(); setWonItems([]); }}
-                className="absolute top-6 right-6 p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all"
+                className="fixed top-3 right-3 sm:top-6 sm:right-6 z-20 p-3 sm:p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all"
             >
-              <X size={24} />
+              <X size={20} />
             </button>
 
             <motion.div
@@ -514,14 +583,14 @@ export default function ShopPage() {
 
             <motion.div
               initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-              className="relative z-10 w-full max-w-5xl flex flex-col items-center"
+              className="relative z-10 w-full max-w-5xl min-h-full sm:min-h-0 flex flex-col items-center justify-center py-8 sm:py-0"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-5xl md:text-7xl font-black mb-12 text-white uppercase tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] text-center">
+              <h2 className="text-3xl sm:text-5xl md:text-7xl font-black mb-5 sm:mb-10 text-white uppercase tracking-normal drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] text-center">
                 You Won!
               </h2>
 
-              <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 w-full px-4">
+              <div className="grid w-full grid-cols-3 gap-2 sm:gap-4 md:gap-6 px-1 sm:px-4">
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
                   return (
@@ -530,20 +599,20 @@ export default function ShopPage() {
                       initial={{ rotateX: -90, opacity: 0 }}
                       animate={{ rotateX: 0, opacity: 1 }}
                       transition={{ delay: idx * 0.15, type: "spring", stiffness: 200 }}
-                      className={`group relative w-full max-w-[280px] bg-black/40 border border-white/10 backdrop-blur-xl p-6 rounded-3xl flex flex-col items-center text-center shadow-2xl overflow-hidden ${theme.border}`}
+                      className={`group relative min-w-0 bg-black/40 border border-white/10 backdrop-blur-xl p-2.5 sm:p-5 md:p-6 rounded-xl sm:rounded-2xl flex min-h-[132px] sm:min-h-[190px] flex-col items-center text-center shadow-2xl overflow-hidden ${theme.border}`}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${theme.glow} opacity-20 group-hover:opacity-40 transition-opacity`} />
 
-                      <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme.text} mb-3`}>
+                      <span className={`relative z-10 max-w-full truncate text-[8px] sm:text-[10px] font-black uppercase tracking-normal sm:tracking-[0.16em] ${theme.text} mb-2 sm:mb-3`}>
                         {item.rarity || "COMMON"}
                       </span>
 
-                      <p className="font-extrabold text-lg md:text-xl text-white mb-4 line-clamp-2">
+                      <p className="relative z-10 font-extrabold text-[11px] leading-tight sm:text-base md:text-xl text-white mb-3 sm:mb-4 line-clamp-3 break-words">
                         {item.name}
                       </p>
 
-                      <div className="mt-auto px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-white font-bold text-xs tracking-wider">
-                        {item.value?.toLocaleString()} COINS
+                      <div className="relative z-10 mt-auto max-w-full px-2 sm:px-4 py-1 sm:py-1.5 rounded-full bg-white/5 border border-white/10 text-white font-bold text-[9px] sm:text-xs tracking-normal sm:tracking-wider truncate">
+                        {item.value?.toLocaleString()} coins
                       </div>
                     </motion.div>
                   );
@@ -555,7 +624,7 @@ export default function ShopPage() {
                 whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(255,255,255,0.4)" }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setWonItems([])}
-                className="mt-12 px-12 py-4 bg-white text-black font-black text-lg rounded-2xl transition-all hover:bg-amber-400"
+                className="mt-6 sm:mt-10 w-full max-w-xs px-8 sm:px-12 py-3 sm:py-4 bg-white text-black font-black text-sm sm:text-lg rounded-xl sm:rounded-2xl transition-all hover:bg-amber-400"
               >
                 COLLECT REWARDS
               </motion.button>
@@ -703,7 +772,7 @@ export default function ShopPage() {
                 transition={{ delay: idx * 0.05 }}
                 whileHover={{ scale: 1.03, translateY: -4 }}
                 whileTap={{ scale: 0.97 }}
-                className={`w-full bg-[#0c0c0c] border p-4 sm:p-5 rounded-2xl relative overflow-hidden flex flex-col items-center cursor-pointer ${
+                className={`w-full bg-[#0c0c0c] border p-3 sm:p-5 rounded-xl sm:rounded-2xl relative overflow-hidden flex flex-col items-center cursor-pointer ${
                   pack.id === "exclusive_vault_pack"
                     ? "border-indigo-500/50 shadow-[0_5px_20px_rgba(99,102,241,0.15)]"
                     : "border-white/10 shadow-lg hover:border-white/30 hover:shadow-[0_5px_20px_rgba(255,255,255,0.05)]"
@@ -722,16 +791,16 @@ export default function ShopPage() {
                   </div>
                 )}
 
-                <div className="relative mb-3 mt-2 flex h-[60px] items-center">
+                <div className="relative mb-2 sm:mb-3 mt-1 sm:mt-2 flex h-[52px] sm:h-[60px] items-center">
                   <div className={`absolute inset-0 blur-xl opacity-40 ${pack.id === "exclusive_vault_pack" ? "bg-indigo-500" : "bg-white"}`}></div>
                   <div className="relative z-10 flex items-center justify-center w-full">
-                    <span className="text-4xl drop-shadow-xl filter hover:brightness-125 transition-all">
+                    <span className="text-3xl sm:text-4xl drop-shadow-xl filter hover:brightness-125 transition-all">
                       {pack.id === "exclusive_vault_pack" ? "📦" : "🎁"}
                     </span>
                   </div>
                 </div>
 
-                <h3 className="font-black text-sm md:text-base mb-4 text-center tracking-wide z-10 leading-tight min-h-[40px] flex items-center justify-center">
+                <h3 className="font-black text-xs sm:text-sm md:text-base mb-3 sm:mb-4 text-center tracking-wide z-10 leading-tight min-h-[34px] sm:min-h-[40px] flex items-center justify-center break-words">
                   {typeof pack.name === 'object' || typeof pack.name === 'function'
                     ? 'Unknown Pack'
                     : pack.name}
@@ -739,7 +808,7 @@ export default function ShopPage() {
 
                 <button
                   onClick={() => handleOpenPack(pack.id)}
-                  className={`w-full py-2.5 rounded-lg font-black text-xs transition-all z-10 ${
+                  className={`w-full py-2.5 rounded-lg font-black text-[11px] sm:text-xs transition-all z-10 ${
                     pack.id === "exclusive_vault_pack"
                       ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]"
                       : "bg-white hover:bg-amber-400 text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]"
