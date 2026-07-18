@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
 
-const MAX_PACKS_PER_REQUEST = 10;
+const MAX_PACKS_PER_REQUEST = 50;
 const EXCLUSIVE_PACK_ID = "exclusive_vault_pack";
 
 const FALLBACK_PACK_ID_TO_NAME: Record<string, string> = {

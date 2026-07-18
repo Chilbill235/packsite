@@ -595,25 +595,50 @@ export default function ShopPage() {
               <div className="grid w-full grid-cols-3 gap-2 sm:gap-4 md:gap-6 px-1 sm:px-4">
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
+                  // Determine size based on number of items - smaller for more items
+                  const sizeClass = wonItems.length <= 5
+                    ? "p-3"
+                    : wonItems.length <= 10
+                    ? "p-2"
+                    : wonItems.length <= 20
+                    ? "p-1"
+                    : "p-0.5";
+                  const minHeightClass = wonItems.length <= 5
+                    ? "min-h-[140px]"
+                    : wonItems.length <= 10
+                    ? "min-h-[120px]"
+                    : wonItems.length <= 20
+                    ? "min-h-[100px]"
+                    : "min-h-[80px]";
+                  const textSizeClass = wonItems.length <= 10
+                    ? "text-[9px] sm:text-[10px]"
+                    : wonItems.length <= 20
+                    ? "text-[8px] sm:text-[9px]"
+                    : "text-[7px] sm:text-[8px]";
+                  const valueTextSizeClass = wonItems.length <= 10
+                    ? "text-[8px]"
+                    : wonItems.length <= 20
+                    ? "text-[7px]"
+                    : "text-[6px]";
                   return (
                     <motion.div
                       key={idx}
                       initial={{ rotateX: -90, opacity: 0 }}
                       animate={{ rotateX: 0, opacity: 1 }}
                       transition={{ delay: idx * 0.15, type: "spring", stiffness: 200 }}
-                      className={`group relative min-w-0 bg-black/40 border border-white/10 backdrop-blur-xl p-2.5 sm:p-5 md:p-6 rounded-xl sm:rounded-2xl flex min-h-[132px] sm:min-h-[190px] flex-col items-center text-center shadow-2xl overflow-hidden ${theme.border}`}
+                      className={`group relative min-w-0 bg-black/40 border border-white/10 backdrop-blur-xl ${sizeClass} ${minHeightClass} flex min-w-0 flex-col items-center text-center shadow-2xl overflow-hidden ${theme.border}`}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${theme.glow} opacity-20 group-hover:opacity-40 transition-opacity`} />
 
-                      <span className={`relative z-10 max-w-full truncate text-[8px] sm:text-[10px] font-black uppercase tracking-normal sm:tracking-[0.16em] ${theme.text} mb-2 sm:mb-3`}>
+                      <span className={`relative z-10 max-w-full truncate ${textSizeClass} font-black uppercase tracking-normal sm:tracking-[0.16em] ${theme.text} mb-1.5`}>
                         {item.rarity || "COMMON"}
                       </span>
 
-                      <p className="relative z-10 font-extrabold text-[11px] leading-tight sm:text-base md:text-xl text-white mb-3 sm:mb-4 line-clamp-3 break-words">
+                      <p className="relative z-10 font-extrabold leading-tight ${textSizeClass} text-white mb-2 line-clamp-3 break-words">
                         {item.name}
                       </p>
 
-                      <div className="relative z-10 mt-auto max-w-full px-2 sm:px-4 py-1 sm:py-1.5 rounded-full bg-white/5 border border-white/10 text-white font-bold text-[9px] sm:text-xs tracking-normal sm:tracking-wider truncate">
+                      <div className="relative z-10 mt-auto max-w-full px-1 py-0.5 rounded-full bg-white/5 border border-white/10 text-white font-bold ${valueTextSizeClass} tracking-normal truncate">
                         {item.value?.toLocaleString()} coins
                       </div>
                     </motion.div>
@@ -736,7 +761,7 @@ export default function ShopPage() {
                 initial={{ opacity: 0, y: 5, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 5, scale: 0.95 }}
                 className="absolute top-full left-0 w-full mt-2 bg-[#161616] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50"
               >
-                {[1, 3, 6].map((q) => (
+                {[1, 3, 6, 9, 12, 18, 24, 30, 50].map((q) => (
                   <button
                     key={q}
                     onClick={() => { setOpenQuantity(q); setIsDropdownOpen(false); }}
