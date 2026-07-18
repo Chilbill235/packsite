@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
-import { TIER_CONFIG } from "./config.ts";
-import { getRandom } from "./utils.ts";
+import { TIER_CONFIG } from "./config";
+import { getRandom } from "./utils";
 
 export const generateItem = (tierKey: string, packId: string, index: number) => {
   const tier = TIER_CONFIG[tierKey as keyof typeof TIER_CONFIG];

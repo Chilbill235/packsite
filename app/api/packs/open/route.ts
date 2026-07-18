@@ -1,10 +1,33 @@
 import { NextResponse } from "next/server";
+import type { Item } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rollItem } from "@/lib/openingEngine";
 
-// Configure maximum packs a user can open in a single click
 const MAX_PACKS_PER_REQUEST = 10;
+const EXCLUSIVE_PACK_ID = "exclusive_vault_pack";
+
+const FALLBACK_PACK_ID_TO_NAME: Record<string, string> = {
+  "76796f88-c7d0-442a-bfeb-380c3863c8b7": "Cosmic Vault",
+  "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f": "Starter Cache",
+  "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f": "Event Crate",
+  "02ada6c5-4bb7-4d2c-953d-3228f28855eb": "Void Box",
+  "5fd47c89-8fd5-4946-9f09-00d90055c6e5": "Promo Bundle",
+};
+
+type OpenPackBody = {
+  packId?: unknown;
+  quantity?: unknown;
+  isFlashSale?: unknown;
+};
+
+const parseQuantity = (value: unknown) => {
+  const quantity = Number(value ?? 1);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_PACKS_PER_REQUEST) {
+    return null;
+  }
+  return quantity;
+};
 
 export async function POST(req: Request) {
   try {
@@ -13,103 +36,144 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Get request body
-    const body = await req.json();
-    const packId = body.packId;
+    const body = (await req.json()) as OpenPackBody;
+    const packId = typeof body.packId === "string" ? body.packId : "";
+    const quantity = parseQuantity(body.quantity);
     const isFlashSale = body.isFlashSale === true;
-    
-    // Parse quantity securely to ensure it's a valid integer
-    const quantity = parseInt(body.quantity || "1", 10);
 
-    // SECURITY CHECK: Prevent infinite free pack rolling
-    if (isNaN(quantity) || quantity < 1 || quantity > MAX_PACKS_PER_REQUEST) {
-      return NextResponse.json({ 
-        error: `Invalid quantity. You can only open between 1 and ${MAX_PACKS_PER_REQUEST} packs at a time.` 
-      }, { status: 400 });
+    if (!packId) {
+      return NextResponse.json({ error: "Missing pack id" }, { status: 400 });
     }
 
-    return await prisma.$transaction(async (tx) => {
-      const pack = await tx.pack.findUnique({ 
-        where: { id: packId }, 
-        include: { items: true } 
-      });
-      
-      const user = await tx.user.findUnique({ 
-        where: { email: session.user.email as string } 
+    if (quantity === null) {
+      return NextResponse.json(
+        { error: `Invalid quantity. Open between 1 and ${MAX_PACKS_PER_REQUEST} packs at a time.` },
+        { status: 400 },
+      );
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { email: session.user.email as string },
       });
 
-      if (!pack) return NextResponse.json({ error: "Pack not found" }, { status: 404 });
-      if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-      
-      // 2. CHECK EXCLUSIVE PACK RESTRICTION
-      if (pack.category.toLowerCase() === "exclusive" && !user.hasExclusivePack) {
-        return NextResponse.json({ 
-          error: "This exclusive pack is locked! Open a secret vault drop notification to access it." 
-        }, { status: 403 });
+      if (!user) {
+        return { response: NextResponse.json({ error: "User not found" }, { status: 404 }) };
       }
 
-      // 3. CALCULATE PRICE WITH DISCOUNTS
-      let unitPrice = isFlashSale ? Math.floor(pack.price * 0.5) : pack.price;
-      
-      if (user.activeDiscount > 0) {
+      let items: Item[] = [];
+      let packPrice = 0;
+      let resolvedPackId = packId;
+
+      if (packId === EXCLUSIVE_PACK_ID) {
+        if (!user.hasExclusivePack) {
+          return {
+            response: NextResponse.json(
+              { error: "This exclusive pack is locked. Claim an exclusive pack reward first." },
+              { status: 403 },
+            ),
+          };
+        }
+
+        items = await tx.item.findMany({
+          where: {
+            rarity: {
+              in: ["LEGENDARY", "MYTHIC", "COSMIC", "VOID", "CELESTIAL", "OMEGA", "Legendary", "Mythical"],
+            },
+          },
+        });
+
+        if (items.length === 0) {
+          items = await tx.item.findMany();
+        }
+      } else {
+        const fallbackName = FALLBACK_PACK_ID_TO_NAME[packId];
+        const pack = await tx.pack.findFirst({
+          where: fallbackName ? { OR: [{ id: packId }, { name: fallbackName }] } : { id: packId },
+          include: { items: true },
+        });
+
+        if (!pack) {
+          return { response: NextResponse.json({ error: "Pack not found" }, { status: 404 }) };
+        }
+
+        if (pack.category.toLowerCase() === "exclusive" && !user.hasExclusivePack) {
+          return {
+            response: NextResponse.json(
+              { error: "This exclusive pack is locked. Claim an exclusive pack reward first." },
+              { status: 403 },
+            ),
+          };
+        }
+
+        items = pack.items;
+        packPrice = pack.price;
+        resolvedPackId = pack.id;
+      }
+
+      if (items.length === 0) {
+        return { response: NextResponse.json({ error: "This pack has no items configured" }, { status: 404 }) };
+      }
+
+      let unitPrice = packPrice;
+      if (isFlashSale && packId !== EXCLUSIVE_PACK_ID) {
+        unitPrice = Math.floor(unitPrice * 0.5);
+      }
+      if (user.activeDiscount > 0 && packId !== EXCLUSIVE_PACK_ID) {
         unitPrice = Math.floor(unitPrice * (1 - user.activeDiscount));
       }
-      
+
       const totalPrice = unitPrice * quantity;
-
       if (user.balance < totalPrice) {
-        return NextResponse.json({ error: "Insufficient funds" }, { status: 400 });
+        return { response: NextResponse.json({ error: "Insufficient balance" }, { status: 400 }) };
       }
 
-      // 4. APPLY LUCK BUFF TO DROP ODDS
-      let itemsToRoll = pack.items;
-      if (user.activeLuck > 1.0) {
-        itemsToRoll = pack.items.map(item => {
-          const isRare = item.rarity.toLowerCase() !== "common";
-          return {
-            ...item,
-            chance: isRare ? item.chance * user.activeLuck : item.chance
-          };
-        });
-      }
+      const wonItems = Array.from({ length: quantity }, () => rollItem(items, user.activeLuck));
 
-      // 5. ROLL THE ITEMS X TIMES
-      const wonItems = [];
-      for (let i = 0; i < quantity; i++) {
-        wonItems.push(rollItem(itemsToRoll));
-      }
-      
-      // 6. PERFORM UPDATES & CONSUME SINGLE-USE BUFFS
       const updatedUser = await tx.user.update({
         where: { id: user.id },
-        data: { 
+        data: {
           balance: { decrement: totalPrice },
-          activeLuck: 1.0,         // Reset back to normal 1x luck
-          activeDiscount: 0.0,     // Reset discount back to normal 0%
-          hasExclusivePack: false, // Consume the key
-          activeXpBoost: false,    // Consume active double XP buff
+          activeLuck: 1.0,
+          activeDiscount: 0.0,
+          hasExclusivePack: packId === EXCLUSIVE_PACK_ID ? false : user.hasExclusivePack,
+          activeXpBoost: false,
+        },
+        select: {
+          balance: true,
+          activeLuck: true,
+          activeDiscount: true,
+          hasExclusivePack: true,
+          activeXpBoost: true,
         },
       });
 
-      // Bulk create inventory items
       await tx.inventory.createMany({
-        data: wonItems.map(item => ({ userId: user.id, itemId: item.id }))
+        data: wonItems.map((item) => ({ userId: user.id, itemId: item.id })),
       });
 
-      // Bulk create history logs
       await tx.opening.createMany({
-        data: wonItems.map(item => ({ userId: user.id, packId, itemId: item.id }))
+        data: wonItems.map((item) => ({
+          userId: user.id,
+          packId: packId === EXCLUSIVE_PACK_ID ? item.packId : resolvedPackId,
+          itemId: item.id,
+        })),
       });
 
-      return NextResponse.json({ 
-        success: true, 
-        wonItems, 
-        newBalance: updatedUser.balance,
-        xpBoostActive: user.activeXpBoost 
-      });
+      return {
+        response: NextResponse.json({
+          success: true,
+          wonItem: wonItems[0],
+          wonItems,
+          newBalance: updatedUser.balance,
+          user: updatedUser,
+        }),
+      };
     });
+
+    return result.response;
   } catch (error) {
-    console.error("BUY_PACK_ERROR", error);
-    return NextResponse.json({ error: "Failed to buy pack" }, { status: 500 });
+    console.error("PACK_OPEN_ERROR", error);
+    return NextResponse.json({ error: "Failed to open pack" }, { status: 500 });
   }
 }

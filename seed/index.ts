@@ -7,10 +7,10 @@ import { Pool } from "pg";
 import { v4 as uuidv4 } from "uuid";
 
 // Imports
-import { TIER_CONFIG, PACK_METADATA } from "./config.ts";
-import { generateItem } from "./engine.ts";
-import { logger } from "./utils.ts";
-import { AuditService } from "./audit.ts";
+import { TIER_CONFIG, PACK_METADATA } from "./config";
+import { generateItem } from "./engine";
+import { logger } from "./utils";
+import { AuditService } from "./audit";
 
 // 2. Initialize the Postgres Pool and Prisma Adapter
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -47,7 +47,7 @@ async function main() {
 
     // Generate and Insert Items for ALL packs
     const itemBatch = [];
-    for (const [packName, packId] of Object.entries(packIds)) {
+    for (const packId of Object.values(packIds)) {
       for (const [key, tier] of Object.entries(TIER_CONFIG)) {
         for (let i = 0; i < tier.qty; i++) {
           // Now passing the dynamic packId instead of hardcoding 'Cosmic Vault'
