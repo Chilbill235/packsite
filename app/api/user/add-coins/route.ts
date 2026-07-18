@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
     if (!suppressNotification) {
       await sendPushNotification(
         userId,
-        "💎 Coins Claimed! 💎",
-        `🪙 You just received ${amount} coins.`,
-        "reward-claim"
+        "\u002728 Coins Claimed! \u002728",
+        "\u{1FA99} You just received " + amount + " coins.",
+        "reward-claim",
+        "/shop?ref=reward-claim"
       );
     }
 

@@ -124,6 +124,30 @@ useEffect(() => {
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getInitialNotificationPermission);
   const [showBanner, setShowBanner] = useState(true);
+  // Prevent body scroll when modals are open
+  useEffect(() => {
+    const shouldLockScroll = wonItems.length > 0 || showAdModal || isOpening || pendingPack;
+    
+    if (shouldLockScroll) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.touchAction = 'none';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.touchAction = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.touchAction = '';
+    };
+  }, [wonItems.length, showAdModal, isOpening, pendingPack]);
+
 
   // --- Active Gameplay Buff States ---
   const [activeDiscount, setActiveDiscount] = useState<number>(0);
@@ -827,7 +851,7 @@ useEffect(() => {
   if (packError) return <div className="min-h-screen flex h-[64vh] items-center justify-center bg-[#070707] text-red-400 text-center p-4">{packError}</div>;
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white p-2 md:p-6 font-sans relative pb-24 overflow-hidden">
+    <div className="h-screen bg-[#070707] text-white font-sans relative overflow-hidden flex flex-col">
       {/* PACK OPENING ANIMATION OVERLAY */}
       <AnimatePresence>
         {isOpening && (
@@ -885,8 +909,7 @@ useEffect(() => {
         {wonItems.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl px-3 py-5 sm:p-6 overflow-y-auto cursor-pointer pointer-events-auto"
-            onClick={() => setWonItems([])}
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 backdrop-blur-2xl p-4 sm:p-6 md:p-8 pointer-events-auto"
           >
             {/* Added an explicit X close button for reliability on mobile */}
             <button
@@ -906,26 +929,26 @@ useEffect(() => {
               className="relative z-10 w-full max-w-5xl min-h-full sm:min-h-0 flex flex-col items-center justify-center py-8 sm:py-0"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-3xl sm:text-5xl md:text-7xl font-black mb-5 sm:mb-10 text-white uppercase tracking-normal drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] text-center">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-white uppercase tracking-normal drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] text-center">
                 You Won!
               </h2>
 
               {/* Responsive grid: 1 column on mobile (row by row), 3 columns on desktop */}
-              <div className={`grid w-full gap-4 sm:gap-6 px-1 sm:px-4 sm:grid-cols-1 md:grid-cols-${getGridCols(wonItems.length)}`}>
+              <div className={`grid w-full gap-2 sm:gap-3 px-2 sm:px-4 sm:grid-cols-1 md:grid-cols-${getGridCols(wonItems.length)}`}>
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
                   // Determine size based on number of items - smaller for more items
-                  const sizeClass = wonItems.length <= 5
-                    ? "p-3"
+                  const sizeClass = wonItems.length <= 3
+                    ? "p-1.5"
                     : wonItems.length <= 10
                     ? "p-2"
                     : wonItems.length <= 20
                     ? "p-1"
                     : "p-0.5";
-                  const minHeightClass = wonItems.length <= 5
-                    ? "min-h-[140px]"
+                  const minHeightClass = wonItems.length <= 3
+                    ? "min-h-[70px]"
                     : wonItems.length <= 10
-                    ? "min-h-[120px]"
+                    ? "min-h-[90px]"
                     : wonItems.length <= 20
                     ? "min-h-[100px]"
                     : "min-h-[80px]";
@@ -983,7 +1006,7 @@ useEffect(() => {
 
 {/* Wrapped in isMounted to prevent server/client mismatch */}
 {isMounted && isIOS && !isStandalone && (
-  <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left relative z-10 max-w-4xl mx-auto">
+  <div className="mx-2 md:mx-4 p-2 md:p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left relative z-10 max-w-4xl">
     <Smartphone className="text-amber-500 shrink-0" size={24} />
     <div>
       <h4 className="font-bold text-amber-500 text-sm">Enable Safari Background Alerts</h4>
@@ -1044,7 +1067,7 @@ useEffect(() => {
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto flex flex-col items-center w-full relative z-10 px-2 sm:px-4">
+      <div className="max-w-7xl mx-auto flex flex-col items-center w-full relative z-10 px-2 sm:px-4 h-full">
         <motion.h1
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
           className="text-3xl md:text-4xl font-black mb-4 tracking-tighter text-center text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-sm"
@@ -1053,7 +1076,7 @@ useEffect(() => {
         </motion.h1>
 
         {(activeDiscount > 0 || activeLuck > 1 || activeXpBoost) && (
-          <div className="flex flex-wrap gap-2 mb-6 justify-center items-center">
+          <div className="flex flex-wrap gap-1 md:gap-1.5 mb-2 md:mb-3 justify-center items-center flex-shrink-0">
             {activeDiscount > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(239,68,68,0.1)]">
                 <span className="animate-pulse">🔥</span> {activeDiscount * 100}% Discount
@@ -1072,7 +1095,7 @@ useEffect(() => {
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 w-full max-w-5xl mx-auto flex-1 overflow-y-auto px-2 md:px-4 content-start items-start">
           {displayPacks.map((pack, idx) => {
             // Guard against invalid pack data
             if (!pack || typeof pack !== 'object' || !pack.id) {
@@ -1098,7 +1121,7 @@ useEffect(() => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05, type: "spring", stiffness: 120, damping: 18 }}
                 whileHover={{ y: -6 }}
-                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_15px_50px_-12px_rgba(255,255,255,0.25)]`}
+                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_10px_30px_-12px_rgba(255,255,255,0.2)]`}
               >
                 {/* Top tier glow that bleeds behind the card */}
                 <div className={`pointer-events-none absolute -top-20 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-70 group-hover:opacity-100 transition-opacity duration-500`} />
@@ -1109,8 +1132,8 @@ useEffect(() => {
                 </div>
 
                 {/* Tier badge top-left, sale badge top-right */}
-                <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5">
-                  <span className={`text-[9px] font-black tracking-[0.2em] px-2 py-1 rounded-full ${theme.badge} shadow-lg`}>
+                <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
+                  <span className={`text-[8px] font-black tracking-[0.15em] px-1.5 py-0.5 rounded-full ${theme.badge} shadow-lg`}>
                     {theme.tier}
                   </span>
                 </div>
@@ -1128,7 +1151,7 @@ useEffect(() => {
                 </div>
 
                 {/* Pack illustration */}
-                <div className="relative h-32 sm:h-40 flex items-center justify-center mt-10 mb-2">
+                <div className="relative h-16 sm:h-24 flex items-center justify-center mt-3 mb-0.5">
                   {/* Halo behind box */}
                   <div className={`absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-60 ${theme.halo} group-hover:opacity-90 transition-opacity`} />
                   {/* Sparkles for higher tiers */}
@@ -1153,7 +1176,7 @@ useEffect(() => {
                       <div className="absolute inset-x-2 top-1 h-1 rounded-full bg-white/40 blur-[1px]" />
                     </div>
                     {/* Body */}
-                    <div className={`relative h-16 w-20 sm:w-24 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/10 border-t-0 shadow-2xl overflow-hidden`}>
+                    <div className={`relative h-12 w-16 sm:w-20 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/10 border-t-0 shadow-xl overflow-hidden`}>
                       {/* Ribbon vertical */}
                       <div className={`absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-2 sm:w-2.5 bg-gradient-to-b ${theme.ribbon} opacity-90`} />
                       {/* Ribbon bow */}

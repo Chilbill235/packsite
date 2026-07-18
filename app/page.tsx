@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
+import { notificationService } from '@/lib/notificationService';
+import { Smartphone } from "lucide-react";
 import type { PackWithItems } from "@/types";
 
 export default function ShopPage() {
@@ -22,18 +24,15 @@ export default function ShopPage() {
   const [bonusClaimed, setBonusClaimed] = useState(false);
 
   // --- Notification State ---
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported" | "ios-needs-pwa">("default");
 
   const targetTimeRef = useRef<number | null>(null);
   const adService = useRef<RewardedAdService | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      if (!("Notification" in window)) {
-        setPermission("unsupported");
-      } else {
-        setPermission(Notification.permission);
-      }
+      const detail = notificationService.getPermissionDetail();
+      setPermission(detail);
     }
   }, []);
 
@@ -51,25 +50,25 @@ export default function ShopPage() {
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) return;
     try {
-      const result = await Notification.requestPermission();
-      setPermission(result);
-      if (result === "granted") {
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.ready;
-          const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
-          const convertedKey = urlBase64ToUint8Array(publicKey);
+      const granted = await notificationService.requestPermission();
+      const detail = notificationService.getPermissionDetail();
+      setPermission(detail as NotificationPermission | "unsupported" | "ios-needs-pwa");
+      
+      if (granted && "serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        const publicKey = "BEtKdyDMRqNtEXn-VObKK2cdNlmnSSk3oz1_KXET_MDVUBPDGrofEvpAYaNBQpGp3-MS45qj_KV9nBbzxzftDtU";
+        const convertedKey = urlBase64ToUint8Array(publicKey);
 
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: convertedKey
-          });
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedKey
+        });
 
-          await fetch("/api/user/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ subscription })
-          });
-        }
+        await fetch("/api/user/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription })
+        });
       }
     } catch (err: any) {
       console.error("Permission Error: " + err.message);
@@ -126,25 +125,29 @@ export default function ShopPage() {
     }
   };
 
-  const handleWatchAdClick = async () => {
-    targetTimeRef.current = Date.now() + 10000;
-    setCountdown(10);
-    setIsWaiting(true);
-    setHasDispatchedPush(false);
+   const handleWatchAdClick = async () => {
+     targetTimeRef.current = Date.now() + 10000;
+     setCountdown(10);
+     setIsWaiting(true);
+     setHasDispatchedPush(false);
 
-    adService.current?.showAd(user?.email || "anon");
+     // Initialize ad service if not already initialized
+     if (!adService.current) {
+       adService.current = new RewardedAdService();
+     }
+     adService.current?.showAd(user?.email || "anon");
 
-    if ("serviceWorker" in navigator) {
-      const registration = await navigator.serviceWorker.ready;
-      if (registration.active) {
-        registration.active.postMessage({
-          type: "START_BACKGROUND_TIMER",
-          delay: 10000,
-          url: window.location.origin + "/shop?ref=reward-claim"
-        });
-      }
-    }
-  };
+     if ("serviceWorker" in navigator) {
+       const registration = await navigator.serviceWorker.ready;
+       if (registration.active) {
+         registration.active.postMessage({
+           type: "START_BACKGROUND_TIMER",
+           delay: 10000,
+           url: window.location.origin + "/shop?ref=reward-claim"
+         });
+       }
+     }
+   };
 
   // --- SECURITY: Flag the ad as complete in the DB ---
   const handleTimerComplete = useCallback(async () => {
@@ -402,6 +405,25 @@ export default function ShopPage() {
         )}
 
         {/* --- Dynamic Notification Banner --- */}
+        {permission === "ios-needs-pwa" && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="mb-8 p-6 bg-blue-500/10 border border-blue-500/20 rounded-3xl"
+          >
+            <div className="text-center">
+              <h4 className="font-bold text-blue-400 text-lg mb-2">📱 Enable Push Notifications on iOS</h4>
+              <p className="text-sm text-gray-400 mb-4">
+                Tap the Share button in Safari, then select <strong>"Add to Home Screen"</strong> to enable notifications.
+              </p>
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                <Smartphone className="w-4 h-4" />
+                <span>Notifications only work when this app is added to your Home Screen</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {permission === "default" && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }} 

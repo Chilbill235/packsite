@@ -47,17 +47,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
         
         {/* Next.js Script Component handles downloading the OneSignal SDK cleanly */}
-        <Script 
-          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" 
-          strategy="afterInteractive" 
+        <Script
+          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+          strategy="afterInteractive"
         />
-        
-        {/* Next.js Script Component handles your initialization and injects the variables correctly */}
+
+        {/* OneSignal Web SDK v16 uses the OneSignalDeferred queue pattern.
+            Using the legacy OneSignal.push() pattern with the v16 SDK throws
+            "Cannot read properties of undefined (reading 'on')" inside
+            NotificationsNamespace during init. */}
         <Script id="onesignal-init" strategy="afterInteractive">
           {`
-            window.OneSignal = window.OneSignal || [];
-            OneSignal.push(function() {
-              OneSignal.init({
+            window.OneSignalDeferred = window.OneSignalDeferred || [];
+            OneSignalDeferred.push(async function (OneSignal) {
+              await OneSignal.init({
                 appId: "${oneSignalAppId}",
                 safari_web_id: "${oneSignalSafariWebId}",
                 allowLocalhostAsSecureOrigin: true,

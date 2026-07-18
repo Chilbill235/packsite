@@ -74,7 +74,7 @@ export default function InventoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to sell item");
       setInventory(prev => prev.filter(i => i.id !== inventoryId));
-      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
+      document.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance }, bubbles: true }));
       localStorage.setItem('userBalance', data.newBalance.toString());
       setNotification({ message: "Item sold successfully!", type: "success" });
     } catch (err) {
@@ -125,6 +125,7 @@ export default function InventoryPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-6">
+        {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
         {inventory.length === 0 ? (
           <div className="text-center py-20 text-white">Your inventory is empty.</div>
         ) : (

@@ -7,11 +7,11 @@ export default function BalanceDisplay({ initialBalance }: { initialBalance: num
 
   useEffect(() => {
     const handleBalanceChange = (event: Event) => {
-      setBalance((event as CustomEvent<number>).detail);
+      setBalance((event as CustomEvent<{ balance: number }>).detail.balance);
     };
 
-    window.addEventListener("balanceChanged", handleBalanceChange);
-    return () => window.removeEventListener("balanceChanged", handleBalanceChange);
+    window.addEventListener("balanceUpdated", handleBalanceChange);
+    return () => window.removeEventListener("balanceUpdated", handleBalanceChange);
   }, []);
 
   return <span className="font-bold text-amber-400">{balance.toLocaleString()} COINS</span>;

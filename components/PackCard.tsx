@@ -5,7 +5,6 @@ import type { Item } from "@prisma/client";
 import type { PackWithItems } from "@/types";
 import Balance from "./Balance";
 import ErrorDialog from "./ErrorDialog";
-import Notification from "./Notification";
 
 interface PackCardProps {
   pack: PackWithItems;

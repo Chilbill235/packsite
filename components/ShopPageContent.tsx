@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
+import Notification from '@/components/Notification';
 import { RewardedAdService } from '@/lib/adService';
 import type { Pack } from "@prisma/client";
 import { notificationService } from '@/lib/notificationService';
@@ -35,8 +36,6 @@ const BUFF_MAP: Record<string, BuffDetails> = {
 };
 
 // Import our notification service
-import { notificationService } from "@/lib/notificationService";
-
 export default function ShopPage() {
   // --- States ---
   interface PackBasic {
@@ -61,6 +60,7 @@ export default function ShopPage() {
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
   
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const [showBanner, setShowBanner] = useState(true);
@@ -411,7 +411,7 @@ export default function ShopPage() {
       setIsIOS(is_ios);
       setIsStandalone(is_standalone);
       if (!("Notification" in window)) setPermission("unsupported");
-      else setPermission(Notification.permission);
+      else setPermission((window as any).Notification.permission);
     }
     loadShopData();
   }, [loadShopData]);
@@ -811,6 +811,7 @@ export default function ShopPage() {
         </div>
       </div>
 
+      {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
   );
