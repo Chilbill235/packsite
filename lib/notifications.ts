@@ -1,71 +1,50 @@
-// Define OneSignal on the Window interface to prevent TypeScript errors
-declare global {
-  interface Window {
-    OneSignal: any;
-  }
-}
+// Environment variables needed for OneSignal Server-Side API
+// NEXT_PUBLIC_ONESIGNAL_APP_ID should match your frontend
+// ONESIGNAL_REST_API_KEY is secret and should ONLY be on the server
+const ONESIGNAL_APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "";
+const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "";
 
-class NotificationService {
-  private isInitialized = false;
-
-  /**
-   * Requests permission from the browser to display notifications.
-   * Returns true if permission is granted, false otherwise.
-   */
-  public async requestPermission(): Promise<boolean> {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      console.warn("Notifications are not supported in this environment.");
-      return false;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      return permission === "granted";
-    } catch (error) {
-      console.error("Error requesting notification permission:", error);
-      return false;
-    }
+/**
+ * Sends a push notification to a specific user via OneSignal's REST API.
+ * 
+ * @param userId The unique ID of the user (matches what was passed to OneSignal.login on the client)
+ * @param title The title of the push notification
+ * @param message The body/content of the push notification
+ */
+export async function sendPushNotification(
+  userId: string,
+  title: string,
+  message: string
+): Promise<void> {
+  if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
+    console.warn("[Notifications] Missing OneSignal App ID or REST API Key. Notification skipped.");
+    return;
   }
 
-  /**
-   * Logs the user into the notification service (OneSignal) using their unique ID.
-   * @param userId The ID of the authenticated user
-   */
-  public async login(userId: string): Promise<void> {
-    if (typeof window === "undefined") return;
-
-    try {
-      // The service worker utilizes OneSignal SDK for campaign deliveries
-      if (window.OneSignal) {
-        await window.OneSignal.login(userId);
-        console.log(`[NotificationService] User ${userId} logged in successfully.`);
-      } else {
-        console.warn("[NotificationService] OneSignal is not loaded on the window object.");
-      }
-    } catch (error) {
-      console.error("[NotificationService] Failed to login to notification service:", error);
-    }
-  }
-
-  /**
-   * Optional: Safely initialize OneSignal if it hasn't been initialized elsewhere
-   */
-  public async initOneSignal(appId: string): Promise<void> {
-    if (typeof window === "undefined" || this.isInitialized) return;
-
-    window.OneSignal = window.OneSignal || [];
-    window.OneSignal.push(() => {
-      window.OneSignal.init({
-        appId: appId,
-        // Configured to work seamlessly with the custom service worker setup
-        notifyButton: {
-          enable: false,
-        },
-      });
+  try {
+    const response = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: `Basic ${ONESIGNAL_REST_API_KEY}`,
+      },
+      body: JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        // Target the specific user ID that was registered on the frontend
+        include_external_user_ids: [userId], 
+        headings: { en: title },
+        contents: { en: message },
+      }),
     });
-    this.isInitialized = true;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("[Notifications] OneSignal API Error:", errorData);
+      return;
+    }
+
+    console.log(`[Notifications] Successfully sent push notification to user: ${userId}`);
+  } catch (error) {
+    console.error("[Notifications] Failed to send push notification:", error);
   }
 }
-
-// Export a singleton instance so the same state is shared across your app
-export const notificationService = new NotificationService();
