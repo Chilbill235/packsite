@@ -109,6 +109,7 @@ export default function ShopPage() {
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
   const [packError, setPackError] = useState<string | null>(null);
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
+  const [adStatus, setAdStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'completed'>('idle');
 
   // --- Refs ---
   const userIdRef = useRef<string | undefined>(undefined);
@@ -178,49 +179,92 @@ export default function ShopPage() {
   // which provides immediate feedback without a second notification
 
   const handleTimerComplete = useCallback(async () => {
-    if (timerCompletedRef.current) return;
-    // Guard against multiple calls
-    if (!isWaiting || !targetTimeRef.current) return;
+    // Prevent multiple executions
+    if (timerCompletedRef.current || !isWaiting) return;
+
     timerCompletedRef.current = true;
-
     setIsWaiting(false);
-    let currentUserId = userIdRef.current;
-    targetTimeRef.current = null;
-
-    // If we don't have a user ID, try to fetch fresh user data
-    if (!currentUserId) {
-      try {
-        const userData = await fetchUserData();
-        currentUserId = userData?.id;
-        userIdRef.current = currentUserId;
-      } catch (err) {
-        console.error("Failed to fetch user data for notification:", err);
-      }
-    }
-
-    if (!currentUserId) {
-      console.error("Cannot send notification: User ID not found");
-      return;
-    }
+    setAdStatus('success'); // Update status for UI feedback
 
     try {
-      console.log("Sending ad reward notification with ref: reward-claim");
-      const response = await fetch("/api/send-notification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: currentUserId,
-          title: "Ad Reward Ready!",
-          message: "Your 500 coins are waiting. Click to claim!",
-          ref: "reward-claim"
-        }),
-      });
-      console.log("Ad reward notification sent:", response);
-    } catch (e) {
-      console.error("Push notification trigger failed:", e);
-    }
+      // Get current user ID
+      let currentUserId = userIdRef.current;
 
-    fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error("Ad completion sync failed", e));
+      // If we don't have a user ID, try to fetch fresh user data
+      if (!currentUserId) {
+        try {
+          const userData = await fetchUserData();
+          currentUserId = userData?.id;
+          if (userData?.id) userIdRef.current = userData.id;
+        } catch (err) {
+          console.error("Failed to fetch user data for ad reward:", err);
+          // Continue anyway - we might still be able to reward the user
+        }
+      }
+
+      // Award the ad reward
+      if (currentUserId) {
+        // Send notification first (non-blocking)
+        try {
+          await fetch("/api/send-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: currentUserId,
+              title: "Ad Reward Earned!",
+              message: "Your 500 coins are waiting. Tap to claim!",
+              ref: "reward-claim"
+            }),
+          }).catch(err => console.warn("Notification failed (non-critical):", err));
+        } catch (notificationError) {
+          console.warn("Notification service error:", notificationError);
+        }
+
+        // Award the coins (this is the critical part)
+        const adCompleteResponse = await fetch("/api/user/ad-complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+
+        if (!adCompleteResponse.ok) {
+          throw new Error(`Failed to award ad reward: ${adCompleteResponse.status}`);
+        }
+
+        // Refresh user data to reflect new balance
+        await fetchUserData();
+
+        // Update UI to show success
+        setAdStatus('completed');
+
+        // Reset status after a delay
+        setTimeout(() => {
+          setAdStatus('idle');
+        }, 3000);
+      } else {
+        throw new Error("Unable to identify user for reward");
+      }
+    } catch (error) {
+      console.error("Failed to process ad reward:", error);
+      setAdStatus('error');
+
+      // Show error to user
+      setErrorDialog({
+        message: "Failed to process your reward. Please try again."
+      });
+
+      // Attempt recovery after delay
+      setTimeout(() => {
+        setAdStatus('idle');
+      }, 3000);
+    } finally {
+      // Cleanup timing references
+      targetTimeRef.current = null;
+
+      // Ensure we're not stuck in waiting state
+      if (isWaiting) {
+        setIsWaiting(false);
+      }
+    }
   }, [isWaiting, fetchUserData]);
 
   // Simplified data loading: use fallback data directly to avoid API issues
@@ -331,19 +375,38 @@ export default function ShopPage() {
   };
 
   const handleWatchAdClick = async (amount: number) => {
+    // Prevent multiple simultaneous ad attempts
+    if (isWaiting) return;
+
     timerCompletedRef.current = false;
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
+    setAdStatus('loading'); // New state for better UX
 
     if (!adService.current) {
       console.error("Ad service not initialized");
       setIsWaiting(false);
+      setAdStatus('error');
       return;
     }
 
-    adService.current.showAd(user?.email || "anon");
+    try {
+      // Show the ad and wait for it to complete
+      // Assuming showAd returns a promise that resolves when ad is completed/watched
+      const adResult = await adService.current.showAd(user?.email || "anon");
 
+      // If ad service provides completion info, use it
+      if (adResult && adResult.completed) {
+        await handleAdRewarded(amount);
+        return;
+      }
+    } catch (adError) {
+      console.error("Ad failed to show or play:", adError);
+      // Fall back to timer-based approach if ad service fails
+    }
+
+    // Fallback: Use timer-based approach
     if ("serviceWorker" in navigator) {
       try {
         const registration = await navigator.serviceWorker.ready;
@@ -352,9 +415,67 @@ export default function ShopPage() {
             type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=reward-claim`
           });
         }
-      } catch (err) { console.error("Service Worker not ready for messaging:", err); }
+      } catch (err) {
+        console.error("Service Worker not ready for messaging:", err);
+        // Fall back to client-side timer only
+      }
     }
+
+    // Start local timer as backup/primary timing mechanism
+    const adTimer = setTimeout(() => {
+      if (isWaiting) { // Only trigger if still waiting
+        handleAdRewarded(amount);
+      }
+    }, 10000);
   };
+
+  // New handler for when ad is successfully rewarded
+  const handleAdRewarded = useCallback(async (amount: number) => {
+    if (timerCompletedRef.current) return; // Prevent double rewards
+
+    timerCompletedRef.current = true;
+    setIsWaiting(false);
+    setAdStatus('success');
+    targetTimeRef.current = null;
+
+    try {
+      // Send ad completion notification
+      const userId = userIdRef.current || (await fetchUserData())?.id;
+      if (userId) {
+        await fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: userId,
+            title: "Ad Reward Earned!",
+            message: `You've earned ${amount} coins! Tap to collect.`,
+            ref: "reward-claim"
+          }),
+        });
+      }
+
+      // Award the coins
+      await fetch("/api/user/ad-complete", { method: "POST" });
+      await fetchUserData(); // Refresh user data
+
+      // Show success feedback
+      setAdStatus('completed');
+
+      // Reset after a short delay
+      setTimeout(() => {
+        setAdStatus('idle');
+      }, 3000);
+    } catch (error) {
+      console.error("Failed to process ad reward:", error);
+      setAdStatus('error');
+
+      // Retry mechanism
+      setTimeout(() => {
+        setAdStatus('idle');
+        setIsWaiting(false);
+      }, 5000);
+    }
+  }, [fetchUserData]);
 
   const handleOpenPack = async (packId: string) => {
     const pack = packs.find(p => p.id === packId);
@@ -413,7 +534,11 @@ export default function ShopPage() {
     adService.current = new RewardedAdService();
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") handleTimerComplete();
+      if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") {
+        // Extract amount from the message if available
+        const amount = event.data.amount || 500;
+        handleAdRewarded(amount);
+      }
     };
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     const openModal = () => { setShowAdModal(true); };
@@ -423,7 +548,7 @@ export default function ShopPage() {
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       window.removeEventListener("openBalanceModal", openModal);
     };
-  }, [loadShopData, handleTimerComplete, userIdRef.current]);
+  }, [loadShopData, handleAdRewarded, userIdRef.current]);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -450,11 +575,14 @@ export default function ShopPage() {
       if (isWaiting && targetTimeRef.current) {
         const remaining = Math.max(0, Math.ceil((targetTimeRef.current - Date.now()) / 1000));
         setCountdown(remaining);
-        if (remaining <= 0) handleTimerComplete();
+        if (remaining <= 0) {
+          // Timer completed - reward the user
+          handleAdRewarded(500); // Hardcoded amount for now, could make configurable
+        }
       }
     }, 250);
     return () => clearInterval(intervalId);
-  }, [isWaiting, handleTimerComplete]);
+  }, [isWaiting, handleAdRewarded]);
 
   // Periodic notifications: send a notification every 10 minutes after initial random delay (2-2.5 minutes)
   useEffect(() => {
@@ -465,7 +593,7 @@ export default function ShopPage() {
     }
 
     // Only set up periodic notifications if we have a user and permission is granted
-    if (userIdRef.current && permission === "granted") {
+    if (user?.id && permission === "granted") {
       const scheduleNextNotification = () => {
         // Calculate delay: random 90-150 seconds for first notification, 600 seconds thereafter
         const isFirstNotification = lastNotificationTimeRef.current === 0;
@@ -484,7 +612,7 @@ export default function ShopPage() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                userId: userIdRef.current,
+                userId: user?.id,
                 title: "Daily Bonus!",
                 message: "Come back to claim your daily bonus coins!",
                 ref: "daily-bonus",
@@ -512,7 +640,7 @@ export default function ShopPage() {
         notificationTimeoutRef.current = null;
       }
     };
-  }, [userIdRef.current, permission]);
+  }, [user, permission]);
 
   const getRarityStyles = (rarity?: string) => {
     const r = rarity?.toLowerCase() || "common";
@@ -562,7 +690,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* WINNING ANIMATION OVERLAY - FIXED FOR IOS */}
+      {/* WINNING ANIMATION OVERLAY - FIXED FOR ROW BY ROW DISPLAY ON MOBILE */}
       <AnimatePresence>
         {wonItems.length > 0 && (
           <motion.div
@@ -592,7 +720,8 @@ export default function ShopPage() {
                 You Won!
               </h2>
 
-              <div className="grid w-full grid-cols-3 gap-2 sm:gap-4 md:gap-6 px-1 sm:px-4">
+              {/* Responsive grid: 1 column on mobile (row by row), 3 columns on desktop */}
+              <div className="grid w-full gap-4 sm:gap-6 px-1 sm:px-4 sm:grid-cols-1 lg:grid-cols-3">
                 {wonItems.map((item, idx) => {
                   const theme = getRarityStyles(item.rarity);
                   // Determine size based on number of items - smaller for more items

@@ -19,23 +19,48 @@ export class OneSignalNotificationService implements NotificationService {
     if (typeof window === 'undefined' || !('OneSignal' in window)) {
       return Notification.permission;
     }
-    try {
-      const granted = await OneSignal.Notifications.requestPermission();
-      return granted ? 'granted' : 'denied';
-    } catch (error) {
-      console.error('OneSignal permission request error:', error);
-      return Notification.permission;
+
+    // Try to request permission with retries in case OneSignal isn't fully initialized yet
+    const maxRetries = 3;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const granted = await OneSignal.Notifications.requestPermission();
+        return granted ? 'granted' : 'denied';
+      } catch (error) {
+        if (i === maxRetries - 1) {
+          // Last attempt failed
+          console.error('OneSignal permission request error after', maxRetries, 'attempts:', error);
+          return Notification.permission;
+        }
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
+    // This should never be reached due to the return in the loop, but TypeScript wants it
+    return Notification.permission;
   }
 
   async login(userId: string): Promise<void> {
     if (typeof window === 'undefined' || !('OneSignal' in window)) {
       return;
     }
-    try {
-      await OneSignal.login(userId);
-    } catch (error) {
-      console.error('OneSignal login error:', error);
+
+    // Try to login with retries in case OneSignal isn't fully initialized yet
+    const maxRetries = 3;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        await OneSignal.login(userId);
+        // If we get here, login succeeded
+        return;
+      } catch (error) {
+        if (i === maxRetries - 1) {
+          // Last attempt failed
+          console.error('OneSignal login error after', maxRetries, 'attempts:', error);
+          return;
+        }
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
   }
 

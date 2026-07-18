@@ -99,45 +99,52 @@ self.addEventListener('activate', function (event) {
 });
 
 self.addEventListener('message', function (event) {
-  if (!event.data) return;
+  try {
+    // Guard against non-object event.data to prevent errors
+    if (!event.data || typeof event.data !== 'object') return;
 
-  if (event.data.type === 'FORCE_DEV_LOOP_TRIGGER') {
-    triggerPeriodicAlert();
-  }
+    if (event.data.type === 'FORCE_DEV_LOOP_TRIGGER') {
+      triggerPeriodicAlert();
+    }
 
-  if (event.data.type === 'START_BACKGROUND_TIMER') {
-    var delayMs = event.data.delay || 10000;
-    var targetUrl = event.data.url || (self.location.origin + "/shop?ref=reward-claim");
-    var amount = event.data.amount || 500; 
+    if (event.data.type === 'START_BACKGROUND_TIMER') {
+      var delayMs = event.data.delay || 10000;
+      var targetUrl = event.data.url || (self.location.origin + "/shop?ref=reward-claim");
+      var amount = event.data.amount || 500;
 
-    event.waitUntil(
-      new Promise(function (resolve) {
-        setTimeout(function () {
-          self.registration.showNotification("Ad Completed! 🪙", {
-            body: "Your countdown is finished! Tap here to claim your " + amount + " coins.",
-            icon: '/images/cup.png',
-            badge: '/images/apple-pay.png',
-            tag: "reward-claim-" + Date.now(),
-            renotify: true,
-            vibrate: [200, 100, 200],
-            data: { url: targetUrl, amount: amount }
-          })
-          .then(function() {
-            return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-          })
-          .then(function(clientList) {
-            for (var i = 0; i < clientList.length; i++) {
-              clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
-            }
-            resolve();
-          })
-          .catch(function(err) {
-            console.error("[SW] Notification display error:", err);
-            resolve();
-          });
-        }, delayMs);
-      })
-    );
+      event.waitUntil(
+        new Promise(function (resolve) {
+          setTimeout(function () {
+            self.registration.showNotification("Ad Completed! 🪙", {
+              body: "Your countdown is finished! Tap here to claim your " + amount + " coins.",
+              icon: '/images/cup.png',
+              badge: '/images/apple-pay.png',
+              tag: "reward-claim-" + Date.now(),
+              renotify: true,
+              vibrate: [200, 100, 200],
+              data: { url: targetUrl, amount: amount }
+            })
+            .then(function() {
+              return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+            })
+            .then(function(clientList) {
+              for (var i = 0; i < clientList.length; i++) {
+                clientList[i].postMessage({ type: 'BACKGROUND_TIMER_COMPLETE', amount: amount });
+              }
+              resolve();
+            })
+            .catch(function(err) {
+              console.error("[SW] Notification display error:", err);
+              resolve();
+            });
+          }, delayMs);
+        })
+      );
+    }
+  } catch (err) {
+    // Prevent any errors in our handler from propagating and potentially
+    // interfering with OneSignal's message handling
+    console.error("[SW] Error in message handler:", err);
   }
 });
 
@@ -158,8 +165,8 @@ self.addEventListener('push', function (event) {
 });
 
 self.addEventListener('notificationclick', function (event) {
-  if (event.notification.data && (event.notification.data.custom || event.notification.data.OS_DATA)) return; 
-  
+  if (event.notification.data && (event.notification.data.custom || event.notification.data.OS_DATA)) return;
+
   event.notification.close();
 
   var targetUrl = "/shop?ref=notification-click";
@@ -168,7 +175,7 @@ self.addEventListener('notificationclick', function (event) {
     var rawUrl = event.notification.data.url;
     if (rawUrl !== 'undefined' && rawUrl !== 'null' && rawUrl !== '') {
       targetUrl = rawUrl;
-      
+
       // Keep existing parameters intact, but append fallback if missing
       if (targetUrl.indexOf('ref=') === -1) {
         targetUrl += (targetUrl.indexOf('?') === -1 ? '?' : '&') + 'ref=notification-click';
@@ -192,6 +199,17 @@ self.addEventListener('notificationclick', function (event) {
       if (self.clients.openWindow) return self.clients.openWindow(destinationUrl);
     })
   );
+});
+
+self.addEventListener('notificationclose', function (event) {
+  // OneSignal may use this event for analytics or cleanup
+  // We don't need to do anything specific here, but we should not prevent
+  // OneSignal from handling it if they have their own listener
+});
+
+self.addEventListener('sync', function (event) {
+  // OneSignal may use sync events for background tasks
+  // Let it pass through to their handlers if they have any
 });
 
 self.addEventListener('periodicsync', function (event) {
