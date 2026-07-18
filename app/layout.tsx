@@ -28,6 +28,10 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Get environment variables for use in the client-side script
+  const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "";
+  const oneSignalSafariWebId = process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID || "";
+
   return (
     <html lang="en" style={{ backgroundColor: '#000000' }}>
       <head>

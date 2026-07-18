@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
+import { Bell, X, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from "@/lib/adService";
 import { notificationService } from "@/lib/notificationService";
@@ -60,6 +60,7 @@ const FALLBACK_PACKS: PackBasic[] = [
   { id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f", name: "Starter Cache", price: 100 },
   { id: "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f", name: "Event Crate", price: 500 },
   { id: "02ada6c5-4bb7-4d2c-953d-3228f28855eb", name: "Void Box", price: 2000 },
+  { id: "b38e2c41-9d5a-4f17-8c63-7a1f9b4e2d04", name: "Singularity Crate", price: 5000 },
   { id: "5fd47c89-8fd5-4946-9f09-00d90055c6e5", name: "Promo Bundle", price: 0 },
 ];
 
@@ -83,7 +84,6 @@ export default function ShopPage() {
   const [isWaiting, setIsWaiting] = useState(false);
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
 
   const [isStandalone] = useState(getIsStandalone);
@@ -96,6 +96,8 @@ export default function ShopPage() {
   };
 
   const [openQuantity, setOpenQuantity] = useState(1);
+  const [pendingPack, setPendingPack] = useState<PackBasic | null>(null);
+  const [modalQuantity, setModalQuantity] = useState(1);
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
 
   // Helper to determine grid columns based on number of won items
@@ -490,34 +492,57 @@ export default function ShopPage() {
     }
   }, [fetchUserData]);
 
-  const handleOpenPack = async (packId: string) => {
-    const pack = packs.find(p => p.id === packId);
+  const requestOpenPack = (packId: string) => {
+    const pack = packs.find((p) => p.id === packId);
     if (!pack && packId !== "exclusive_vault_pack") return;
+    const target: PackBasic =
+      pack ?? ({ id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic);
+    setModalQuantity(openQuantity > 0 ? openQuantity : 1);
+    setPendingPack(target);
+  };
+
+  const closePackModal = () => {
+    setPendingPack(null);
+  };
+
+  const confirmOpenPack = async () => {
+    if (!pendingPack) return;
+    const packId = pendingPack.id;
+    const qty = Math.max(1, modalQuantity | 0);
+
+    const pack = packs.find((p) => p.id === packId);
+    if (!pack && packId !== "exclusive_vault_pack") {
+      setPendingPack(null);
+      return;
+    }
 
     const basePrice = pack ? Number(pack.price) || 0 : 0;
+    const isExclusive = packId === "exclusive_vault_pack";
 
     let discountMultiplier = 1;
-    if (isFlashSaleActive && packId !== "exclusive_vault_pack") discountMultiplier = 0.5;
-    else if (activeDiscount > 0 && packId !== "exclusive_vault_pack") discountMultiplier = 1 - activeDiscount;
+    if (isFlashSaleActive && !isExclusive) discountMultiplier = 0.5;
+    else if (activeDiscount > 0 && !isExclusive) discountMultiplier = 1 - activeDiscount;
 
     const finalPrice = Math.floor(basePrice * discountMultiplier);
-    const totalCost = finalPrice * openQuantity;
+    const totalCost = finalPrice * qty;
 
     if (user && (user.balance ?? 0) < totalCost) {
       setErrorDialog({ message: "Insufficient coins! Wait for drops." });
       return;
     }
 
+    setPendingPack(null);
+    setOpenQuantity(qty);
     setIsOpening(true);
     try {
       const res = await fetch("/api/packs/open", {
         method: "POST",
-        body: JSON.stringify({ packId, quantity: openQuantity, isFlashSale: isFlashSaleActive }),
-        headers: {"Content-Type": "application/json"}
+        body: JSON.stringify({ packId, quantity: qty, isFlashSale: isFlashSaleActive }),
+        headers: { "Content-Type": "application/json" }
       });
       const data = await res.json();
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       if (res.ok) {
         setWonItems(Array.isArray(data.wonItems) ? data.wonItems : []);
@@ -531,8 +556,11 @@ export default function ShopPage() {
       } else {
         setErrorDialog({ message: data.error || "Failed to open pack" });
       }
-    } catch { setErrorDialog({ message: "Network error occurred" }); }
-    finally { setIsOpening(false); }
+    } catch {
+      setErrorDialog({ message: "Network error occurred" });
+    } finally {
+      setIsOpening(false);
+    }
   };
 
   // --- Effects ---
@@ -663,9 +691,126 @@ export default function ShopPage() {
     return { bg: "bg-zinc-800/50", border: "border-zinc-500/50", text: "text-zinc-300", glow: "from-zinc-500/20", shadow: "shadow-xl" };
   };
 
-  const displayPacks = hasExclusivePack
-    ? [ ...packs, { id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic ]
-    : packs;
+  const displayPacks = (() => {
+    // Split off the free exclusive pack so it never sorts into the price ladder.
+    const real = packs.filter((p) => p && p.id !== "exclusive_vault_pack");
+    const exclusive = hasExclusivePack
+      ? [{ id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic]
+      : [];
+    real.sort((a, b) => {
+      const pa = typeof a.price === "string" ? parseInt(a.price) : a.price;
+      const pb = typeof b.price === "string" ? parseInt(b.price) : b.price;
+      return (pa || 0) - (pb || 0);
+    });
+    return [...real, ...exclusive];
+  })();
+
+  // Tiered visual theme for each pack card, keyed off base price.
+  const getPackTheme = (basePrice: number, isExclusive: boolean) => {
+    if (isExclusive) {
+      return {
+        tier: "EXCLUSIVE",
+        accent: "indigo",
+        cardBg: "bg-gradient-to-br from-indigo-950/90 via-[#0c0c0c] to-[#0c0c0c]",
+        border: "border-indigo-400/60",
+        glow: "from-indigo-500/30 via-fuchsia-500/20 to-transparent",
+        halo: "bg-indigo-500",
+        badge: "bg-indigo-500 text-white",
+        priceFrom: "from-indigo-300 to-fuchsia-300",
+        ribbon: "from-indigo-400 via-fuchsia-400 to-indigo-400",
+        boxLid: "from-indigo-500/80 to-fuchsia-500/80",
+        boxBody: "from-indigo-700/70 to-[#0a0a0a]",
+      };
+    }
+    if (basePrice >= 4000) {
+      return {
+        tier: "OMEGA",
+        accent: "omega",
+        cardBg: "bg-gradient-to-br from-black via-zinc-950 to-[#0a0a0a]",
+        border: "border-white/40",
+        glow: "from-white/30 via-fuchsia-500/20 to-red-500/20",
+        halo: "bg-white",
+        badge: "bg-gradient-to-r from-white via-fuchsia-300 to-red-400 text-black shadow-[0_0_18px_rgba(255,255,255,0.5)]",
+        priceFrom: "from-white via-fuchsia-200 to-red-300",
+        ribbon: "from-white via-fuchsia-300 to-red-400",
+        boxLid: "from-white/90 via-fuchsia-400/80 to-red-500/80",
+        boxBody: "from-zinc-900 via-black to-red-950/60",
+      };
+    }
+    if (basePrice >= 2000) {
+      return {
+        tier: "MYTHIC",
+        accent: "red",
+        cardBg: "bg-gradient-to-br from-red-950/60 via-[#0a0a0a] to-[#0c0c0c]",
+        border: "border-red-500/50",
+        glow: "from-red-500/30 via-orange-500/15 to-transparent",
+        halo: "bg-red-500",
+        badge: "bg-gradient-to-r from-red-500 to-orange-400 text-black",
+        priceFrom: "from-red-300 to-orange-300",
+        ribbon: "from-red-400 via-orange-400 to-red-400",
+        boxLid: "from-red-500/80 to-orange-500/80",
+        boxBody: "from-red-900/70 to-[#0a0a0a]",
+      };
+    }
+    if (basePrice >= 1000) {
+      return {
+        tier: "LEGENDARY",
+        accent: "amber",
+        cardBg: "bg-gradient-to-br from-amber-950/50 via-[#0a0a0a] to-[#0c0c0c]",
+        border: "border-amber-400/50",
+        glow: "from-amber-400/25 via-yellow-500/10 to-transparent",
+        halo: "bg-amber-400",
+        badge: "bg-gradient-to-r from-amber-300 to-yellow-400 text-black",
+        priceFrom: "from-amber-200 to-yellow-200",
+        ribbon: "from-amber-300 via-yellow-300 to-amber-300",
+        boxLid: "from-amber-400/80 to-yellow-500/80",
+        boxBody: "from-amber-700/70 to-[#0a0a0a]",
+      };
+    }
+    if (basePrice >= 500) {
+      return {
+        tier: "EPIC",
+        accent: "purple",
+        cardBg: "bg-gradient-to-br from-purple-950/50 via-[#0a0a0a] to-[#0c0c0c]",
+        border: "border-purple-400/50",
+        glow: "from-purple-500/25 via-fuchsia-500/10 to-transparent",
+        halo: "bg-purple-500",
+        badge: "bg-gradient-to-r from-purple-400 to-fuchsia-400 text-white",
+        priceFrom: "from-purple-200 to-fuchsia-200",
+        ribbon: "from-purple-400 via-fuchsia-400 to-purple-400",
+        boxLid: "from-purple-500/80 to-fuchsia-500/80",
+        boxBody: "from-purple-800/70 to-[#0a0a0a]",
+      };
+    }
+    if (basePrice >= 100) {
+      return {
+        tier: "RARE",
+        accent: "sky",
+        cardBg: "bg-gradient-to-br from-sky-950/40 via-[#0a0a0a] to-[#0c0c0c]",
+        border: "border-sky-400/40",
+        glow: "from-sky-400/20 via-cyan-400/10 to-transparent",
+        halo: "bg-sky-400",
+        badge: "bg-gradient-to-r from-sky-300 to-cyan-300 text-black",
+        priceFrom: "from-sky-200 to-cyan-200",
+        ribbon: "from-sky-300 via-cyan-300 to-sky-300",
+        boxLid: "from-sky-400/80 to-cyan-500/80",
+        boxBody: "from-sky-700/70 to-[#0a0a0a]",
+      };
+    }
+    return {
+      tier: "COMMON",
+      accent: "emerald",
+      cardBg: "bg-gradient-to-br from-emerald-950/30 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-emerald-400/40",
+      glow: "from-emerald-400/20 via-teal-400/10 to-transparent",
+      halo: "bg-emerald-400",
+      badge: "bg-gradient-to-r from-emerald-300 to-teal-300 text-black",
+      priceFrom: "from-emerald-200 to-teal-200",
+      ribbon: "from-emerald-300 via-teal-300 to-emerald-300",
+      boxLid: "from-emerald-400/80 to-teal-500/80",
+      boxBody: "from-emerald-700/70 to-[#0a0a0a]",
+    };
+  };
 
   if (packError) return <div className="min-h-screen flex h-[64vh] items-center justify-center bg-[#070707] text-red-400 text-center p-4">{packError}</div>;
 
@@ -700,6 +845,26 @@ export default function ShopPage() {
               />
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PACK PURCHASE MODAL — glass card with pack preview + quantity chips */}
+      <AnimatePresence>
+        {pendingPack && (
+          <PackPurchaseModal
+            pack={pendingPack}
+            quantity={modalQuantity}
+            setQuantity={setModalQuantity}
+            balance={user?.balance ?? 0}
+            activeDiscount={activeDiscount}
+            isFlashSaleActive={isFlashSaleActive}
+            theme={getPackTheme(
+              typeof pendingPack.price === "string" ? parseInt(pendingPack.price) : pendingPack.price,
+              pendingPack.id === "exclusive_vault_pack"
+            )}
+            onClose={closePackModal}
+            onConfirm={confirmOpenPack}
+          />
         )}
       </AnimatePresence>
 
@@ -888,107 +1053,131 @@ export default function ShopPage() {
           </div>
         )}
 
-        <div className="relative mb-6 z-20">
-          <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 bg-[#111] border border-white/10 px-4 py-2 rounded-xl hover:bg-[#1a1a1a] transition-all min-w-[160px] justify-between shadow-xl text-sm"
-          >
-            <span className="font-bold">Open {openQuantity} {openQuantity > 1 ? "Packs" : "Pack"}</span>
-            <ChevronDown className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} size={16} />
-          </button>
-
-          <AnimatePresence>
-            {isDropdownOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 5, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                className="absolute top-full left-0 w-full mt-2 bg-[#161616] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50"
-              >
-                {[1, 3, 6, 9, 12, 18, 24, 30, 50].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => { setOpenQuantity(q); setIsDropdownOpen(false); }}
-                    className={`w-full px-4 py-2.5 text-left font-bold text-sm transition-all hover:bg-white/5 ${openQuantity === q ? "text-amber-500 bg-white/5" : "text-white"}`}
-                  >
-                    Open {q} {q > 1 ? "Packs" : "Pack"}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5 w-full">
           {displayPacks.map((pack, idx) => {
             // Guard against invalid pack data
             if (!pack || typeof pack !== 'object' || !pack.id) {
               return null;
             }
 
+            const isExclusive = pack.id === "exclusive_vault_pack";
             const basePrice = typeof pack.price === 'string' ? parseInt(pack.price) : pack.price;
+            const theme = getPackTheme(basePrice || 0, isExclusive);
 
             let discountMultiplier = 1;
-            if (isFlashSaleActive && pack.id !== "exclusive_vault_pack") discountMultiplier = 0.5;
-            else if (activeDiscount > 0 && pack.id !== "exclusive_vault_pack") discountMultiplier = 1 - activeDiscount;
+            if (isFlashSaleActive && !isExclusive) discountMultiplier = 0.5;
+            else if (activeDiscount > 0 && !isExclusive) discountMultiplier = 1 - activeDiscount;
 
-            const finalPrice = Math.floor(basePrice * discountMultiplier);
+            const finalPrice = Math.floor((basePrice || 0) * discountMultiplier);
             const totalCost = finalPrice * openQuantity;
+            const onSale = discountMultiplier < 1;
 
             return (
               <motion.div
                 key={pack.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                whileHover={{ scale: 1.03, translateY: -4 }}
-                whileTap={{ scale: 0.97 }}
-                className={`w-full bg-[#0c0c0c] border p-3 sm:p-5 rounded-xl sm:rounded-2xl relative overflow-hidden flex flex-col items-center cursor-pointer ${
-                  pack.id === "exclusive_vault_pack"
-                    ? "border-indigo-500/50 shadow-[0_5px_20px_rgba(99,102,241,0.15)]"
-                    : "border-white/10 shadow-lg hover:border-white/30 hover:shadow-[0_5px_20px_rgba(255,255,255,0.05)]"
-                }`}
+                transition={{ delay: idx * 0.05, type: "spring", stiffness: 120, damping: 18 }}
+                whileHover={{ y: -6 }}
+                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_15px_50px_-12px_rgba(255,255,255,0.25)]`}
               >
-                <div className={`absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b ${pack.id === "exclusive_vault_pack" ? "from-indigo-500/10" : "from-white/5"} to-transparent pointer-events-none`} />
+                {/* Top tier glow that bleeds behind the card */}
+                <div className={`pointer-events-none absolute -top-20 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-70 group-hover:opacity-100 transition-opacity duration-500`} />
 
-                {isFlashSaleActive && pack.id !== "exclusive_vault_pack" && (
-                  <div className="absolute top-3 right-3 bg-red-500 text-black text-[9px] font-black px-2 py-1 rounded-full uppercase shadow-[0_0_10px_rgba(239,68,68,0.5)] animate-pulse z-10">
-                    -50%
-                  </div>
-                )}
-                {pack.id === "exclusive_vault_pack" && (
-                  <div className="absolute top-3 right-3 bg-indigo-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase shadow-[0_0_10px_rgba(99,102,241,0.5)] animate-pulse z-10">
-                    LIMITED
-                  </div>
-                )}
+                {/* Shimmer that sweeps on hover */}
+                <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute -inset-y-4 -left-1/2 w-1/3 rotate-12 bg-gradient-to-r from-transparent via-white/10 to-transparent blur-md" />
+                </div>
 
-                <div className="relative mb-2 sm:mb-3 mt-1 sm:mt-2 flex h-[52px] sm:h-[60px] items-center">
-                  <div className={`absolute inset-0 blur-xl opacity-40 ${pack.id === "exclusive_vault_pack" ? "bg-indigo-500" : "bg-white"}`}></div>
-                  <div className="relative z-10 flex items-center justify-center w-full">
-                    <span className="text-3xl sm:text-4xl drop-shadow-xl filter hover:brightness-125 transition-all">
-                      {pack.id === "exclusive_vault_pack" ? "📦" : "🎁"}
+                {/* Tier badge top-left, sale badge top-right */}
+                <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5">
+                  <span className={`text-[9px] font-black tracking-[0.2em] px-2 py-1 rounded-full ${theme.badge} shadow-lg`}>
+                    {theme.tier}
+                  </span>
+                </div>
+                <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
+                  {onSale && (
+                    <span className="text-[9px] font-black tracking-wider px-2 py-1 rounded-full bg-red-500 text-black shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse">
+                      FLASH −{Math.round((1 - discountMultiplier) * 100)}%
                     </span>
+                  )}
+                  {isExclusive && (
+                    <span className="text-[9px] font-black tracking-wider px-2 py-1 rounded-full bg-fuchsia-500 text-white shadow-[0_0_12px_rgba(217,70,239,0.6)] animate-pulse">
+                      LIMITED
+                    </span>
+                  )}
+                </div>
+
+                {/* Pack illustration */}
+                <div className="relative h-32 sm:h-40 flex items-center justify-center mt-10 mb-2">
+                  {/* Halo behind box */}
+                  <div className={`absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-60 ${theme.halo} group-hover:opacity-90 transition-opacity`} />
+                  {/* Sparkles for higher tiers */}
+                  {theme.tier === "OMEGA" ? (
+                    <>
+                      <span className="absolute top-2 left-6 text-fuchsia-300 text-xs animate-ping">✦</span>
+                      <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">✦</span>
+                      <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">✧</span>
+                      <span className="absolute bottom-6 left-12 text-white/80 text-[8px]">✧</span>
+                    </>
+                  ) : (theme.tier === "LEGENDARY" || theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
+                    <>
+                      <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">✦</span>
+                      <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">✦</span>
+                      <span className="absolute top-6 right-10 text-white/70 text-[8px]">✧</span>
+                    </>
+                  )}
+                  {/* The box: lid + body + ribbon */}
+                  <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
+                    {/* Lid */}
+                    <div className={`relative h-5 w-20 sm:w-24 rounded-t-md bg-gradient-to-b ${theme.boxLid} shadow-[inset_0_-3px_0_rgba(0,0,0,0.35)] border border-white/10`}>
+                      <div className="absolute inset-x-2 top-1 h-1 rounded-full bg-white/40 blur-[1px]" />
+                    </div>
+                    {/* Body */}
+                    <div className={`relative h-16 w-20 sm:w-24 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/10 border-t-0 shadow-2xl overflow-hidden`}>
+                      {/* Ribbon vertical */}
+                      <div className={`absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-2 sm:w-2.5 bg-gradient-to-b ${theme.ribbon} opacity-90`} />
+                      {/* Ribbon bow */}
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex gap-1">
+                        <span className={`w-2.5 h-3 rounded-full bg-gradient-to-br ${theme.ribbon} shadow-md`} />
+                        <span className={`w-2.5 h-3 rounded-full bg-gradient-to-br ${theme.ribbon} shadow-md`} />
+                      </div>
+                      {/* Shimmer line */}
+                      <div className="absolute inset-x-0 top-2 h-px bg-white/20" />
+                    </div>
+                    {/* Floor shadow */}
+                    <div className="mt-1 w-24 sm:w-28 h-1.5 rounded-full bg-black/60 blur-md" />
                   </div>
                 </div>
 
-                <h3 className="font-black text-xs sm:text-sm md:text-base mb-3 sm:mb-4 text-center tracking-wide z-10 leading-tight min-h-[34px] sm:min-h-[40px] flex items-center justify-center break-words">
-                  {typeof pack.name === 'object' || typeof pack.name === 'function'
-                    ? 'Unknown Pack'
-                    : pack.name}
-                </h3>
+                {/* Title + price */}
+                <div className="relative z-10 px-3 sm:px-4 pb-4 pt-1 flex flex-col items-center text-center">
+                  <h3 className="font-black text-sm sm:text-base md:text-lg mb-1 tracking-tight leading-tight break-words max-w-full text-white drop-shadow-sm">
+                    {typeof pack.name === 'object' || typeof pack.name === 'function'
+                      ? 'Unknown Pack'
+                      : pack.name}
+                  </h3>
+                  <div className={`text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-3`}>
+                    {isExclusive ? "FREE EXCLUSIVE" : `FROM ${finalPrice.toLocaleString()} 🪙`}
+                  </div>
 
-                <button
-                  onClick={() => handleOpenPack(pack.id)}
-                  className={`w-full py-2.5 rounded-lg font-black text-[11px] sm:text-xs transition-all z-10 ${
-                    pack.id === "exclusive_vault_pack"
-                      ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]"
-                      : "bg-white hover:bg-amber-400 text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]"
-                  }`}
-                >
-                  {pack.id === "exclusive_vault_pack"
-                    ? "CLAIM (FREE)"
-                    : `${totalCost.toLocaleString()} 🪙`
-                  }
-                </button>
-            </motion.div>
+                  <button
+                    onClick={() => requestOpenPack(pack.id)}
+                    className={`relative w-full py-2.5 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all duration-200 overflow-hidden ${
+                      isExclusive
+                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] hover:shadow-[0_0_30px_rgba(168,85,247,0.75)]"
+                        : `bg-gradient-to-r ${theme.priceFrom} text-black shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]`
+                    } hover:scale-[1.03] active:scale-95`}
+                  >
+                    <span className="relative z-10">
+                      {isExclusive
+                        ? "CLAIM (FREE)"
+                        : `OPEN ${openQuantity > 1 ? openQuantity : ""} • ${totalCost.toLocaleString()} 🪙`}
+                    </span>
+                    <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-white/30 skew-x-12" />
+                  </button>
+                </div>
+              </motion.div>
             );
           })}
         </div>
@@ -996,5 +1185,259 @@ export default function ShopPage() {
 
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// PackPurchaseModal
+// Glass-card modal that confirms a pack purchase. Shows a tier-styled pack
+// preview, quantity chips, and a live total cost. The visual theme matches
+// the card on the shop grid (Mythic = red, Legendary = gold, etc).
+// ---------------------------------------------------------------------------
+
+const QUANTITY_CHIPS = [1, 3, 5, 10, 25, 50] as const;
+
+interface PackBasic {
+  id: string;
+  name: string;
+  price: number | string;
+}
+
+interface PackTheme {
+  tier: string;
+  cardBg: string;
+  border: string;
+  glow: string;
+  halo: string;
+  badge: string;
+  priceFrom: string;
+  ribbon: string;
+  boxLid: string;
+  boxBody: string;
+}
+
+interface PackPurchaseModalProps {
+  pack: PackBasic;
+  quantity: number;
+  setQuantity: (n: number) => void;
+  balance: number;
+  activeDiscount: number;
+  isFlashSaleActive: boolean;
+  theme: PackTheme;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+export function PackPurchaseModal({
+  pack,
+  quantity,
+  setQuantity,
+  balance,
+  activeDiscount,
+  isFlashSaleActive,
+  theme,
+  onClose,
+  onConfirm,
+}: PackPurchaseModalProps) {
+  const isExclusive = pack.id === "exclusive_vault_pack";
+  const basePrice = typeof pack.price === "string" ? parseInt(pack.price) : pack.price;
+
+  let discountMultiplier = 1;
+  if (isFlashSaleActive && !isExclusive) discountMultiplier = 0.5;
+  else if (activeDiscount > 0 && !isExclusive) discountMultiplier = 1 - activeDiscount;
+
+  const finalPrice = Math.floor((basePrice || 0) * discountMultiplier);
+  const totalCost = finalPrice * quantity;
+  const insufficient = !isExclusive && balance < totalCost;
+  const remainingBalance = balance - totalCost;
+
+  // ESC to close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.94 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 260, damping: 24 }}
+        onClick={(e) => e.stopPropagation()}
+        className={`relative w-full max-w-md overflow-hidden rounded-3xl ${theme.cardBg} ${theme.border} border shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]`}
+      >
+        {/* Top tier glow */}
+        <div className={`pointer-events-none absolute -top-24 -inset-x-10 h-56 bg-gradient-to-b ${theme.glow} blur-3xl opacity-80`} />
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 z-30 p-2 rounded-full bg-white/5 hover:bg-white/15 transition-colors text-white/80 hover:text-white"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="relative z-10 p-6 sm:p-7">
+          {/* Tier badge */}
+          <div className="flex justify-center mb-4">
+            <span className={`text-[10px] font-black tracking-[0.25em] px-3 py-1.5 rounded-full ${theme.badge} shadow-lg`}>
+              {theme.tier}
+            </span>
+          </div>
+
+          {/* Pack preview (matches the card visual) */}
+          <div className="relative h-32 sm:h-36 flex items-center justify-center mb-5">
+            <div className={`absolute w-32 h-32 rounded-full blur-3xl opacity-60 ${theme.halo}`} />
+            {/* Sparkles for high tiers */}
+            {(theme.tier === "LEGENDARY" || theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
+              <>
+                <span className="absolute top-2 left-8 text-yellow-200 text-sm animate-ping">✦</span>
+                <span className="absolute bottom-3 right-8 text-yellow-200 text-xs animate-pulse">✦</span>
+                <span className="absolute top-6 right-12 text-white/70 text-[10px]">✧</span>
+                <span className="absolute bottom-6 left-14 text-white/60 text-[9px]">✧</span>
+              </>
+            )}
+            <div className="relative z-10 flex flex-col items-center">
+              <div className={`relative h-6 w-28 sm:w-32 rounded-t-md bg-gradient-to-b ${theme.boxLid} shadow-[inset_0_-3px_0_rgba(0,0,0,0.35)] border border-white/10`}>
+                <div className="absolute inset-x-3 top-1 h-1 rounded-full bg-white/40 blur-[1px]" />
+              </div>
+              <div className={`relative h-20 w-28 sm:w-32 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/10 border-t-0 shadow-2xl overflow-hidden`}>
+                <div className={`absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-3 bg-gradient-to-b ${theme.ribbon} opacity-90`} />
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 flex gap-1">
+                  <span className={`w-3 h-3.5 rounded-full bg-gradient-to-br ${theme.ribbon} shadow-md`} />
+                  <span className={`w-3 h-3.5 rounded-full bg-gradient-to-br ${theme.ribbon} shadow-md`} />
+                </div>
+                <div className="absolute inset-x-0 top-2 h-px bg-white/20" />
+              </div>
+              <div className="mt-1.5 w-32 sm:w-36 h-2 rounded-full bg-black/60 blur-md" />
+            </div>
+          </div>
+
+          {/* Title */}
+          <h2 className="text-center text-2xl sm:text-3xl font-black tracking-tight text-white mb-1 leading-tight">
+            {typeof pack.name === "object" || typeof pack.name === "function"
+              ? "Unknown Pack"
+              : pack.name}
+          </h2>
+          <p className={`text-center text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-5`}>
+            {isExclusive ? "FREE EXCLUSIVE DROP" : `FROM ${finalPrice.toLocaleString()} 🪙 / PACK`}
+          </p>
+
+          {/* Quantity chips */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">
+                How many?
+              </span>
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">
+                Qty {quantity}
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {QUANTITY_CHIPS.map((q) => {
+                const selected = quantity === q;
+                return (
+                  <button
+                    key={q}
+                    onClick={() => setQuantity(q)}
+                    className={`relative py-2.5 rounded-xl font-black text-sm transition-all ${
+                      selected
+                        ? `bg-gradient-to-b ${theme.priceFrom} text-black shadow-[0_0_18px_rgba(255,255,255,0.3)] scale-105`
+                        : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10"
+                    }`}
+                  >
+                    {q}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Total cost breakdown */}
+          <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-5 backdrop-blur">
+            <div className="flex items-center justify-between text-xs text-white/60 mb-1.5">
+              <span>Price per pack</span>
+              <span className="font-bold text-white/90">
+                {isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}
+              </span>
+            </div>
+            
+            {discountMultiplier < 1 && (
+              <div className="flex items-center justify-between text-[11px] text-emerald-300 mb-1.5">
+                <span>Discount</span>
+                <span className="font-bold">−{Math.round((1 - discountMultiplier) * 100)}%</span>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between text-xs text-white/60 mb-2">
+              <span>Quantity</span>
+              <span className="font-bold text-white/90">×{quantity}</span>
+            </div>
+            
+            <div className="border-t border-white/10 pt-2 flex items-center justify-between">
+              <span className="text-sm font-bold text-white/80">Total Cost</span>
+              <span className={`text-xl font-black bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent`}>
+                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}
+              </span>
+            </div>
+
+            {/* NEW: Balance calculations section */}
+            {!isExclusive && (
+              <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-[10px] text-white/50">
+                  <span>Current balance</span>
+                  <span>{balance.toLocaleString()} 🪙</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-white/70">
+                  <span>Balance after purchase</span>
+                  <span className={insufficient ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+                    {insufficient 
+                      ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` 
+                      : `${remainingBalance.toLocaleString()} 🪙`}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={onConfirm}
+            disabled={insufficient}
+            className={`relative w-full py-4 rounded-2xl font-black text-base uppercase tracking-wider overflow-hidden transition-all ${
+              isExclusive
+                ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-[0_0_25px_rgba(168,85,247,0.5)] hover:shadow-[0_0_35px_rgba(168,85,247,0.8)] hover:scale-[1.02] active:scale-95"
+                : insufficient
+                ? "bg-white/10 text-white/40 cursor-not-allowed"
+                : `bg-gradient-to-r ${theme.priceFrom} text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:scale-[1.02] active:scale-95`
+            }`}
+          >
+            <span className="relative z-10">
+              {isExclusive
+                ? "CLAIM FREE PACK"
+                : insufficient
+                ? "INSUFFICIENT COINS"
+                : `OPEN ${quantity} ${quantity > 1 ? "PACKS" : "PACK"}`}
+            </span>
+            {!insufficient && (
+              <span className="absolute inset-0 -translate-x-full hover:translate-x-full transition-transform duration-700 bg-white/30 skew-x-12" />
+            )}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

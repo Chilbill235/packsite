@@ -5,14 +5,19 @@ export interface NotificationService {
 }
 
 export class OneSignalNotificationService implements NotificationService {
-  private appId: string;
-  private apiKey: string;
-  private baseUrl: string;
+  private get appId(): string {
+    if (typeof process === "undefined") return "";
+    return process.env.ONESIGNAL_APP_ID || process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "";
+  }
 
-  constructor() {
-    this.appId = process.env.ONESIGNAL_APP_ID || process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '';
-    this.apiKey = process.env.ONESIGNAL_REST_API_KEY || '';
-    this.baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000/';
+  private get apiKey(): string {
+    if (typeof process === "undefined") return "";
+    return process.env.ONESIGNAL_REST_API_KEY || "";
+  }
+
+  private get baseUrl(): string {
+    if (typeof process === "undefined") return "http://localhost:3000/";
+    return process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000/";
   }
 
   async requestPermission(): Promise<NotificationPermission> {
