@@ -23,7 +23,13 @@ export default function Navbar() {
         setBalance(Number(data.balance));
       }
     } catch (err) {
-      console.error("Failed to sync live balance:", err);
+      // Silently catch network errors during dev compilation
+      // so it doesn't crash your browser console
+      if (process.env.NODE_ENV === 'development') {
+        console.warn("Dev: Could not fetch balance (server likely compiling).");
+      } else {
+        console.error("Failed to sync live balance:", err);
+      }
     }
   }, []);
 
@@ -34,7 +40,7 @@ export default function Navbar() {
   }, [isAuthenticated, refreshBalance]);
 
   // FIXED: Updated event listener to listen for 'balanceUpdated'
-  // and properly access 'detail.balance'[cite: 1, 2]
+  // and properly access 'detail.balance'
   useEffect(() => {
     const handleBalanceUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<{ balance: number }>;

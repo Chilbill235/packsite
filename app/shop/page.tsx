@@ -85,8 +85,20 @@ export default function ShopPage() {
   const [countdown, setCountdown] = useState(10);
   const [showAdModal, setShowAdModal] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const [isStandalone] = useState(getIsStandalone);
+useEffect(() => {
+  setIsMounted(true);
+}, []);
+
+
+useEffect(() => {
+  setIsStandalone(getIsStandalone());
+}, []);
+
+
+
+  const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS] = useState(getIsIOS);
 
   // Get initial notification permission state
@@ -150,7 +162,7 @@ export default function ShopPage() {
 
   const fetchUserData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/user/profile?t=${Date.now()}`);
+      const res = await fetch(`/api/user/profile`);
       if (res.ok) {
         const userData = await res.json() as UserProfile;
         syncUserState(userData);
@@ -969,34 +981,41 @@ export default function ShopPage() {
 
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
 
-      {isIOS && !isStandalone && (
-        <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left relative z-10 max-w-4xl mx-auto">
-          <Smartphone className="text-amber-500 shrink-0" size={24} />
-          <div>
-            <h4 className="font-bold text-amber-500 text-sm">Enable Safari Background Alerts</h4>
-            <p className="text-xs text-gray-300 mt-1">Tap the <strong className="text-white">Share</strong> button in Safari, then choose <strong className="text-white">&quot;Add to Home Screen&quot;</strong> to receive background timer payouts and free drops!</p>
-          </div>
-        </div>
-      )}
+{/* Wrapped in isMounted to prevent server/client mismatch */}
+{isMounted && isIOS && !isStandalone && (
+  <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left relative z-10 max-w-4xl mx-auto">
+    <Smartphone className="text-amber-500 shrink-0" size={24} />
+    <div>
+      <h4 className="font-bold text-amber-500 text-sm">Enable Safari Background Alerts</h4>
+      <p className="text-xs text-gray-300 mt-1">Tap the <strong className="text-white">Share</strong> button in Safari, then choose <strong className="text-white">&quot;Add to Home Screen&quot;</strong> to receive background timer payouts and free drops!</p>
+    </div>
+  </div>
+)}
 
-      <AnimatePresence>
-        {permission === "default" && showBanner && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="mb-8 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto">
-            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
-            <div className="flex items-center gap-3 relative z-10">
-              <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500"><Bell size={20} /></div>
-              <div>
-                <h4 className="font-bold text-sm">Enable Notifications</h4>
-                <p className="text-gray-400 text-xs">Get alerts for shop drops, flash sales, and bonus claims.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 relative z-10 w-full md:w-auto">
-              <button onClick={handleEnableNotifications} className="w-full md:w-auto px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)]">ALLOW ALERTS</button>
-              <button onClick={() => setShowBanner(false)} className="p-2 text-gray-500 hover:text-white transition-colors"><X size={18} /></button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+<AnimatePresence>
+  {/* Wrapped in isMounted to prevent server/client mismatch */}
+  {isMounted && permission === "default" && showBanner && (
+    <motion.div 
+      initial={{ opacity: 0, y: -20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      exit={{ opacity: 0, height: 0 }} 
+      className="mb-8 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto"
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
+      <div className="flex items-center gap-3 relative z-10">
+        <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500"><Bell size={20} /></div>
+        <div>
+          <h4 className="font-bold text-sm">Enable Notifications</h4>
+          <p className="text-gray-400 text-xs">Get alerts for shop drops, flash sales, and bonus claims.</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 relative z-10 w-full md:w-auto">
+        <button onClick={handleEnableNotifications} className="w-full md:w-auto px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)]">ALLOW ALERTS</button>
+        <button onClick={() => setShowBanner(false)} className="p-2 text-gray-500 hover:text-white transition-colors"><X size={18} /></button>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       <AnimatePresence>
         {showAdModal && (

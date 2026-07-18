@@ -1,4 +1,5 @@
 import { Metadata, Viewport } from "next";
+import Script from "next/script"; // <-- Import Next.js Script component
 import "./globals.css";
 import LayoutContent from "./layout-content";
 import Providers from "@/app/providers";
@@ -28,7 +29,6 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Get environment variables for use in the client-side script
   const oneSignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "";
   const oneSignalSafariWebId = process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID || "";
 
@@ -37,53 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
-        {/*
-          We'll conditionally load the OneSignal script based on user agent
-          This is done via inline script that checks if it's iOS standalone
-        */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Simple test to see if script runs
-              console.log('OneSignal script is running');
-
-              // Check if running in browser
-              if (typeof window !== 'undefined') {
-                console.log('Browser detected');
-
-                // Get OneSignal credentials from environment variables (already extracted on server)
-                const appId = oneSignalAppId;
-                const safariWebId = oneSignalSafariWebId;
-
-                console.log('OneSignal App ID:', appId ? '[REDACTED]' : 'missing');
-                console.log('OneSignal Safari Web ID:', safariWebId ? '[REDACTED]' : 'missing');
-
-                // Simple script creation test
-                const script = document.createElement('script');
-                script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
-                script.defer = true;
-                script.onload = () => {
-                  console.log('OneSignal script loaded');
-
-                  // Initialize OneScript
-                  window.OneSignal = window.OneSignal || [];
-                  OneSignal.push(() => {
-                    OneSignal.init({
-                      appId: appId,
-                      safari_web_id: safariWebId,
-                      allowLocalhostAsSecureOrigin: true,
-                      welcomeNotification: { disable: true, message: "" }
-                    });
-                  });
-                };
-                script.onerror = () => {
-                  console.error('Failed to load OneSignal script');
-                };
-                document.head.appendChild(script);
-              }
-            `
-          }}
-        />
+        
         <link
           rel="apple-touch-startup-image"
           href="/splash/apple-splash-2048-2732.jpg"
@@ -91,6 +45,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-black text-zinc-100 antialiased min-h-screen flex flex-col">
+        
+        {/* Next.js Script Component handles downloading the OneSignal SDK cleanly */}
+        <Script 
+          src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" 
+          strategy="afterInteractive" 
+        />
+        
+        {/* Next.js Script Component handles your initialization and injects the variables correctly */}
+        <Script id="onesignal-init" strategy="afterInteractive">
+          {`
+            window.OneSignal = window.OneSignal || [];
+            OneSignal.push(function() {
+              OneSignal.init({
+                appId: "${oneSignalAppId}",
+                safari_web_id: "${oneSignalSafariWebId}",
+                allowLocalhostAsSecureOrigin: true,
+                welcomeNotification: { disable: true, message: "" }
+              });
+            });
+          `}
+        </Script>
+
         <Providers>
           <InstallPrompt />
           <LayoutContent>
