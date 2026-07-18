@@ -1,6 +1,6 @@
 // app/api/send-notification/route.ts
 import { NextResponse, NextRequest } from "next/server";
-import { sendPushNotification } from "@/lib/notifications"; // Use the same helper
+import { notificationService } from "@/lib/notificationService";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const result = await sendPushNotification(userId, title, message, ref);
+    const result = await notificationService.sendNotification(userId, title, message, ref);
 
     if (!result.success) {
       return NextResponse.json({ error: "Notification failed", details: result.data }, { status: 500 });

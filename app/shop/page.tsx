@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from "@/lib/adService";
-import OneSignal from "react-onesignal";
+import { notificationService } from "@/lib/notificationService";
 
 // --- Notification Buff Definitions ---
 interface BuffDetails {
@@ -74,15 +74,6 @@ const getIsStandalone = () => {
   return window.matchMedia("(display-mode: standalone)").matches || navigatorWithStandalone.standalone === true;
 };
 
-const getNotificationPermission = (): NotificationPermission | "unsupported" => {
-  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  return Notification.permission;
-};
-
-const isOneSignalAllowedOrigin = () => {
-  if (typeof window === "undefined") return false;
-  return window.location.hostname === "packsite.vercel.app";
-};
 
 export default function ShopPage() {
   // --- States ---
@@ -98,12 +89,18 @@ export default function ShopPage() {
   const [isStandalone] = useState(getIsStandalone);
   const [isIOS] = useState(getIsIOS);
 
+  // Get initial notification permission state
+  const getInitialNotificationPermission = (): NotificationPermission | "unsupported" => {
+    if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+    return Notification.permission;
+  };
+
   const [openQuantity, setOpenQuantity] = useState(1);
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
 
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getNotificationPermission);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getInitialNotificationPermission);
   const [showBanner, setShowBanner] = useState(true);
 
   // --- Active Gameplay Buff States ---
@@ -118,74 +115,10 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
-  const oneSignalInitRef = useRef(false);
-  const oneSignalPermissionListenerRef = useRef(false);
+  const notificationTimeoutRef = useRef<number | null>(null);
+  const lastNotificationTimeRef = useRef<number>(0);
 
-  const isOneSignalAlreadyInitializedError = (err: unknown) => {
-    return err instanceof Error && err.message.toLowerCase().includes("already initialized");
-  };
 
-  const initOneSignal = useCallback(async (userId?: string) => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      setPermission("unsupported");
-      return false;
-    }
-
-    const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
-    if (!appId) {
-      console.warn("OneSignal app id is missing. Set NEXT_PUBLIC_ONESIGNAL_APP_ID.");
-      setPermission(Notification.permission);
-      return false;
-    }
-
-    if (!isOneSignalAllowedOrigin()) {
-      setPermission(Notification.permission);
-      return false;
-    }
-
-    try {
-      if (!oneSignalInitRef.current) {
-        try {
-          await OneSignal.init({
-            appId,
-            serviceWorkerPath: "/OneSignalSDKWorker.js",
-            serviceWorkerParam: { scope: "/" },
-            allowLocalhostAsSecureOrigin: true,
-            welcomeNotification: { disable: true, message: "" },
-          });
-        } catch (err) {
-          if (!isOneSignalAlreadyInitializedError(err)) {
-            throw err;
-          }
-        }
-        oneSignalInitRef.current = true;
-
-        if (!oneSignalPermissionListenerRef.current) {
-          OneSignal.Notifications.addEventListener("permissionChange", (isGranted) => {
-            setPermission(isGranted ? "granted" : Notification.permission);
-          });
-          oneSignalPermissionListenerRef.current = true;
-        }
-        await OneSignal.Notifications.setDefaultUrl(`${window.location.origin}/shop`);
-      } else if (!oneSignalPermissionListenerRef.current) {
-        OneSignal.Notifications.addEventListener("permissionChange", (isGranted) => {
-          setPermission(isGranted ? "granted" : Notification.permission);
-        });
-        oneSignalPermissionListenerRef.current = true;
-      }
-
-      if (userId) {
-        await OneSignal.login(userId);
-      }
-
-      setPermission(Notification.permission);
-      return true;
-    } catch (err) {
-      console.error("OneSignal init error:", err);
-      setPermission(Notification.permission);
-      return false;
-    }
-  }, []);
 
   // --- Core Logic ---
   const syncUserState = useCallback((userData: UserProfile) => {
@@ -196,12 +129,13 @@ export default function ShopPage() {
     setHasExclusivePack(userData.hasExclusivePack ?? false);
     setActiveXpBoost(userData.activeXpBoost ?? false);
     if (userData.id) {
-      initOneSignal(userData.id);
+      // Login to notification service
+      notificationService.login(userData.id);
     }
     if (typeof userData.balance === "number") {
       window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: userData.balance } }));
     }
-  }, [initOneSignal]);
+  }, []);
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -381,14 +315,19 @@ export default function ShopPage() {
       setPermission("unsupported");
       return;
     }
+
     try {
-      const isOneSignalReady = await initOneSignal(userIdRef.current);
-      const status = isOneSignalReady
-        ? await OneSignal.Notifications.requestPermission()
-        : await Notification.requestPermission();
-      setPermission(status === true || status === "granted" ? "granted" : "denied");
-      if ((status === true || status === "granted") && userIdRef.current) await initOneSignal(userIdRef.current);
-    } catch (err) { console.error("OneSignal Permission Request Error: ", err); };
+      const granted = await notificationService.requestPermission();
+      setPermission(granted ? "granted" : "denied");
+
+      // If we have userId and permission granted, login to notification service
+      if (userIdRef.current && granted) {
+        await notificationService.login(userIdRef.current);
+      }
+    } catch (err) {
+      console.error("Notification Permission Request Error: ", err);
+      setPermission("denied");
+    }
   };
 
   const handleWatchAdClick = async (amount: number) => {
@@ -465,7 +404,12 @@ export default function ShopPage() {
   // --- Effects ---
   useEffect(() => {
     Promise.resolve().then(loadShopData);
-    Promise.resolve().then(() => initOneSignal(userIdRef.current));
+
+    // If we have a userId, login to notification service
+    if (userIdRef.current) {
+      notificationService.login(userIdRef.current);
+    }
+
     adService.current = new RewardedAdService();
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
@@ -479,7 +423,7 @@ export default function ShopPage() {
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       window.removeEventListener("openBalanceModal", openModal);
     };
-  }, [loadShopData, handleTimerComplete, initOneSignal]);
+  }, [loadShopData, handleTimerComplete, userIdRef.current]);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -511,6 +455,64 @@ export default function ShopPage() {
     }, 250);
     return () => clearInterval(intervalId);
   }, [isWaiting, handleTimerComplete]);
+
+  // Periodic notifications: send a notification every 10 minutes after initial random delay (2-2.5 minutes)
+  useEffect(() => {
+    // Clear any existing timer
+    if (notificationTimeoutRef.current !== null) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+
+    // Only set up periodic notifications if we have a user and permission is granted
+    if (userIdRef.current && permission === "granted") {
+      const scheduleNextNotification = () => {
+        // Calculate delay: random 90-150 seconds for first notification, 600 seconds thereafter
+        const isFirstNotification = lastNotificationTimeRef.current === 0;
+        const delay = isFirstNotification
+          ? Math.floor(Math.random() * 60000) + 90000 // 90-150 seconds in ms
+          : 600000; // 10 minutes in ms
+
+        notificationTimeoutRef.current = setTimeout(async () => {
+          try {
+            // Update the last notification time
+            const now = Date.now();
+            lastNotificationTimeRef.current = now;
+
+            // Send a daily bonus notification
+            const response = await fetch("/api/send-notification", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: userIdRef.current,
+                title: "Daily Bonus!",
+                message: "Come back to claim your daily bonus coins!",
+                ref: "daily-bonus",
+              }),
+            });
+
+            console.log("Periodic notification sent:", response);
+          } catch (error) {
+            console.error("Error sending periodic notification:", error);
+          } finally {
+            // Schedule next notification regardless of success/failure
+            scheduleNextNotification();
+          }
+        }, delay);
+      };
+
+      // Start the scheduling
+      scheduleNextNotification();
+    }
+
+    // Cleanup function
+    return () => {
+      if (notificationTimeoutRef.current !== null) {
+        clearTimeout(notificationTimeoutRef.current);
+        notificationTimeoutRef.current = null;
+      }
+    };
+  }, [userIdRef.current, permission]);
 
   const getRarityStyles = (rarity?: string) => {
     const r = rarity?.toLowerCase() || "common";

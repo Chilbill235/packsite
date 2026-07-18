@@ -7,7 +7,7 @@ import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import { RewardedAdService } from '@/lib/adService';
 import type { Pack } from "@prisma/client";
-import OneSignal from "react-onesignal";
+import { notificationService } from '@/lib/notificationService';
 
 // --- Notification Buff Definitions ---
 interface BuffDetails {
@@ -33,6 +33,9 @@ const BUFF_MAP: Record<string, BuffDetails> = {
   exclusive_pack: { title: "Exclusive Pack Unlocked!", description: "A special vault pack has been unlocked in your shop!", icon: "📦", color: "text-indigo-400" },
   xp_boost_2x: { title: "2x XP Buff Active!", description: "Earn double experience progression for your level!", icon: "👑", color: "text-orange-400" }
 };
+
+// Import our notification service
+import { notificationService } from "@/lib/notificationService";
 
 export default function ShopPage() {
   // --- States ---
@@ -188,9 +191,9 @@ export default function ShopPage() {
           userIdRef.current = userData?.id;
           if (userData?.id) {
             try {
-              await OneSignal.login(userData.id);
+              await notificationService.login(userData.id);
             } catch (e) {
-              console.error("OneSignal Login Error:", e);
+              console.error("Notification Login Error:", e);
             }
           }
         } catch (e) {
@@ -301,10 +304,10 @@ export default function ShopPage() {
       return;
     }
     try {
-      const status = await OneSignal.Notifications.requestPermission();
+      const status = await notificationService.requestPermission();
       setPermission(status ? "granted" : "denied");
-      if (status && userIdRef.current) await OneSignal.login(userIdRef.current);
-    } catch (err) { console.error("OneSignal Permission Request Error: ", err); }
+      if (status && userIdRef.current) await notificationService.login(userIdRef.current);
+    } catch (err) { console.error("Notification Permission Request Error: ", err); }
   };
 
   const handleWatchAdClick = async (amount: number) => {
