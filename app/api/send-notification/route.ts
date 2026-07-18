@@ -4,13 +4,18 @@ import { sendPushNotification } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, title, message, notificationType, url } = await request.json();
+    const body = await request.json();
+    const { userId, title, message, notificationType, url, ref, type } = body;
 
     if (!userId || !title || !message) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    await sendPushNotification(userId, title, message, notificationType || "general", url);
+    // Support both "notificationType" and "ref"/"type" field names from different callers
+    const resolvedType = notificationType || ref || type;
+    const resolvedUrl = url;
+
+    await sendPushNotification(userId, title, message, resolvedType, resolvedUrl);
 
     return NextResponse.json({ success: true });
   } catch (error) {
