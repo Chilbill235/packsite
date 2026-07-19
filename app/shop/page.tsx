@@ -496,8 +496,8 @@ useEffect(() => {
           body: JSON.stringify({
             userId: userId,
             title: "Ad Reward Earned!",
-            message: `You've earned ${amount} coins! Tap to collect.`,
-            ref: "reward-claim"
+            message: `You've earned ${amount} coins!`,
+            ref: ""
           }),
         });
       }

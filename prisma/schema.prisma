@@ -46,6 +46,11 @@ model User {
   activeDiscount   Float          @default(0.0)   // Percentage discount off store prices (e.g., 0.20 for 20% off)
   hasExclusivePack Boolean        @default(false) // Grants access to pull from the limited-time secret vaults
   activeXpBoost    Boolean        @default(false) // Doubles level progression speed when active
+  
+  // Buff expiration times (Unix timestamps for easy comparison)
+  luckExpiresAt    DateTime?      // When luck boost expires (24 hours)
+  discountExpiresAt DateTime?    // When discount expires (48 hours)
+  xpBoostExpiresAt DateTime?      // When XP boost expires (2 hours)
 
   accounts      Account[]
   inventory     Inventory[]

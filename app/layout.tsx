@@ -64,7 +64,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 appId: "${oneSignalAppId}",
                 safari_web_id: "${oneSignalSafariWebId}",
                 allowLocalhostAsSecureOrigin: true,
-                welcomeNotification: { disable: true, message: "" }
+                welcomeNotification: { disable: true, message: "" },
+                notifyButton: {
+                  enable: true,
+                  showWhenNotGranted: true,
+                  showWhenGranted: false,
+                  position: "bottom-right",
+                  size: "medium",
+                  text: {
+                    subscribe: "SUBSCRIBE",
+                    unsubscribe: "UNSUBSCRIBE"
+                  }
+                }
               });
             });
           `}

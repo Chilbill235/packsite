@@ -115,7 +115,7 @@ self.addEventListener('message', function (event) {
       event.waitUntil(
         new Promise(function (resolve) {
           setTimeout(function () {
-            self.registration.showNotification("Ad Completed! 🪙", {
+            self.registration.showNotification("Ad Completed!", {
               body: "Your countdown is finished! Tap here to claim your " + amount + " coins.",
               icon: '/images/cup.png',
               badge: '/images/apple-pay.png',

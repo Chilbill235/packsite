@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
+import WonScreen from "@/components/WonScreen";
 import ErrorDialog from "@/components/ErrorDialog";
 import Notification from '@/components/Notification';
 import { RewardedAdService } from '@/lib/adService';
@@ -62,7 +63,7 @@ export default function ShopPage() {
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [notification, setNotification] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [permission, setPermission] = useState<"granted" | "denied" | "default" | "unsupported" | "ios-needs-pwa">("default");
   const [showBanner, setShowBanner] = useState(true);
 
   // --- Active Gameplay Buff States ---
@@ -410,8 +411,7 @@ export default function ShopPage() {
       const is_standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
       setIsIOS(is_ios);
       setIsStandalone(is_standalone);
-      if (!("Notification" in window)) setPermission("unsupported");
-      else setPermission((window as any).Notification.permission);
+      setPermission(notificationService.getPermissionDetail());
     }
     loadShopData();
   }, [loadShopData]);
@@ -545,6 +545,11 @@ export default function ShopPage() {
       </AnimatePresence>
 
       {/* WINNING ANIMATION OVERLAY */}
+      <WonScreen 
+        items={wonItems} 
+        onClose={() => setWonItems([])} 
+        newBalance={user?.balance}
+      />
       <AnimatePresence>
         {wonItems.length > 0 && (
           <motion.div 
@@ -629,7 +634,7 @@ export default function ShopPage() {
       )}
 
       <AnimatePresence>
-        {permission === "default" && showBanner && (
+        {(permission === "default" || permission === "ios-needs-pwa") && showBanner && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="mb-8 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto">
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
             <div className="flex items-center gap-3 relative z-10">
@@ -816,3 +821,7 @@ export default function ShopPage() {
     </div>
   );
 }
+
+
+
+
