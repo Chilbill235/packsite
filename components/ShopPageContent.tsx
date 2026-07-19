@@ -162,7 +162,7 @@ export default function ShopPage() {
       console.error("Push notification trigger failed:", e);
     }
 
-    fetch("/api/user/ad-complete", { method: "POST" }).catch(e => console.error("Ad completion sync failed", e));
+    fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) }).catch(e => console.error("Ad completion sync failed", e));
   }, [isWaiting, fetchUserData]);
 
   const loadShopData = useCallback(async () => {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
@@ -267,11 +267,12 @@ useEffect(() => {
         // Award the coins (this is the critical part)
         const addCoinsResponse = await fetch("/api/user/add-coins", {
           method: "POST",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: 500, suppressNotification: true })
         });
 
-        if (!adCompleteResponse.ok) {
-          throw new Error(`Failed to award ad reward: ${adCompleteResponse.status}`);
+        if (!addCoinsResponse.ok) {
+          throw new Error(`Failed to award ad reward: ${addCoinsResponse.status}`);
         }
 
         // Refresh user data to reflect new balance
@@ -371,15 +372,15 @@ useEffect(() => {
         await fetchUserData();
       } catch { console.error("Auto-claim failed"); }
     } else if (ref === "reward-claim") {
-      // Handle reward claim from notification click - trigger ad completion flow
+      // Handle reward claim from notification click - award coins immediately
       try {
-        console.log("Handling reward claim notification - triggering ad completion flow");
+        console.log("Handling reward claim notification - awarding coins");
         // Simulate ad completion by setting ad status to completed
         // This will show the success UI and handle the actual reward giving
         setAdStatus('completed');
 
-        // Give the coins through the proper ad completion flow
-        await fetch("/api/user/ad-complete", { method: "POST" });
+        // Actually award the coins (not just mark pending)
+        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
         await fetchUserData(); // Refresh user data
 
         // Show success feedback briefly
@@ -387,14 +388,14 @@ useEffect(() => {
           setAdStatus('idle');
         }, 3000);
 
-        console.log("Reward processed via ad completion flow");
+        console.log("Reward claimed successfully via notification click");
       } catch (e) {
         console.error("Reward claim failed:", e);
         setAdStatus('error');
         setTimeout(() => {
           setAdStatus('idle');
-        });
-        setErrorDialog({ message: "Failed to process reward: " + (e instanceof Error ? e.message : "Unknown error") });
+        }, 3000);
+        setErrorDialog({ message: "Failed to claim reward: " + (e instanceof Error ? e.message : "Unknown error") });
       }
     } else if (["vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
       setShowAdModal(true);
@@ -504,7 +505,7 @@ useEffect(() => {
       }
 
       // Award the coins
-      await fetch("/api/user/ad-complete", { method: "POST" });
+      await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
       await fetchUserData(); // Refresh user data
 
       // Show success feedback
@@ -1481,3 +1482,8 @@ export function PackPurchaseModal({
     </motion.div>
   );
 }
+
+
+
+
+
