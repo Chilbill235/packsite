@@ -1,4 +1,3 @@
-// app/api/send-notification/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { sendPushNotification } from "@/lib/notifications";
 
@@ -11,11 +10,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Support both "notificationType" and "ref"/"type" field names from different callers
     const resolvedType = notificationType || ref || type;
-    const resolvedUrl = url;
+    
+    // Create an object to hold metadata to be sent to OneSignal
+    const additionalData = { 
+        ref: resolvedType,
+        url: url 
+    };
 
-    await sendPushNotification(userId, title, message, resolvedType, resolvedUrl);
+    // Pass the additionalData to your helper function
+    await sendPushNotification(userId, title, message, additionalData);
 
     return NextResponse.json({ success: true });
   } catch (error) {

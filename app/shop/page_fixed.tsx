@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
@@ -17,20 +17,20 @@ interface BuffDetails {
 }
 
 const BUFF_MAP: Record<string, BuffDetails> = {
-  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop! Coins added to your account.", icon: "💎", color: "text-blue-400" },
-  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Your mythic pack odds are boosted by 1.5x on your next opening!", icon: "🍀", color: "text-green-400" },
-  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active! Open a pack now to use it.", icon: "🍀", color: "text-green-500" },
-  luck_boost_3x: { title: "3x Mythic Luck Active!", description: "Unbelievable luck active! Open a mythic pack now.", icon: "🦄", color: "text-purple-400" },
-  discount_10: { title: "10% Discount Unlocked!", description: "Enjoy 10% off all packs on your next open.", icon: "🔥", color: "text-red-400" },
-  discount_15: { title: "15% Discount Unlocked!", description: "Enjoy 15% off all packs on your next open.", icon: "🔥", color: "text-red-400" },
-  discount_20: { title: "20% Discount Unlocked!", description: "Massive 20% discount active for your next pack!", icon: "🔥", color: "text-red-500" },
-  exclusive_pack: { title: "Exclusive Pack Unlocked!", description: "A special vault pack has been unlocked in your shop!", icon: "📦", color: "text-indigo-400" },
-  xp_boost_2x: { title: "2x XP Buff Active!", description: "Earn double experience progression for your level!", icon: "👑", color: "text-orange-400" }
+  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop! Coins added to your account.", icon: "??", color: "text-blue-400" },
+  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Your mythic pack odds are boosted by 1.5x on your next opening!", icon: "??", color: "text-green-400" },
+  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active! Open a pack now to use it.", icon: "??", color: "text-green-500" },
+  luck_boost_3x: { title: "3x Mythic Luck Active!", description: "Unbelievable luck active! Open a mythic pack now.", icon: "??", color: "text-purple-400" },
+  discount_10: { title: "10% Discount Unlocked!", description: "Enjoy 10% off all packs on your next open.", icon: "??", color: "text-red-400" },
+  discount_15: { title: "15% Discount Unlocked!", description: "Enjoy 15% off all packs on your next open.", icon: "??", color: "text-red-400" },
+  discount_20: { title: "20% Discount Unlocked!", description: "Massive 20% discount active for your next pack!", icon: "??", color: "text-red-500" },
+  exclusive_pack: { title: "Exclusive Pack Unlocked!", description: "A special vault pack has been unlocked in your shop!", icon: "??", color: "text-indigo-400" },
+  xp_boost_2x: { title: "2x XP Buff Active!", description: "Earn double experience progression for your level!", icon: "??", color: "text-orange-400" }
 };
 
 interface PackBasic {
@@ -91,6 +91,7 @@ export default function ShopPage() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS] = useState(getIsIOS);
 
+  // Load flags to avoid duplicate executions inside useEffect blocks
   const [isFetchingUser, setIsFetchingUser] = useState(false);
   const [isFetchingPacks, setIsFetchingPacks] = useState(false);
 
@@ -102,6 +103,7 @@ export default function ShopPage() {
     setIsStandalone(getIsStandalone());
   }, []);
 
+  // Get initial notification permission state
   const getInitialNotificationPermission = (): NotificationPermission | "unsupported" => {
     if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
     return Notification.permission;
@@ -182,6 +184,8 @@ export default function ShopPage() {
   const adService = useRef<RewardedAdService | null>(null);
   const notificationTimeoutRef = useRef<number | null>(null);
   const lastNotificationTimeRef = useRef<number>(0);
+  
+  // Guard reference to prevent execution on multi-mount environments
   const initializeFetchGuardRef = useRef(false);
 
   // --- Core Logic ---
@@ -190,18 +194,22 @@ export default function ShopPage() {
     if (userData.id) {
       if (userIdRef.current !== userData.id) {
         userIdRef.current = userData.id;
+        // Authenticate with OneSignal only when user identity explicitly transitions
         notificationService.login(userData.id);
       }
     }
 
     const now = Date.now();
     
+    // Validate Luck Buff expiration
     const luckExpired = userData.luckExpiresAt ? new Date(userData.luckExpiresAt).getTime() <= now : false;
     setActiveLuck(luckExpired ? 1 : (userData.activeLuck ?? 1));
 
+    // Validate Discount Buff expiration
     const discountExpired = userData.discountExpiresAt ? new Date(userData.discountExpiresAt).getTime() <= now : false;
     setActiveDiscount(discountExpired ? 0 : (userData.activeDiscount ?? 0));
 
+    // Validate XP Buff expiration
     const xpExpired = userData.xpBoostExpiresAt ? new Date(userData.xpBoostExpiresAt).getTime() <= now : false;
     setActiveXpBoost(xpExpired ? false : (userData.activeXpBoost ?? false));
 
@@ -221,6 +229,7 @@ export default function ShopPage() {
       let dynamicUpdates: Partial<UserProfile> = {};
       let changed = false;
 
+      // Realtime validation for Luck
       if (user.luckExpiresAt) {
         const timeStr = formatTimeLeft(user.luckExpiresAt);
         setLuckTimeLeft(timeStr);
@@ -234,6 +243,7 @@ export default function ShopPage() {
         setLuckTimeLeft("");
       }
 
+      // Realtime validation for Discounts
       if (user.discountExpiresAt) {
         const timeStr = formatTimeLeft(user.discountExpiresAt);
         setDiscountTimeLeft(timeStr);
@@ -247,6 +257,7 @@ export default function ShopPage() {
         setDiscountTimeLeft("");
       }
 
+      // Realtime validation for XP Boost
       if (user.xpBoostExpiresAt) {
         const timeStr = formatTimeLeft(user.xpBoostExpiresAt);
         setXpTimeLeft(timeStr);
@@ -411,7 +422,7 @@ export default function ShopPage() {
       console.error("[Shop] Error in loadShopData:", err);
       setPackError("An error occurred while loading packs");
       setPacks(FALLBACK_PACKS);
-    } finally {
+    } {
       setIsFetchingPacks(false);
     }
   }, [fetchUserData, isFetchingPacks]);
@@ -548,7 +559,7 @@ export default function ShopPage() {
     const pack = packs.find((p) => p.id === packId);
     if (!pack && packId !== "exclusive_vault_pack") return;
     const target: PackBasic =
-      pack ?? ({ id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic);
+      pack ?? ({ id: "exclusive_vault_pack", name: "?? Secret Vault Pack", price: 0 } as PackBasic);
     setModalQuantity(openQuantity > 0 ? openQuantity : 1);
     setPendingPack(target);
   };
@@ -618,6 +629,7 @@ export default function ShopPage() {
     }
   };
 
+  // Safe mount lifecycle block
   useEffect(() => {
     if (initializeFetchGuardRef.current) return;
     initializeFetchGuardRef.current = true;
@@ -735,7 +747,7 @@ export default function ShopPage() {
   const displayPacks = (() => {
     const real = packs.filter((p) => p && p.id !== "exclusive_vault_pack");
     const exclusive = hasExclusivePack
-      ? [{ id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic]
+      ? [{ id: "exclusive_vault_pack", name: "?? Secret Vault Pack", price: 0 } as PackBasic]
       : [];
     real.sort((a, b) => {
       const pa = typeof a.price === "string" ? parseInt(a.price) : a.price;
@@ -870,7 +882,7 @@ export default function ShopPage() {
               transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
               className="text-8xl mb-8"
             >
-              🎁
+              ??
             </motion.div>
             <h2 className="text-2xl font-black tracking-widest text-white uppercase animate-pulse">
               Opening Packs...
@@ -981,7 +993,7 @@ export default function ShopPage() {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
 
       {isMounted && isIOS && !isStandalone && (
-        <div className="mx-2 md:mx-4 p-2 md:p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left relative z-10 max-w-4xl mx-auto w-full mb-4">
+        <div className="mx-2 md:mx-4 p-2 md:p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left relative z-10 max-w-4xl">
           <Smartphone className="text-amber-500 shrink-0" size={24} />
           <div>
             <h4 className="font-bold text-amber-500 text-sm">Enable Safari Background Alerts</h4>
@@ -996,7 +1008,7 @@ export default function ShopPage() {
             initial={{ opacity: 0, y: -20 }} 
             animate={{ opacity: 1, y: 0 }} 
             exit={{ opacity: 0, height: 0 }} 
-            className="mb-4 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto w-full"
+            className="mb-8 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
             <div className="flex items-center gap-3 relative z-10">
@@ -1041,10 +1053,10 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto flex flex-col items-center w-full relative z-10 px-2 sm:px-4 flex-1 overflow-hidden">
+      <div className="max-w-7xl mx-auto flex flex-col items-center w-full relative z-10 px-2 sm:px-4 h-full">
         <motion.h1
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-          className="text-3xl md:text-4xl font-black mb-4 tracking-tighter text-center text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-sm flex-shrink-0"
+          className="text-3xl md:text-4xl font-black mb-4 tracking-tighter text-center text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-sm"
         >
           VAULT
         </motion.h1>
@@ -1053,23 +1065,23 @@ export default function ShopPage() {
           <div className="flex flex-wrap gap-1 md:gap-1.5 mb-2 md:mb-3 justify-center items-center flex-shrink-0">
             {activeDiscount > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(239,68,68,0.1)]">
-                <span className="animate-pulse">🔥</span> {activeDiscount * 100}% Discount {discountTimeLeft && `(${discountTimeLeft})`}
+                <span className="animate-pulse">??</span> {activeDiscount * 100}% Discount {discountTimeLeft && `(${discountTimeLeft})`}
               </div>
             )}
             {activeLuck > 1 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(34,197,94,0.1)]">
-                <span className="animate-pulse">🍀</span> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
+                <span className="animate-pulse">??</span> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
               </div>
             )}
             {activeXpBoost && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(249,115,22,0.1)]">
-                <span className="animate-pulse">👑</span> 2x XP Active {xpTimeLeft && `(${xpTimeLeft})`}
+                <span className="animate-pulse">??</span> 2x XP Active {xpTimeLeft && `(${xpTimeLeft})`}
               </div>
             )}
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 w-full max-w-5xl mx-auto flex-1 overflow-y-auto px-2 md:px-4 content-start items-start pb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 w-full max-w-5xl mx-auto flex-1 overflow-y-auto px-2 md:px-4 content-start items-start">
           {displayPacks.map((pack, idx) => {
             if (!pack || typeof pack !== 'object' || !pack.id) return null;
 
@@ -1107,7 +1119,7 @@ export default function ShopPage() {
                 <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
                   {onSale && (
                     <span className="text-[9px] font-black tracking-wider px-2 py-1 rounded-full bg-red-500 text-black shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse">
-                      FLASH −{Math.round((1 - discountMultiplier) * 100)}%
+                      FLASH -{Math.round((1 - discountMultiplier) * 100)}%
                     </span>
                   )}
                   {isExclusive && (
@@ -1121,14 +1133,14 @@ export default function ShopPage() {
                   <div className={`absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-60 ${theme.halo} group-hover:opacity-90 transition-opacity`} />
                   {theme.tier === "OMEGA" ? (
                     <>
-                      <span className="absolute top-2 left-6 text-fuchsia-300 text-xs animate-ping">✦</span>
-                      <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">✦</span>
-                      <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">✧</span>
+                      <span className="absolute top-2 left-6 text-fuchsia-300 text-xs animate-ping">?</span>
+                      <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">?</span>
+                      <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">?</span>
                     </>
                   ) : (theme.tier === "LEGENDARY" || theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
                     <>
-                      <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">✦</span>
-                      <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">✦</span>
+                      <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">?</span>
+                      <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">?</span>
                     </>
                   )}
                   <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
@@ -1147,11 +1159,11 @@ export default function ShopPage() {
                     {pack.name}
                   </h3>
                   <div className={`text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-3`}>
-                    {isExclusive ? "FREE EXCLUSIVE" : `FROM ${finalPrice.toLocaleString()} 🪙`}
+                    {isExclusive ? "FREE EXCLUSIVE" : `FROM ${finalPrice.toLocaleString()} ??`}
                   </div>
 
                   <button
-                    onClick={(e) => { e.stopPropagation(); requestOpenPack(pack.id); }}
+                    onClick={() => requestOpenPack(pack.id)}
                     className={`relative w-full py-2.5 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all duration-200 overflow-hidden ${
                       isExclusive
                         ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] hover:shadow-[0_0_30px_rgba(168,85,247,0.75)]"
@@ -1161,7 +1173,7 @@ export default function ShopPage() {
                     <span className="relative z-10">
                       {isExclusive
                         ? "CLAIM (FREE)"
-                        : `OPEN ${openQuantity > 1 ? openQuantity : ""} • ${totalCost.toLocaleString()} 🪙`}
+                        : `OPEN ${openQuantity > 1 ? openQuantity : ""} � ${totalCost.toLocaleString()} ??`}
                     </span>
                   </button>
                 </div>
@@ -1275,7 +1287,7 @@ export function PackPurchaseModal({
             {pack.name}
           </h2>
           <p className={`text-center text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-5`}>
-            {isExclusive ? "FREE EXCLUSIVE DROP" : `FROM ${finalPrice.toLocaleString()} 🪙 / PACK`}
+            {isExclusive ? "FREE EXCLUSIVE DROP" : `FROM ${finalPrice.toLocaleString()} ?? / PACK`}
           </p>
 
           <div className="mb-4">
@@ -1304,22 +1316,22 @@ export function PackPurchaseModal({
           <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-5 backdrop-blur">
             <div className="flex items-center justify-between text-xs text-white/60 mb-1.5">
               <span>Price per pack</span>
-              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}</span>
+              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} ??`}</span>
             </div>
             {discountMultiplier < 1 && (
               <div className="flex items-center justify-between text-[11px] text-emerald-300 mb-1.5">
                 <span>Discount</span>
-                <span className="font-bold">−{Math.round((1 - discountMultiplier) * 100)}%</span>
+                <span className="font-bold">-{Math.round((1 - discountMultiplier) * 100)}%</span>
               </div>
             )}
             <div className="flex items-center justify-between text-xs text-white/60 mb-2">
               <span>Quantity</span>
-              <span className="font-bold text-white/90">×{quantity}</span>
+              <span className="font-bold text-white/90">�{quantity}</span>
             </div>
             <div className="border-t border-white/10 pt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-white/80">Total Cost</span>
               <span className={`text-xl font-black bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent`}>
-                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}
+                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} ??`}
               </span>
             </div>
 
@@ -1327,12 +1339,12 @@ export function PackPurchaseModal({
               <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[10px] text-white/50">
                   <span>Current balance</span>
-                  <span>{balance.toLocaleString()} 🪙</span>
+                  <span>{balance.toLocaleString()} ??</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-white/70">
                   <span>Balance after purchase</span>
                   <span className={insufficient ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
-                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` : `${remainingBalance.toLocaleString()} 🪙`}
+                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} ??` : `${remainingBalance.toLocaleString()} ??`}
                   </span>
                 </div>
               </div>

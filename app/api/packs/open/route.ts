@@ -61,6 +61,16 @@ export async function POST(req: Request) {
         return { response: NextResponse.json({ error: "User not found" }, { status: 404 }) };
       }
 
+      // Check timestamp expirations
+      const now = new Date();
+      const isLuckExpired = user.luckExpiresAt ? new Date(user.luckExpiresAt).getTime() <= now.getTime() : true;
+      const isDiscountExpired = user.discountExpiresAt ? new Date(user.discountExpiresAt).getTime() <= now.getTime() : true;
+      const isXpExpired = user.xpBoostExpiresAt ? new Date(user.xpBoostExpiresAt).getTime() <= now.getTime() : true;
+
+      // Determine values to apply in this specific operation
+      const currentLuck = isLuckExpired ? 1.0 : user.activeLuck;
+      const currentDiscount = isDiscountExpired ? 0.0 : user.activeDiscount;
+
       let items: Item[] = [];
       let packPrice = 0;
       let resolvedPackId = packId;
@@ -119,8 +129,8 @@ export async function POST(req: Request) {
       if (isFlashSale && packId !== EXCLUSIVE_PACK_ID) {
         unitPrice = Math.floor(unitPrice * 0.5);
       }
-      if (user.activeDiscount > 0 && packId !== EXCLUSIVE_PACK_ID) {
-        unitPrice = Math.floor(unitPrice * (1 - user.activeDiscount));
+      if (currentDiscount > 0 && packId !== EXCLUSIVE_PACK_ID) {
+        unitPrice = Math.floor(unitPrice * (1 - currentDiscount));
       }
 
       const totalPrice = unitPrice * quantity;
@@ -128,16 +138,25 @@ export async function POST(req: Request) {
         return { response: NextResponse.json({ error: "Insufficient balance" }, { status: 400 }) };
       }
 
-      const wonItems = Array.from({ length: quantity }, () => rollItem(items, user.activeLuck));
+      // Roll utilizing active duration luck values
+      const wonItems = Array.from({ length: quantity }, () => rollItem(items, currentLuck));
 
       const updatedUser = await tx.user.update({
         where: { id: user.id },
         data: {
           balance: { decrement: totalPrice },
-          activeLuck: 1.0,
-          activeDiscount: 0.0,
+          
+          // Only drop down to default values if the duration has expired
+          activeLuck: isLuckExpired ? 1.0 : user.activeLuck,
+          luckExpiresAt: isLuckExpired ? null : user.luckExpiresAt,
+
+          activeDiscount: isDiscountExpired ? 0.0 : user.activeDiscount,
+          discountExpiresAt: isDiscountExpired ? null : user.discountExpiresAt,
+
+          activeXpBoost: isXpExpired ? false : user.activeXpBoost,
+          xpBoostExpiresAt: isXpExpired ? null : user.xpBoostExpiresAt,
+
           hasExclusivePack: packId === EXCLUSIVE_PACK_ID ? false : user.hasExclusivePack,
-          activeXpBoost: false,
         },
         select: {
           balance: true,
@@ -145,6 +164,9 @@ export async function POST(req: Request) {
           activeDiscount: true,
           hasExclusivePack: true,
           activeXpBoost: true,
+          luckExpiresAt: true,
+          discountExpiresAt: true,
+          xpBoostExpiresAt: true,
         },
       });
 

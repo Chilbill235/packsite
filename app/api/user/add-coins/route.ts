@@ -1,8 +1,8 @@
-// app/api/user/add-coins/route.ts
+﻿// app/api/user/add-coins/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sendPushNotification } from "@/lib/notifications"; // Import the helper
+import { sendPushNotification } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const suppressNotification = body.suppressNotification === true;
     const userId = session.user.id;
 
-    // 1. Update DB
+    // Update DB
     const updatedUser = await prisma.user.update({
       where: { email: session.user.email },
       data: { 
@@ -25,16 +25,15 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // 2. Trigger notification directly (No internal network fetch needed!)
-    // Unless suppressed (e.g., when claiming reward via notification click)
+    // Trigger notification only if not suppressed
     if (!suppressNotification) {
       await sendPushNotification(
         userId,
-        "\u002728 Coins Claimed! \u002728",
-        "\u{1FA99} You just received " + amount + " coins.",
+        "Coins Claimed!",
+        "You received " + amount + " coins!",
         "reward-claim",
         "/shop?ref=reward-claim"
-      );
+      ).catch(err => console.warn("Notification send failed:", err));
     }
 
     return NextResponse.json({ newBalance: updatedUser.balance });

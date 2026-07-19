@@ -1,16 +1,10 @@
-// lib/notificationService.ts
+﻿// lib/notificationService.ts
 
-// Window.OneSignalDeferred and the PacksiteOneSignal type are declared in
-// types/global.d.ts. We use the v16 OneSignalDeferred queue pattern here;
-// the legacy window.OneSignal.push() pattern crashes the v16 SDK.
-
-/** Detect iOS device */
 export function isIOS(): boolean {
   if (typeof window === 'undefined') return false;
   return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
 }
 
-/** Detect if PWA is in standalone mode (added to Home Screen) */
 export function isInStandaloneMode(): boolean {
   if (typeof window === 'undefined') return false;
   return (
@@ -19,14 +13,6 @@ export function isInStandaloneMode(): boolean {
   );
 }
 
-/**
- * Returns detailed permission state to help UI decide what to show.
- * - "granted" – push allowed
- * - "denied" – user denied or blocked
- * - "default" – not yet asked
- * - "unsupported" – browser doesn't support push at all
- * - "ios-needs-pwa" – iOS Safari not in standalone mode; user must add to Home Screen first
- */
 export type PermissionDetail =
   | "granted"
   | "denied"
@@ -37,7 +23,7 @@ export type PermissionDetail =
 export function getPermissionDetail(): PermissionDetail {
   if (typeof window === 'undefined') return "unsupported";
 
-  // iOS Safari non-standalone → can't push at all
+  // iOS Safari non-standalone - can't push at all
   if (isIOS() && !isInStandaloneMode()) {
     return "ios-needs-pwa";
   }
@@ -46,16 +32,13 @@ export function getPermissionDetail(): PermissionDetail {
   return Notification.permission as PermissionDetail;
 }
 
+// Track if OneSignal login has been attempted for this session to prevent duplicates
+let loginAttempted = false;
+
 export const OneSignalNotificationService = {
-  /**
-   * Waits for the OneSignal SDK to be fully initialized.
-   * Resolves with the OneSignal instance, or null if initialization fails.
-   */
   waitForInit: async (timeout = 10000): Promise<boolean> => {
     if (typeof window === 'undefined') return false;
     
-    // If OneSignalDeferred already has items and they've been processed,
-    // the SDK should already be available
     if ((window as any).OneSignal && (window as any).OneSignal.init) {
       return true;
     }
@@ -79,14 +62,10 @@ export const OneSignalNotificationService = {
     });
   },
 
-  /**
-   * Logs a user into OneSignal safely using the required v16 OneSignalDeferred pattern.
-   */
   login: async (externalId: string, maxRetries = 3) => {
-    // Ensure we are in a browser environment
     if (typeof window === 'undefined') return;
-
-    // Initialize the OneSignalDeferred queue if not already present (v16 pattern)
+    if (!externalId) return;
+    
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
     for (let i = 0; i < maxRetries; i++) {
@@ -102,7 +81,7 @@ export const OneSignalNotificationService = {
             }
           });
         });
-        return; // Success, exit the function
+        return; 
       } catch (error) {
         if (i === maxRetries - 1) {
           console.error('OneSignal login error after', maxRetries, 'attempts:', error);
@@ -113,18 +92,12 @@ export const OneSignalNotificationService = {
     }
   },
 
-  /**
-   * Requests notification permission from the user.
-   * On iOS, this only works when the PWA is added to the home screen (standalone mode).
-   * Returns true if permission was granted.
-   */
   requestPermission: async (): Promise<boolean> => {
     if (typeof window === 'undefined') return false;
 
-    // Use getPermissionDetail for consistent iOS detection logic
     const detail = getPermissionDetail();
 
-    // iOS non-standalone → silently fail (UI should show "ios-needs-pwa" guidance instead)
+    // iOS non-standalone - silently fail (UI should show "ios-needs-pwa" guidance instead)
     if (detail === "ios-needs-pwa") {
       console.log("[OneSignal] iOS Safari requires PWA to be added to Home Screen for push notifications.");
       return false;
@@ -136,11 +109,9 @@ export const OneSignalNotificationService = {
     // Already denied / unsupported
     if (detail === "denied" || detail === "unsupported") return false;
 
-    // detail === "default" → proceed with OneSignal SDK
-    // First ensure OneSignal SDK is initialized
+    // detail === "default" - proceed with OneSignal SDK
     const initialized = await OneSignalNotificationService.waitForInit();
     if (!initialized) {
-      // Fallback to standard Notification API if OneSignal isn't ready
       if ("Notification" in window && Notification.permission === "default") {
         const result = await Notification.requestPermission();
         return result === "granted";
@@ -155,7 +126,6 @@ export const OneSignalNotificationService = {
           resolve(Notification.permission === 'granted');
         } catch (e) {
           console.error("Permission request failed", e);
-          // Fallback to standard Notification API
           if ("Notification" in window && Notification.permission === "default") {
             const result = await Notification.requestPermission();
             resolve(result === "granted");
@@ -167,10 +137,6 @@ export const OneSignalNotificationService = {
     });
   },
 
-  /**
-   * Returns the current notification permission status.
-   * On iOS non-standalone, always returns "unsupported".
-   */
   getPermissionDetail: (): PermissionDetail => getPermissionDetail(),
 
   getPermissionStatus: (): NotificationPermission | "unsupported" => {
@@ -182,5 +148,4 @@ export const OneSignalNotificationService = {
   }
 };
 
-// Explicit export to resolve the 'import { notificationService }' error in page.tsx
 export const notificationService = OneSignalNotificationService;
