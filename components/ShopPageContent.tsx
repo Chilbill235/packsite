@@ -324,7 +324,7 @@ export default function ShopPage() {
         typeof (packRes as any).json === "function"
       ) {
         try {
-          let packData = await (packRes as any).json();
+          const packData = await (packRes as any).json();
           console.log("[Shop] Raw pack response:", packData);
 
           let packsArray: any[] = [];

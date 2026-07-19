@@ -180,7 +180,7 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
-  const notificationTimeoutRef = useRef<number | null>(null);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNotificationTimeRef = useRef<number>(0);
   const initializeFetchGuardRef = useRef(false);
 
@@ -218,7 +218,7 @@ export default function ShopPage() {
 
     const ticker = setInterval(() => {
       const now = Date.now();
-      let dynamicUpdates: Partial<UserProfile> = {};
+      const dynamicUpdates: Partial<UserProfile> = {};
       let changed = false;
 
       if (user.luckExpiresAt) {

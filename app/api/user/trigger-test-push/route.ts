@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import webpush from 'web-push';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 
-export async function POST(req: Request) {
+interface SubscriptionData {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export async function POST(request: Request) {
   try {
-    // 1. Authenticate using Next-Auth v5
     const session = await auth(); 
     
     if (!session || !session.user || !session.user.id) {
@@ -14,27 +18,20 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
 
-    // 2. Safely capture your environment variables
     const publicKey = process.env.VAPID_PUBLIC_KEY;
     const privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT || 'mailto:admin@packsite.com';
 
-    // Guardrail: Provide clean logs if keys are missing from .env
     if (!publicKey || !privateKey) {
-      console.error("❌ [VAPID ERROR] Missing keys in environment variables!");
-      console.error(`- VAPID_PUBLIC_KEY: ${publicKey ? '✅ Detected' : '❌ MISSING'}`);
-      console.error(`- VAPID_PRIVATE_KEY: ${privateKey ? '✅ Detected' : '❌ MISSING'}`);
-      
+      console.error('[VAPID ERROR] Missing keys in environment variables');
       return NextResponse.json(
         { error: 'VAPID Keys are missing from server configuration.' },
         { status: 500 }
       );
     }
 
-    // 3. Set VAPID details on-demand
     webpush.setVapidDetails(subject, publicKey, privateKey);
 
-    // 4. Fetch the user's active push subscriptions using your correct model "subscription"
     const userSubscriptions = await prisma.subscription.findMany({
       where: { userId },
     });
@@ -46,55 +43,46 @@ export async function POST(req: Request) {
       );
     }
 
-    // 5. Define the push payload
     const notificationPayload = JSON.stringify({
-      title: 'PackSite Test Alert! 📦',
-      body: 'This is an instant test push notification. Your service worker is receiving pushes correctly!',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/badge-72x72.png',
-      data: {
-        url: '/shop', 
-      },
+      title: 'PackSite Test Alert!',
+      body: 'This is an instant test push notification.',
+      data: { url: '/shop' },
     });
 
-    // 6. Dispatch the test notifications
     const pushPromises = userSubscriptions.map(async (sub) => {
-      // Safely typecast and parse subscription details from your dynamic Json "data" field
-      const subscriptionData = sub.data as any;
+      const rawData = sub.data as unknown as SubscriptionData;
 
-      if (!subscriptionData || !subscriptionData.endpoint || !subscriptionData.keys) {
-        console.warn(`Skipping invalid subscription format for subscription ID: ${sub.id}`);
+      if (!rawData || !rawData.endpoint || !rawData.keys) {
+        console.warn('Skipping invalid subscription format for subscription ID: ' + sub.id);
         return;
       }
 
       const pushConfig = {
-        endpoint: subscriptionData.endpoint,
+        endpoint: rawData.endpoint,
         keys: {
-          p256dh: subscriptionData.keys.p256dh,
-          auth: subscriptionData.keys.auth,
+          p256dh: rawData.keys.p256dh,
+          auth: rawData.keys.auth,
         },
       };
 
       try {
         await webpush.sendNotification(pushConfig, notificationPayload);
-      } catch (error: any) {
-        // Automatically prune expired or revoked browser subscriptions (410 Gone / 404 Not Found)
-        if (error.statusCode === 410 || error.statusCode === 404) {
-          await prisma.subscription.delete({
-            where: { id: sub.id },
-          });
+      } catch (error: unknown) {
+        const err = error as { statusCode?: number };
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await prisma.subscription.delete({ where: { id: sub.id } });
         }
-        throw error;
       }
     });
 
     await Promise.allSettled(pushPromises);
 
     return NextResponse.json({ success: true, message: 'Test alert triggered successfully!' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error triggering test push:', error);
+    const err = error as { message?: string };
     return NextResponse.json(
-      { error: 'Internal Server Error', details: error.message },
+      { error: 'Internal Server Error', details: err.message || 'Unknown error' },
       { status: 500 }
     );
   }

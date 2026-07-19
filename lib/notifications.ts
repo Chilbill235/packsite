@@ -1,3 +1,11 @@
+interface PushPayload {
+  app_id: string;
+  include_external_user_ids: string[];
+  headings: { en: string };
+  contents: { en: string };
+  data?: { type?: string; url?: string };
+}
+
 // Environment variables needed for OneSignal Server-Side API
 const ONESIGNAL_APP_ID = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || "";
 const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "";
@@ -24,7 +32,7 @@ export async function sendPushNotification(
   }
 
   try {
-    const payload: any = {
+    const payload: PushPayload = {
       app_id: ONESIGNAL_APP_ID,
       include_external_user_ids: [userId], 
       headings: { en: title },
@@ -32,7 +40,7 @@ export async function sendPushNotification(
     };
 
     // Build data object with type and optional URL
-    const data: any = {};
+    const data: PushPayload['data'] = {};
     if (notificationType) {
       data.type = notificationType;
     }
@@ -76,7 +84,7 @@ export async function sendPushNotification(
     }
 
     console.log(`[Notifications] Successfully sent push notification to user: ${userId}`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[Notifications] Failed to send push notification:", error);
   }
 }

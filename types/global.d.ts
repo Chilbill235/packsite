@@ -15,7 +15,7 @@ declare global {
   }
 
   interface Window {
-    googletag: any;
+    googletag: googletag.Service;
     OneSignalDeferred?: Array<(OneSignal: PacksiteOneSignal) => void | Promise<void>>;
     __packsiteOneSignalInitQueued?: boolean;
   }

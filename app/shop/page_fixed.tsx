@@ -182,7 +182,7 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
-  const notificationTimeoutRef = useRef<number | null>(null);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNotificationTimeRef = useRef<number>(0);
   
   // Guard reference to prevent execution on multi-mount environments
@@ -226,7 +226,7 @@ export default function ShopPage() {
 
     const ticker = setInterval(() => {
       const now = Date.now();
-      let dynamicUpdates: Partial<UserProfile> = {};
+      const dynamicUpdates: Partial<UserProfile> = {};
       let changed = false;
 
       // Realtime validation for Luck
@@ -1173,7 +1173,7 @@ export default function ShopPage() {
                     <span className="relative z-10">
                       {isExclusive
                         ? "CLAIM (FREE)"
-                        : `OPEN ${openQuantity > 1 ? openQuantity : ""} • ${totalCost.toLocaleString()} ??`}
+                        : `OPEN ${openQuantity > 1 ? openQuantity : ""} ï¿½ ${totalCost.toLocaleString()} ??`}
                     </span>
                   </button>
                 </div>
@@ -1326,7 +1326,7 @@ export function PackPurchaseModal({
             )}
             <div className="flex items-center justify-between text-xs text-white/60 mb-2">
               <span>Quantity</span>
-              <span className="font-bold text-white/90">×{quantity}</span>
+              <span className="font-bold text-white/90">ï¿½{quantity}</span>
             </div>
             <div className="border-t border-white/10 pt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-white/80">Total Cost</span>

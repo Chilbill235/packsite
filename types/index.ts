@@ -1,4 +1,4 @@
-import { User, Pack, Item, Inventory, Opening, Prisma } from "@prisma/client";
+import { User, Pack, Item, Opening, Prisma } from "@prisma/client";
 
 // These use standard model types for simple entities
 export interface PackWithItems extends Pack {

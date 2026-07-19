@@ -9,5 +9,6 @@ export const ItemSchema = z.object({
   image: z.string(),
   packId: z.string().uuid()
 });
+export type ItemInput = z.infer<typeof ItemSchema>;
 
-export const validateItem = (data: any) => ItemSchema.parse(data);
+export const validateItem = (data: unknown): ItemInput => ItemSchema.parse(data);

@@ -137,7 +137,7 @@ export async function POST(req: Request) {
       user: updatedUser
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("PACK_OPEN_ERROR", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

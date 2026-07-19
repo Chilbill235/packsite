@@ -2,6 +2,17 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
+interface BuffUpdateData {
+  activeLuck?: number;
+  luckExpiresAt?: Date | null;
+  activeDiscount?: number;
+  discountExpiresAt?: Date | null;
+  hasExclusivePack?: boolean;
+  activeXpBoost?: boolean;
+  xpBoostExpiresAt?: Date | null;
+  balance?: { increment: number };
+}
+
 // Buff durations in milliseconds
 const BUFF_DURATIONS: Record<string, number> = {
   luck_boost_1_5x: 30 * 60 * 1000,   // 30 minutes
@@ -42,7 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const updateData: any = {};
+    const updateData: BuffUpdateData = {};
     const now = new Date();
     
     // Normalize lookups cleanly

@@ -1,7 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 
+interface QueryResult {
+  query: (sql: string, params: unknown[]) => Promise<void>;
+}
+
 export class InventoryService {
-  constructor(private client: any) {}
+  constructor(private client: QueryResult) {}
 
   async distribute(userIds: string[], itemIds: string[]) {
     for (const userId of userIds) {

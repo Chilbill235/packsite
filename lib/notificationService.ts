@@ -9,9 +9,19 @@ export function isInStandaloneMode(): boolean {
   if (typeof window === 'undefined') return false;
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true
+    (window.navigator as { standalone?: boolean }).standalone === true
   );
 }
+
+type OneSignalWindow = {
+  OneSignal?: {
+    init: () => Promise<void>;
+    login: (externalId: string) => Promise<void>;
+    Notifications: {
+      requestPermission: () => Promise<boolean>;
+    };
+  };
+};
 
 export type PermissionDetail =
   | "granted"
@@ -35,13 +45,15 @@ export function getPermissionDetail(): PermissionDetail {
 }
 
 // Track if OneSignal login has been attempted for this session to prevent duplicates
-let loginAttempted = false;
+const loginAttempted = false;
 
 export const OneSignalNotificationService = {
   waitForInit: async (timeout = 10000): Promise<boolean> => {
     if (typeof window === 'undefined') return false;
     
-    if ((window as any).OneSignal && (window as any).OneSignal.init) {
+    const win = window as unknown as OneSignalWindow & { OneSignalDeferred?: Array<(os: unknown) => void> };
+    
+    if (win.OneSignal && typeof win.OneSignal.init === 'function') {
       return true;
     }
 
@@ -49,7 +61,7 @@ export const OneSignalNotificationService = {
       const startTime = Date.now();
       
       const check = () => {
-        if ((window as any).OneSignal && (window as any).OneSignal.init) {
+        if (win.OneSignal && typeof win.OneSignal.init === 'function') {
           resolve(true);
           return;
         }
@@ -64,27 +76,29 @@ export const OneSignalNotificationService = {
     });
   },
 
-  login: async (externalId: string, maxRetries = 3) => {
+  login: async (externalId: string, maxRetries = 3): Promise<void> => {
     if (typeof window === 'undefined') return;
     if (!externalId) return;
     
+     
     window.OneSignalDeferred = window.OneSignalDeferred || [];
 
     for (let i = 0; i < maxRetries; i++) {
       try {
         await new Promise<void>((resolve, reject) => {
-          window.OneSignalDeferred!.push(async (OneSignal) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).OneSignalDeferred!.push(async (OneSignal: any) => {
             try {
               await OneSignal.login(externalId);
               console.log("OneSignal login successful for:", externalId);
               resolve();
-            } catch (error) {
+            } catch (error: unknown) {
               reject(error);
             }
           });
         });
         return; 
-      } catch (error) {
+      } catch (error: unknown) {
         if (i === maxRetries - 1) {
           console.error('OneSignal login error after', maxRetries, 'attempts:', error);
           return;
@@ -126,11 +140,12 @@ export const OneSignalNotificationService = {
     }
 
     return new Promise((resolve) => {
-      window.OneSignalDeferred!.push(async (OneSignal) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).OneSignalDeferred!.push(async (OneSignal: any) => {
         try {
           await OneSignal.Notifications.requestPermission();
           resolve(Notification.permission === 'granted');
-        } catch (e) {
+        } catch (e: unknown) {
           console.error("Permission request failed", e);
           if ("Notification" in window && Notification.permission === "default") {
             const result = await Notification.requestPermission();
