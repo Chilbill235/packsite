@@ -375,8 +375,6 @@ useEffect(() => {
       // Handle reward claim from notification click - award coins immediately
       try {
         console.log("Handling reward claim notification - awarding coins");
-        // Simulate ad completion by setting ad status to completed
-        // This will show the success UI and handle the actual reward giving
         setAdStatus('completed');
 
         // Actually award the coins (not just mark pending)
