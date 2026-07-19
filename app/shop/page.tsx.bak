@@ -265,7 +265,7 @@ useEffect(() => {
         }
 
         // Award the coins (this is the critical part)
-        const addCoinsResponse = await fetch("/api/user/add-coins", {
+        const adCompleteResponse = await fetch("/api/user/ad-complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });

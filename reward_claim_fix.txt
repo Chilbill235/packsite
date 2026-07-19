@@ -1,0 +1,33 @@
+﻿    } else if (ref === "reward-claim") {
+      // Handle reward claim from notification click - award coins immediately
+      try {
+        console.log("Handling reward claim notification - awarding coins");
+        setAdStatus('completed');
+
+        // Actually award the coins (not just mark pending)
+        const response = await fetch("/api/user/add-coins", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: 500, suppressNotification: true })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to claim reward");
+        }
+        await fetchUserData(); // Refresh user data to show updated balance
+
+        // Show success feedback briefly
+        setTimeout(() => {
+          setAdStatus('idle');
+        }, 3000);
+
+        console.log("Reward claimed successfully via notification click");
+      } catch (e) {
+        console.error("Reward claim failed:", e);
+        setAdStatus('error');
+        setTimeout(() => {
+          setAdStatus('idle');
+        }, 3000);
+        setErrorDialog({ message: "Failed to claim reward: " + (e instanceof Error ? e.message : "Unknown error") });
+      }

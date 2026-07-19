@@ -13,5 +13,5 @@ export const PACK_METADATA = [
   { name: 'Event Crate', price: 500, desc: 'Limited time seasonal items.', cat: 'EVENT', rarityMod: 1.2 },
   { name: 'Void Box', price: 2000, desc: 'High-tier dark-matter gear.', cat: 'VOID', rarityMod: 2.0 },
   { name: 'Singularity Crate', price: 5000, desc: 'Reality-warping Omega anomalies. Not for the faint of heart.', cat: 'OMEGA', rarityMod: 3.0 },
-  { name: 'Promo Bundle', price: 0, desc: 'Daily free rewards.', cat: 'PROMO', rarityMod: 1.1 }
+  { name: 'Promo Bundle', price: 50, desc: 'Daily free rewards.', cat: 'PROMO', rarityMod: 1.1 }
 ];
