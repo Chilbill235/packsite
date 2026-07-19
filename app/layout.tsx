@@ -64,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 appId: "${oneSignalAppId}",
                 safari_web_id: "${oneSignalSafariWebId}",
                 allowLocalhostAsSecureOrigin: true,
-                welcomeNotification: { disable: true, message: "" },
+                welcomeNotification: { disable: false, message: "Test - Your Subscribed" },
                 notifyButton: {
                   enable: true,
                   showWhenNotGranted: true,

@@ -7,6 +7,7 @@ import { Bell, X, ChevronDown, Smartphone } from "lucide-react";
 import WonScreen from "@/components/WonScreen";
 import ErrorDialog from "@/components/ErrorDialog";
 import Notification from "@/components/Notification";
+import WatchAdModal from "@/components/WatchAdModal";
 import { RewardedAdService } from "@/lib/adService";
 import type { Pack } from "@prisma/client";
 import { notificationService } from "@/lib/notificationService";
@@ -875,126 +876,86 @@ export default function ShopPage() {
 
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
 
-      {isIOS && !isStandalone && (
-        <div className="mb-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left relative z-10 max-w-4xl mx-auto">
-          <Smartphone className="text-amber-500 shrink-0" size={24} />
-          <div>
-            <h4 className="font-bold text-amber-500 text-sm">
-              Enable Safari Background Alerts
-            </h4>
-            <p className="text-xs text-gray-300 mt-1">
-              Tap the <strong className="text-white">Share</strong> button in
-              Safari, then choose{" "}
-              <strong className="text-white">"Add to Home Screen"</strong> to
-              receive background timer payouts and free drops!
-            </p>
-          </div>
-        </div>
-      )}
-
+      {/* iOS PWA Install Prompt Banner */}
       <AnimatePresence>
-        {(permission === "default" || permission === "ios-needs-pwa") &&
-          showBanner && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-8 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500">
-                  <Bell size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm">Enable Notifications</h4>
-                  <p className="text-gray-400 text-xs">
-                    Get alerts for shop drops, flash sales, and bonus claims.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 relative z-10 w-full md:w-auto">
-                <button
-                  onClick={handleEnableNotifications}
-                  className="w-full md:w-auto px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)]"
-                >
-                  ALLOW ALERTS
-                </button>
-                <button
-                  onClick={() => setShowBanner(false)}
-                  className="p-2 text-gray-500 hover:text-white transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showAdModal && (
+        {isIOS && !isStandalone && showBanner && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-4 relative overflow-hidden rounded-xl border border-amber-500/20 bg-black/40 backdrop-blur-xl p-4 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left z-10 max-w-4xl mx-auto"
           >
-            <motion.div className="bg-[#111111] border border-white/10 p-6 rounded-3xl w-full max-w-xs text-center relative overflow-hidden shadow-2xl">
-              {isWaiting ? (
-                <div className="flex flex-col items-center py-6">
-                  <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
-                    <svg className="w-full h-full rotate-[-90deg]">
-                      <circle
-                        cx="40"
-                        cy="40"
-                        r="36"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="transparent"
-                        className="text-zinc-800"
-                      />
-                      <motion.circle
-                        cx="40"
-                        cy="40"
-                        r="36"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="transparent"
-                        className="text-amber-500"
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: 1 }}
-                        transition={{ duration: 10, ease: "linear" }}
-                      />
-                    </svg>
-                    <span className="absolute text-2xl font-black">
-                      {countdown}
-                    </span>
-                  </div>
-                  <h3 className="text-lg font-bold">Watching Ad</h3>
-                </div>
-              ) : (
-                <>
-                  <h3 className="text-xl font-black mb-2 tracking-tight">
-                    Boost Balance
-                  </h3>
-                  <button
-                    onClick={() => handleWatchAdClick(500)}
-                    className="w-full py-3 mt-4 rounded-xl font-black text-sm bg-amber-500/10 border border-amber-500/20 text-amber-500"
-                  >
-                    WATCH AD (500)
-                  </button>
-                  <button
-                    onClick={() => setShowAdModal(false)}
-                    className="mt-4 text-xs text-zinc-600"
-                  >
-                    Cancel
-                  </button>
-                </>
-              )}
-            </motion.div>
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
+            <Smartphone className="text-amber-500 shrink-0" size={24} />
+            <div className="flex-1 relative z-10">
+              <h4 className="font-bold text-amber-500 text-sm">
+                Enable Safari Background Alerts
+              </h4>
+              <p className="text-xs text-gray-300 mt-1">
+                Tap the <strong className="text-white">Share</strong> button in
+                Safari, then choose{" "}
+                <strong className="text-white">"Add to Home Screen"</strong> to
+                receive background timer payouts and free drops!
+              </p>
+            </div>
+            <button
+              onClick={() => setShowBanner(false)}
+              className="p-2 text-gray-500 hover:text-white transition-colors relative z-10"
+            >
+              <X size={18} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Notification Permission Banner (non-iOS) */}
+      <AnimatePresence>
+        {!isIOS && permission === "default" && showBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-8 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500">
+                <Bell size={20} />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm">Enable Notifications</h4>
+                <p className="text-gray-400 text-xs">
+                  Get alerts for shop drops, flash sales, and bonus claims.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 relative z-10 w-full md:w-auto">
+              <button
+                onClick={handleEnableNotifications}
+                className="w-full md:w-auto px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+              >
+                ALLOW ALERTS
+              </button>
+              <button
+                onClick={() => setShowBanner(false)}
+                className="p-2 text-gray-500 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Watch Ad Modal */}
+      <WatchAdModal
+        open={showAdModal}
+        onFinished={() => {
+          setShowAdModal(false);
+          // Reward will be given via the timer/service worker
+        }}
+        onClose={() => setShowAdModal(false)}
+      />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto flex flex-col items-center w-full relative z-10 px-2 sm:px-4">

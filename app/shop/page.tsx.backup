@@ -907,7 +907,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* WINNING ANIMATION OVERLAY - FULL REDESIGN */}
+      {/* WINNING ANIMATION OVERLAY */}
       <AnimatePresence>
         {wonItems.length > 0 && (
           <motion.div

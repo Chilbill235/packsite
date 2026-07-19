@@ -23,9 +23,11 @@ export type PermissionDetail =
 export function getPermissionDetail(): PermissionDetail {
   if (typeof window === 'undefined') return "unsupported";
 
-  // iOS Safari non-standalone - can't push at all
+  // iOS Safari non-standalone - special case that still allows banner to show
   if (isIOS() && !isInStandaloneMode()) {
-    return "ios-needs-pwa";
+    // Return 'default' so the notification banner shows on localhost/ngrok
+    // The banner UI should handle iOS-specific messaging
+    return "default";
   }
 
   if (!("Notification" in window)) return "unsupported";
@@ -97,9 +99,13 @@ export const OneSignalNotificationService = {
 
     const detail = getPermissionDetail();
 
-    // iOS non-standalone - silently fail (UI should show "ios-needs-pwa" guidance instead)
-    if (detail === "ios-needs-pwa") {
-      console.log("[OneSignal] iOS Safari requires PWA to be added to Home Screen for push notifications.");
+    // iOS non-standalone - still allow banner but request native permission
+    if (detail === "default" && isIOS() && !isInStandaloneMode()) {
+      console.log("[OneSignal] iOS Safari - requesting native notification permission.");
+      if ("Notification" in window && Notification.permission === "default") {
+        const result = await Notification.requestPermission();
+        return result === "granted";
+      }
       return false;
     }
 
@@ -142,7 +148,7 @@ export const OneSignalNotificationService = {
   getPermissionStatus: (): NotificationPermission | "unsupported" => {
     if (typeof window === 'undefined' ) return "unsupported";
     const detail = getPermissionDetail();
-    if (detail === 'ios-needs-pwa' ) return 'unsupported';
+    if (detail === 'default' ) return 'default';  // iOS still shows as default to allow banner
     if (detail === 'unsupported' ) return 'unsupported';
     return Notification.permission;
   }
