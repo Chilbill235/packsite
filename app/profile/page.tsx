@@ -95,7 +95,7 @@ export default function ProfilePage() {
 
     if (session?.user) {
       setNewUsername((session.user as any).username || "");
-      setAvatarUrl(session.user.image || "");
+      setAvatarUrl((session.user as any).image || "");
     }
 
     const handleLevelUpToast = (e: Event) => {
