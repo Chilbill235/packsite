@@ -94,7 +94,7 @@ export default function ProfilePage() {
     fetchOpenings();
 
     if (session?.user) {
-      setNewUsername(session.user.name || "");
+      setNewUsername((session.user as any).username || "");
       setAvatarUrl(session.user.image || "");
     }
 
@@ -130,9 +130,15 @@ export default function ProfilePage() {
     setConfirmModal(null);
     try {
       const res = await fetch("/api/inventory/sell-all", { method: "POST" });
+      const data = await res.json();
+      
       if (res.ok) {
         await fetchInventory();
+        await fetchOpenings();
         await fetchProgress(); // Resync global account statistics context
+        
+        // Dispatch custom event to instantly update navbar coin counters across the app
+        window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { newBalance: data.newBalance } }));
       }
     } catch (e) { 
       console.error(e); 
