@@ -14,9 +14,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    // Check both username AND email for existing users
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          { username }
+        ]
+      }
+    });
+    
     if (existingUser) {
-      return NextResponse.json({ error: "User already exists" }, { status: 400 });
+      if (existingUser.email === email) {
+        return NextResponse.json({ error: "Email already registered" }, { status: 400 });
+      }
+      if (existingUser.username === username) {
+        return NextResponse.json({ error: "Username already taken" }, { status: 400 });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

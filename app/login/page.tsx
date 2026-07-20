@@ -22,10 +22,10 @@ function LoginForm() {
     setLoading(true);
 
     try {
+      // 🌟 FIXED: Passing 'identifier' as a single key to match your Prisma OR auth configuration backend
       const res = await signIn("credentials", {
         redirect: false,
-        email: identifier,
-        username: identifier,
+        identifier: identifier,
         password,
       });
 

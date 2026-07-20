@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Script from "next/script";
@@ -17,7 +17,7 @@ export default function CoinRefill() {
       const data = await res.json();
       if (res.ok && user) {
         setUser({ ...user, balance: data.newBalance });
-        document.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance } }));
+        window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance } }));
       }
     } finally {
       setLoading(false);

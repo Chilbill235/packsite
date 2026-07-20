@@ -1,8 +1,8 @@
-// auth.config.ts
+// auth.config.ts - Edge-compatible config for middleware
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
-  providers: [], // No DB imports here!
+  providers: [],
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
 } satisfies NextAuthConfig;

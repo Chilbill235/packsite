@@ -1,33 +1,20 @@
 import { NextResponse } from "next/server";
-import type { Item } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { rollItem } from "@/lib/openingEngine";
 
-const MAX_PACKS_PER_REQUEST = 50;
-const EXCLUSIVE_PACK_ID = "exclusive_vault_pack";
+// Production-tier rarity configuration and base item rolls
+const RARITY_POOL = [
+  { rarity: "COMMON", chance: 0.50, xp: 10, valueMultiplier: 1 },
+  { rarity: "RARE", chance: 0.30, xp: 25, valueMultiplier: 2.5 },
+  { rarity: "EPIC", chance: 0.12, xp: 60, valueMultiplier: 6 },
+  { rarity: "LEGENDARY", chance: 0.06, xp: 150, valueMultiplier: 15 },
+  { rarity: "MYTHIC", chance: 0.02, xp: 500, valueMultiplier: 50 },
+];
 
-const FALLBACK_PACK_ID_TO_NAME: Record<string, string> = {
-  "76796f88-c7d0-442a-bfeb-380c3863c8b7": "Cosmic Vault",
-  "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f": "Starter Cache",
-  "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f": "Event Crate",
-  "02ada6c5-4bb7-4d2c-953d-3228f28855eb": "Void Box",
-  "5fd47c89-8fd5-4946-9f09-00d90055c6e5": "Promo Bundle",
-};
-
-type OpenPackBody = {
-  packId?: unknown;
-  quantity?: unknown;
-  isFlashSale?: unknown;
-};
-
-const parseQuantity = (value: unknown) => {
-  const quantity = Number(value ?? 1);
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_PACKS_PER_REQUEST) {
-    return null;
-  }
-  return quantity;
-};
+// Helper function to calculate required XP for a given level
+function getXpForLevel(level: number): number {
+  return Math.floor(100 * Math.pow(level, 1.5));
+}
 
 export async function POST(req: Request) {
   try {
@@ -36,166 +23,214 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await req.json()) as OpenPackBody;
-    const packId = typeof body.packId === "string" ? body.packId : "";
-    const quantity = parseQuantity(body.quantity);
-    const isFlashSale = body.isFlashSale === true;
+    const body = await req.json();
+    const { packId, quantity, isFlashSale } = body;
 
-    if (!packId) {
-      return NextResponse.json({ error: "Missing pack id" }, { status: 400 });
-    }
+    const qty = Math.max(1, parseInt(quantity) || 1);
 
-    if (quantity === null) {
-      return NextResponse.json(
-        { error: `Invalid quantity. Open between 1 and ${MAX_PACKS_PER_REQUEST} packs at a time.` },
-        { status: 400 },
-      );
-    }
-
+    // Run the operation inside an atomic transaction with an increased timeout (10 seconds)
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Fetch user profile and validate status
       const user = await tx.user.findUnique({
-        where: { email: session.user.email as string },
+        where: { email: session.user.email },
       });
 
       if (!user) {
-        return { response: NextResponse.json({ error: "User not found" }, { status: 404 }) };
+        throw new Error("User not found");
       }
 
-      // Check timestamp expirations
       const now = new Date();
-      const isLuckExpired = user.luckExpiresAt ? new Date(user.luckExpiresAt).getTime() <= now.getTime() : true;
-      const isDiscountExpired = user.discountExpiresAt ? new Date(user.discountExpiresAt).getTime() <= now.getTime() : true;
-      const isXpExpired = user.xpBoostExpiresAt ? new Date(user.xpBoostExpiresAt).getTime() <= now.getTime() : true;
 
-      // Determine values to apply in this specific operation
-      const currentLuck = isLuckExpired ? 1.0 : user.activeLuck;
-      const currentDiscount = isDiscountExpired ? 0.0 : user.activeDiscount;
+      // Check boost expirations
+      const isLuckActive = user.luckExpiresAt && new Date(user.luckExpiresAt) > now;
+      const isDiscountActive = user.discountExpiresAt && new Date(user.discountExpiresAt) > now;
+      const isXpBoostActive = user.xpBoostExpiresAt && new Date(user.xpBoostExpiresAt) > now;
 
-      let items: Item[] = [];
-      let packPrice = 0;
-      let resolvedPackId = packId;
+      const currentLuck = isLuckActive ? (user.activeLuck ?? 1) : 1;
+      const currentDiscount = isDiscountActive ? (user.activeDiscount ?? 0) : 0;
+      const xpMultiplier = isXpBoostActive ? 2 : 1;
 
-      if (packId === EXCLUSIVE_PACK_ID) {
-        if (!user.hasExclusivePack) {
-          return {
-            response: NextResponse.json(
-              { error: "This exclusive pack is locked. Claim an exclusive pack reward first." },
-              { status: 403 },
-            ),
-          };
-        }
+      // 2. Resolve Pack Info
+      let basePrice = 0;
+      let packName = "APOCALYPSE VAULT";
+      let isExclusive = packId === "exclusive_vault_pack";
 
-        items = await tx.item.findMany({
-          where: {
-            rarity: {
-              in: ["LEGENDARY", "MYTHIC", "COSMIC", "VOID", "CELESTIAL", "OMEGA", "Legendary", "Mythical"],
-            },
-          },
-        });
-
-        if (items.length === 0) {
-          items = await tx.item.findMany();
-        }
-      } else {
-        const fallbackName = FALLBACK_PACK_ID_TO_NAME[packId];
-        const pack = await tx.pack.findFirst({
-          where: fallbackName ? { OR: [{ id: packId }, { name: fallbackName }] } : { id: packId },
-          include: { items: true },
-        });
-
+      if (!isExclusive) {
+        const pack = await tx.pack.findUnique({ where: { id: packId } });
         if (!pack) {
-          return { response: NextResponse.json({ error: "Pack not found" }, { status: 404 }) };
+          throw new Error("Pack configuration not found");
+        }
+        basePrice = Number(pack.price) || 0;
+        packName = pack.name;
+      } else {
+        if (!user.hasExclusivePack) {
+          throw new Error("No exclusive drop packs available to claim");
+        }
+      }
+
+      // 3. Financial calculations
+      let discountMultiplier = 1;
+      if (!isExclusive) {
+        if (isFlashSale) discountMultiplier = 0.5;
+        else if (currentDiscount > 0) discountMultiplier = 1 - currentDiscount;
+      }
+
+      const finalUnitPrice = Math.floor(basePrice * discountMultiplier);
+      const totalCost = finalUnitPrice * qty;
+
+      if (user.balance < totalCost) {
+        throw new Error("Insufficient coins! Wait for drops.");
+      }
+
+      // 4. Generate Loot Drops & Experience Logic
+      let totalXpGained = 0;
+      const wonItems = [];
+      const openingsData = [];
+      const inventoryData = [];
+
+      for (let i = 0; i < qty; i++) {
+        let rolledRarity = "COMMON";
+        let rolledXp = 10;
+        let rolledMultiplier = 1;
+        let poolChance = 0.50;
+        
+        const randomRoll = Math.random();
+        let cumulativeChance = 0;
+
+        for (const pool of RARITY_POOL) {
+          let adjustedChance = pool.chance;
+          if (currentLuck > 1 && ["MYTHIC", "LEGENDARY", "EPIC"].includes(pool.rarity)) {
+            adjustedChance *= currentLuck;
+          }
+          cumulativeChance += adjustedChance;
         }
 
-        if (pack.category.toLowerCase() === "exclusive" && !user.hasExclusivePack) {
-          return {
-            response: NextResponse.json(
-              { error: "This exclusive pack is locked. Claim an exclusive pack reward first." },
-              { status: 403 },
-            ),
-          };
+        const rollSeed = randomRoll * cumulativeChance;
+        let runningSum = 0;
+        
+        for (const pool of RARITY_POOL) {
+          let adjustedChance = pool.chance;
+          if (currentLuck > 1 && ["MYTHIC", "LEGENDARY", "EPIC"].includes(pool.rarity)) {
+            adjustedChance *= currentLuck;
+          }
+          runningSum += adjustedChance;
+          if (rollSeed <= runningSum) {
+            rolledRarity = pool.rarity;
+            rolledXp = pool.xp;
+            rolledMultiplier = pool.valueMultiplier;
+            poolChance = pool.chance;
+            break;
+          }
         }
 
-        items = pack.items;
-        packPrice = pack.price;
-        resolvedPackId = pack.id;
+        let possibleItems = await tx.item.findMany({
+          where: { 
+            rarity: rolledRarity,
+            ...(isExclusive ? {} : { packId: packId })
+          }
+        });
+
+        const calculatedValue = Math.floor((finalUnitPrice || 100) * rolledMultiplier * 0.2);
+
+        if (possibleItems.length === 0) {
+          let targetPackId = packId;
+          if (isExclusive) {
+            const anyPack = await tx.pack.findFirst();
+            if (!anyPack) throw new Error("No packs exist in database to attach fallback item.");
+            targetPackId = anyPack.id;
+          }
+
+          const fallbackItem = await tx.item.create({
+            data: {
+              name: `${rolledRarity} Emergency Drop #${Math.floor(Math.random() * 9000 + 1000)}`,
+              rarity: rolledRarity,
+              value: calculatedValue,
+              image: rolledRarity,
+              chance: poolChance,
+              packId: targetPackId,
+            }
+          });
+          possibleItems = [fallbackItem];
+        }
+
+        const selectedItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+
+        totalXpGained += rolledXp * xpMultiplier;
+
+        wonItems.push({
+          name: selectedItem.name,
+          rarity: rolledRarity,
+          value: calculatedValue
+        });
+
+        openingsData.push({
+          userId: user.id,
+          packId: isExclusive ? (possibleItems[0]?.packId || "") : packId,
+          itemId: selectedItem.id,
+        });
+
+        inventoryData.push({
+          userId: user.id,
+          itemId: selectedItem.id,
+        });
       }
 
-      if (items.length === 0) {
-        return { response: NextResponse.json({ error: "This pack has no items configured" }, { status: 404 }) };
+      // 5. Compute New Progression Levels
+      let newXp = (user.xp ?? 0) + totalXpGained;
+      let newLevel = user.level ?? 1;
+
+      while (newXp >= getXpForLevel(newLevel)) {
+        newXp -= getXpForLevel(newLevel);
+        newLevel += 1;
       }
 
-      let unitPrice = packPrice;
-      if (isFlashSale && packId !== EXCLUSIVE_PACK_ID) {
-        unitPrice = Math.floor(unitPrice * 0.5);
-      }
-      if (currentDiscount > 0 && packId !== EXCLUSIVE_PACK_ID) {
-        unitPrice = Math.floor(unitPrice * (1 - currentDiscount));
-      }
-
-      const totalPrice = unitPrice * quantity;
-      if (user.balance < totalPrice) {
-        return { response: NextResponse.json({ error: "Insufficient balance" }, { status: 400 }) };
-      }
-
-      // Roll utilizing active duration luck values
-      const wonItems = Array.from({ length: quantity }, () => rollItem(items, currentLuck));
-
+      // 6. Persist updates to database records
       const updatedUser = await tx.user.update({
         where: { id: user.id },
         data: {
-          balance: { decrement: totalPrice },
-          
-          // Only drop down to default values if the duration has expired
-          activeLuck: isLuckExpired ? 1.0 : user.activeLuck,
-          luckExpiresAt: isLuckExpired ? null : user.luckExpiresAt,
-
-          activeDiscount: isDiscountExpired ? 0.0 : user.activeDiscount,
-          discountExpiresAt: isDiscountExpired ? null : user.discountExpiresAt,
-
-          activeXpBoost: isXpExpired ? false : user.activeXpBoost,
-          xpBoostExpiresAt: isXpExpired ? null : user.xpBoostExpiresAt,
-
-          hasExclusivePack: packId === EXCLUSIVE_PACK_ID ? false : user.hasExclusivePack,
-        },
-        select: {
-          balance: true,
-          activeLuck: true,
-          activeDiscount: true,
-          hasExclusivePack: true,
-          activeXpBoost: true,
-          luckExpiresAt: true,
-          discountExpiresAt: true,
-          xpBoostExpiresAt: true,
-        },
+          balance: user.balance - totalCost,
+          xp: newXp,
+          level: newLevel,
+          hasExclusivePack: isExclusive ? false : user.hasExclusivePack,
+          activeLuck: isLuckActive ? user.activeLuck : 1,
+          activeDiscount: isDiscountActive ? user.activeDiscount : 0,
+        }
       });
 
-      await tx.inventory.createMany({
-        data: wonItems.map((item) => ({ userId: user.id, itemId: item.id })),
-      });
+      // Write historical unboxing items logs
+      if (openingsData.length > 0) {
+        await tx.opening.createMany({
+          data: openingsData.map(op => ({
+            userId: op.userId,
+            packId: op.packId,
+            itemId: op.itemId,
+          }))
+        });
+      }
 
-      await tx.opening.createMany({
-        data: wonItems.map((item) => ({
-          userId: user.id,
-          packId: packId === EXCLUSIVE_PACK_ID ? item.packId : resolvedPackId,
-          itemId: item.id,
-        })),
-      });
+      // Populate user's vault inventory storage
+      if (inventoryData.length > 0) {
+        await tx.inventory.createMany({
+          data: inventoryData.map(inv => ({
+            userId: inv.userId,
+            itemId: inv.itemId,
+          }))
+        });
+      }
 
       return {
-        response: NextResponse.json({
-          success: true,
-          wonItem: wonItems[0],
-          wonItems,
-          newBalance: updatedUser.balance,
-          user: updatedUser,
-        }),
+        newBalance: updatedUser.balance,
+        wonItems,
+        user: updatedUser
       };
+    }, {
+      maxWait: 10000,
+      timeout: 10000,
     });
 
-    return result.response;
-  } catch (error) {
-    console.error("PACK_OPEN_ERROR", error);
-    return NextResponse.json({ error: "Failed to open pack" }, { status: 500 });
+    return NextResponse.json(result);
+  } catch (error: any) {
+    console.error("API Error in /api/packs/open:", error);
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 400 });
   }
 }

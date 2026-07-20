@@ -41,16 +41,20 @@ model User {
   lastAdWatched DateTime?
   pendingReward Boolean        @default(false)
 
-  // --- NEW: Gameplay & Chance Modifiers ---
+  // --- NEW: Progression Tracks ---
+  level         Int            @default(1)    // User's current level
+  xp            Int            @default(0)    // User's current experience points
+
+  // --- Gameplay & Chance Modifiers ---
   activeLuck       Float          @default(1.0)   // Multiplier for rare item drop rates (e.g., 2.0 for 2x, 3.0 for 3x)
   activeDiscount   Float          @default(0.0)   // Percentage discount off store prices (e.g., 0.20 for 20% off)
   hasExclusivePack Boolean        @default(false) // Grants access to pull from the limited-time secret vaults
   activeXpBoost    Boolean        @default(false) // Doubles level progression speed when active
   
-  // Buff expiration times (Unix timestamps for easy comparison)
-  luckExpiresAt    DateTime?      // When luck boost expires (24 hours)
-  discountExpiresAt DateTime?    // When discount expires (48 hours)
-  xpBoostExpiresAt DateTime?      // When XP boost expires (2 hours)
+  // Buff expiration times
+  luckExpiresAt     DateTime?      // When luck boost expires (24 hours)
+  discountExpiresAt DateTime?      // When discount expires (48 hours)
+  xpBoostExpiresAt  DateTime?      // When XP boost expires (2 hours)
 
   accounts      Account[]
   inventory     Inventory[]
@@ -94,7 +98,7 @@ model Inventory {
 
 model Subscription {
   id     String @id @default(cuid())
-  userId String @unique // <-- Fixed: Marked as @unique to allow upsert
+  userId String @unique
   data   Json
   user   User   @relation(fields: [userId], references: [id])
 }

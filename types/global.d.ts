@@ -1,3 +1,15 @@
+// Extend NextAuth Session type to include custom fields
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      username?: string;
+      email?: string | null;
+      name?: string | null;
+    };
+  }
+}
+
 // types/global.d.ts
 export {}; 
 

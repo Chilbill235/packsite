@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   --background: #ffffff;
@@ -12,15 +12,180 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* WonScreen item card with uniform responsive sizing */
+.won-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 1rem;
+  overflow: hidden;
+  position: relative;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 40px rgba(0,0,0,0.4);
+  min-width: 0;
+  min-height: 80px;
+  padding: 0.5rem;
 }
+.won-card-rarity { font-size: 0.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; }
+.won-card-text { font-size: 0.65rem; font-weight: 800; line-height: 1.2; color: white; }
+.won-card-value { font-size: 0.55rem; font-weight: 700; }
+
+/* Shrink cards as count increases to ALWAYS fit one screen */
+.item-count-13 .won-card, .item-count-14 .won-card, .item-count-15 .won-card, .item-count-16 .won-card { min-height: 65px; padding: 0.375rem; }
+.item-count-17 .won-card, .item-count-18 .won-card, .item-count-19 .won-card, .item-count-20 .won-card { min-height: 60px; padding: 0.3rem; }
+.item-count-21 .won-card, .item-count-22 .won-card, .item-count-23 .won-card, .item-count-24 .won-card, .item-count-25 .won-card { min-height: 55px; padding: 0.25rem; }
+.item-count-26 .won-card, .item-count-27 .won-card, .item-count-28 .won-card, .item-count-29 .won-card, .item-count-30 .won-card { min-height: 50px; padding: 0.2rem; }
+.item-count-31 .won-card, .item-count-32 .won-card, .item-count-33 .won-card, .item-count-34 .won-card, .item-count-35 .won-card { min-height: 45px; padding: 0.15rem; }
+.item-count-36 .won-card, .item-count-37 .won-card, .item-count-38 .won-card, .item-count-39 .won-card, .item-count-40 .won-card { min-height: 42px; padding: 0.15rem; }
+.item-count-41 .won-card, .item-count-42 .won-card, .item-count-43 .won-card, .item-count-44 .won-card, .item-count-45 .won-card { min-height: 38px; padding: 0.125rem; }
+.item-count-46 .won-card, .item-count-47 .won-card, .item-count-48 .won-card, .item-count-49 .won-card, .item-count-50 .won-card { min-height: 34px; padding: 0.1rem; }
+
+/* Shrink text for large counts */
+.item-count-26 .won-card .won-card-rarity, .item-count-27 .won-card .won-card-rarity, .item-count-28 .won-card .won-card-rarity, .item-count-29 .won-card .won-card-rarity { font-size: 0.5rem; }
+.item-count-30 .won-card .won-card-rarity, .item-count-31 .won-card .won-card-rarity, .item-count-32 .won-card .won-card-rarity, .item-count-33 .won-card .won-card-rarity, .item-count-34 .won-card .won-card-rarity, .item-count-35 .won-card .won-card-rarity { font-size: 0.45rem; }
+.item-count-36 .won-card .won-card-rarity, .item-count-37 .won-card .won-card-rarity, .item-count-38 .won-card .won-card-rarity, .item-count-39 .won-card .won-card-rarity, .item-count-40 .won-card .won-card-rarity { font-size: 0.4rem; }
+.item-count-41 .won-card .won-card-rarity, .item-count-42 .won-card .won-card-rarity, .item-count-43 .won-card .won-card-rarity, .item-count-44 .won-card .won-card-rarity, .item-count-45 .won-card .won-card-rarity, .item-count-46 .won-card .won-card-rarity, .item-count-47 .won-card .won-card-rarity, .item-count-48 .won-card .won-card-rarity, .item-count-49 .won-card .won-card-rarity, .item-count-50 .won-card .won-card-rarity { font-size: 0.35rem; }
+
+.item-count-26 .won-card .won-card-text, .item-count-27 .won-card .won-card-text, .item-count-28 .won-card .won-card-text, .item-count-29 .won-card .won-card-text { font-size: 0.55rem; }
+.item-count-30 .won-card .won-card-text, .item-count-31 .won-card .won-card-text, .item-count-32 .won-card .won-card-text, .item-count-33 .won-card .won-card-text, .item-count-34 .won-card .won-card-text, .item-count-35 .won-card .won-card-text { font-size: 0.5rem; }
+.item-count-36 .won-card .won-card-text, .item-count-37 .won-card .won-card-text, .item-count-38 .won-card .won-card-text, .item-count-39 .won-card .won-card-text, .item-count-40 .won-card .won-card-text { font-size: 0.45rem; }
+.item-count-41 .won-card .won-card-text, .item-count-42 .won-card .won-card-text, .item-count-43 .won-card .won-card-text, .item-count-44 .won-card .won-card-text, .item-count-45 .won-card .won-card-text, .item-count-46 .won-card .won-card-text, .item-count-47 .won-card .won-card-text, .item-count-48 .won-card .won-card-text, .item-count-49 .won-card .won-card-text, .item-count-50 .won-card .won-card-text { font-size: 0.4rem; }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.won-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(24px);
+  padding: 0.5rem;
+}
+.won-screen-container {
+  position: relative;
+  width: 100%;
+  max-width: 72rem;
+  max-height: 98vh;
+  height: 98vh;
+  background: linear-gradient(to bottom, #0c0d14, #05060b);
+  border: 1px solid rgba(39, 39, 42, 0.8);
+  border-radius: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 0 50px rgba(0,0,0,0.8);
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 639px) {
+  .won-screen-overlay { padding: 0.25rem; }
+  .won-screen-container { border-radius: 1rem; max-height: 100vh; height: 100vh; }
+}
+.won-screen-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(39, 39, 42, 0.6);
+}
+.won-screen-summary {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(0,0,0,0.4);
+  border-bottom: 1px solid rgba(39, 39, 42, 0.4);
+}
+.won-screen-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+.won-screen-footer {
+  flex-shrink: 0;
+  padding: 0.5rem;
+  border-top: 1px solid rgba(39, 39, 42, 0.6);
+  background: rgba(0,0,0,0.2);
+  display: flex;
+  justify-content: center;
+}
+
+/* Responsive: Shrink header/summary on short screens */
+@media (max-height: 700px) {
+  .won-screen-header { padding: 0.4rem 0.75rem; }
+  .won-screen-header h2 { font-size: 1rem !important; }
+  .won-screen-summary { padding: 0.3rem 0.5rem; gap: 0.3rem; }
+  .won-screen-summary .summary-card { padding: 0.3rem 0.5rem; }
+  .won-screen-items { padding: 0.3rem; }
+  .won-screen-footer { padding: 0.3rem; }
+}
+@media (max-height: 600px) {
+  .won-screen-header { padding: 0.25rem 0.5rem; }
+  .won-screen-header h2 { font-size: 0.875rem !important; }
+  .won-screen-summary { display: none; }
+  .won-screen-items { padding: 0.2rem; }
+  .won-screen-footer { padding: 0.25rem; }
+  .won-screen-footer button { padding: 0.4rem 1.5rem; font-size: 0.75rem; }
+}
+
+/* WonScreen Grid Layout - responsive columns based on item count */
+.won-grid {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.25rem;
+}
+
+/* Grid columns for different item counts - ensures items always fit */
+.item-count-1 .won-grid { grid-template-columns: 1fr; }
+.item-count-2 .won-grid, .item-count-3 .won-grid { grid-template-columns: 1fr; }
+.item-count-4 .won-grid, .item-count-5 .won-grid, .item-count-6 .won-grid { grid-template-columns: repeat(2, 1fr); }
+.item-count-7 .won-grid, .item-count-8 .won-grid, .item-count-9 .won-grid { grid-template-columns: repeat(3, 1fr); }
+.item-count-10 .won-grid, .item-count-11 .won-grid, .item-count-12 .won-grid { grid-template-columns: repeat(3, 1fr); }
+.item-count-13 .won-grid, .item-count-14 .won-grid, .item-count-15 .won-grid, .item-count-16 .won-grid { grid-template-columns: repeat(4, 1fr); }
+.item-count-17 .won-grid, .item-count-18 .won-grid, .item-count-19 .won-grid, .item-count-20 .won-grid { grid-template-columns: repeat(4, 1fr); }
+.item-count-21 .won-grid, .item-count-22 .won-grid, .item-count-23 .won-grid, .item-count-24 .won-grid, .item-count-25 .won-grid { grid-template-columns: repeat(5, 1fr); }
+.item-count-26 .won-grid, .item-count-27 .won-grid, .item-count-28 .won-grid, .item-count-29 .won-grid, .item-count-30 .won-grid { grid-template-columns: repeat(5, 1fr); }
+.item-count-31 .won-grid, .item-count-32 .won-grid, .item-count-33 .won-grid, .item-count-34 .won-grid, .item-count-35 .won-grid { grid-template-columns: repeat(6, 1fr); }
+.item-count-36 .won-grid, .item-count-37 .won-grid, .item-count-38 .won-grid, .item-count-39 .won-grid, .item-count-40 .won-grid { grid-template-columns: repeat(6, 1fr); }
+.item-count-41 .won-grid, .item-count-42 .won-grid, .item-count-43 .won-grid, .item-count-44 .won-grid, .item-count-45 .won-grid { grid-template-columns: repeat(7, 1fr); }
+.item-count-46 .won-grid, .item-count-47 .won-grid, .item-count-48 .won-grid, .item-count-49 .won-grid, .item-count-50 .won-grid { grid-template-columns: repeat(8, 1fr); }
+
+/* Responsive adjustments for won-grid */
+@media (max-width: 639px) {
+  .won-grid { gap: 0.375rem; padding: 0.125rem; }
+  .item-count-7 .won-grid, .item-count-8 .won-grid, .item-count-9 .won-grid { grid-template-columns: repeat(2, 1fr); }
+  .item-count-10 .won-grid, .item-count-11 .won-grid, .item-count-12 .won-grid, .item-count-13 .won-grid { grid-template-columns: repeat(3, 1fr); }
+  .item-count-14 .won-grid, .item-count-15 .won-grid, .item-count-16 .won-grid { grid-template-columns: repeat(3, 1fr); }
+  .item-count-17 .won-grid, .item-count-18 .won-grid, .item-count-19 .won-grid, .item-count-20 .won-grid, .item-count-21 .won-grid { grid-template-columns: repeat(4, 1fr); }
+  .item-count-22 .won-grid, .item-count-23 .won-grid, .item-count-24 .won-grid, .item-count-25 .won-grid { grid-template-columns: repeat(4, 1fr); }
+  .item-count-26 .won-grid, .item-count-27 .won-grid, .item-count-28 .won-grid, .item-count-29 .won-grid, .item-count-30 .won-grid { grid-template-columns: repeat(5, 1fr); }
+  .item-count-31 .won-grid, .item-count-32 .won-grid, .item-count-33 .won-grid, .item-count-34 .won-grid, .item-count-35 .won-grid { grid-template-columns: repeat(5, 1fr); }
+  .item-count-36 .won-grid, .item-count-37 .won-grid, .item-count-38 .won-grid, .item-count-39 .won-grid, .item-count-40 .won-grid, .item-count-41 .won-grid, .item-count-42 .won-grid, .item-count-43 .won-grid { grid-template-columns: repeat(6, 1fr); }
+  .item-count-44 .won-grid, .item-count-45 .won-grid, .item-count-46 .won-grid, .item-count-47 .won-grid, .item-count-48 .won-grid, .item-count-49 .won-grid, .item-count-50 .won-grid { grid-template-columns: repeat(7, 1fr); }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

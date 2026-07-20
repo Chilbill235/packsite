@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
-import { useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 
 interface NotificationProps {
   message: string;
@@ -14,15 +14,11 @@ export default function Notification({
   type = "success",
   onClose,
 }: NotificationProps) {
-  useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
+  // Prevent multiple rapid re-triggers
   const styles = {
-    success: { bg: "bg-emerald-600", icon: "✅" },
-    error: { bg: "bg-rose-600", icon: "⚠️" },
-    info: { bg: "bg-blue-600", icon: "ℹ️" },
+    success: { bg: "bg-emerald-600", icon: "?" },
+    error: { bg: "bg-rose-600", icon: "??" },
+    info: { bg: "bg-blue-600", icon: "??" },
   };
 
   const { bg, icon } = styles[type];
@@ -32,10 +28,16 @@ export default function Notification({
       initial={{ opacity: 0, x: 100 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 100 }}
-      className="fixed top-4 right-4 max-w-xs w-full text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50"
+      className={`fixed top-4 right-4 max-w-xs w-full text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-50 ${bg}`}
     >
       <span>{icon}</span>
       <span className="flex-1 text-sm font-medium">{message}</span>
+      <button
+        onClick={onClose}
+        className="p-0.5 rounded hover:bg-white/20 transition-colors flex-shrink-0"
+      >
+        <X size={14} />
+      </button>
     </motion.div>
   );
 }

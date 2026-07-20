@@ -7,8 +7,6 @@ import Link from "next/link";
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  // Forward the callbackUrl so the user returns to their destination after authentication
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [username, setUsername] = useState("");
@@ -36,7 +34,6 @@ function RegisterForm() {
         throw new Error(data.error || "Registration failed.");
       }
 
-      // Redirect to login upon success
       router.push(`/login?registered=true&callbackUrl=${encodeURIComponent(callbackUrl)}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred.";

@@ -1,6 +1,2 @@
-// lib/auth-edge.ts
-import { authConfig } from "@/auth.config";
-import NextAuth from "next-auth";
-
-// This instance DOES NOT use Prisma or Bcrypt
-export const { auth } = NextAuth(authConfig);
+// lib/auth-edge.ts - Edge-compatible auth config for middleware
+// Note: This file is kept for potential future use, but currently middleware.ts uses auth.config.ts directly

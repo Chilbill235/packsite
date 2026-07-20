@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import Balance from "./Balance";
 
 export default function Navbar() {
@@ -23,12 +23,10 @@ export default function Navbar() {
         setBalance(Number(data.balance));
       }
     } catch (err) {
-      // Silently catch network errors during dev compilation
-      // so it doesn't crash your browser console
       if (process.env.NODE_ENV === 'development') {
-        console.warn("Dev: Could not fetch balance (server likely compiling).");
+        window.console.warn("Dev: Could not fetch balance (server likely compiling).");
       } else {
-        console.error("Failed to sync live balance:", err);
+        window.console.error("Failed to sync live balance:", err);
       }
     }
   }, []);
@@ -39,8 +37,6 @@ export default function Navbar() {
     }
   }, [isAuthenticated, refreshBalance]);
 
-  // FIXED: Updated event listener to listen for 'balanceUpdated'
-  // and properly access 'detail.balance'
   useEffect(() => {
     const handleBalanceUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<{ balance: number }>;
@@ -85,15 +81,26 @@ export default function Navbar() {
         <div className="flex items-center space-x-3">
           {isAuthenticated ? (
             <>
-              {/* Balance display */}
+              {/* FIXED: Clicking this fires a custom global event to open your balance/ad modal */}
               <button
-                onClick={() => window.dispatchEvent(new Event("openBalanceModal"))}
-                className="hover:opacity-80 transition-opacity"
+                onClick={() => window.dispatchEvent(new Event("openShopBalanceModal"))}
+                className="hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500/50 rounded-lg"
+                title="Earn Balance / Watch Ads"
               >
                 <Balance amount={balance} className="text-sm" />
               </button>
 
-              {/* Mobile menu toggle (moved to be next to balance) */}
+              {/* Desktop Log Out Button */}
+              <button
+                onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
+                className="hidden md:flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-all"
+                aria-label="Log out"
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
+
+              {/* Mobile menu toggle */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-400 md:hidden"
@@ -122,18 +129,15 @@ export default function Navbar() {
           </div>
           <div className="px-4 pt-2 pb-4 space-y-1 sm:px-6 border-t border-gray-700">
             {isAuthenticated ? (
-              <>
-                {/* Logout button moved to mobile menu */}
-                <button
-                  onClick={() => {
-                    signOut({ callbackUrl: `${window.location.origin}/login` });
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-200 hover:bg-red-900/20"
-                >
-                  Logout
-                </button>
-              </>
+              <button
+                onClick={() => {
+                  signOut({ callbackUrl: `${window.location.origin}/login` });
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-200 hover:bg-red-900/20"
+              >
+                Logout
+              </button>
             ) : (
               <div className="space-y-2">
                 <Link href="/login" className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-white bg-amber-600/20">Sign In</Link>

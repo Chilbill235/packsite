@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Notification from "@/components/Notification";
-import ErrorDialog from "@/components/ErrorDialog";
 import type { InventoryWithItem } from "@/types";
 
 export default function InventoryPage() {
@@ -37,11 +36,11 @@ export default function InventoryPage() {
 
   useEffect(() => {
     const handleBalanceChange = (event: Event) => {
-      const newBalance = (event as CustomEvent<number>).detail;
+      const newBalance = (event as CustomEvent<{ balance: number }>).detail.balance;
       localStorage.setItem('userBalance', newBalance.toString());
     };
-    document.addEventListener("balanceChanged", handleBalanceChange);
-    return () => document.removeEventListener("balanceChanged", handleBalanceChange);
+    document.addEventListener("balanceUpdated", handleBalanceChange);
+    return () => document.removeEventListener("balanceUpdated", handleBalanceChange);
   }, []);
 
   const filteredInventory = useMemo(() => {

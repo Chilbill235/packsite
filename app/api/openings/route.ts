@@ -10,25 +10,26 @@ export async function GET() {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { email: session.user.email },
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    // Fetch all unboxing logs without any cap or take limit
     const openings = await prisma.opening.findMany({
       where: { userId: user.id },
-      include: {
+      include: { 
         item: true,
-        pack: true
+        pack: true 
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json({ openings });
-  } catch (error) {
+  } catch (error: any) {
     console.error("API Error in /api/openings:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

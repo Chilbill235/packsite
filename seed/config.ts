@@ -59,7 +59,7 @@ export const PACK_METADATA = [
     rarityMod: 1.1 
   },
   { 
-    name: 'Nova-Class Contingency Cache', 
+    name: 'Nova-Class Cache', 
     price: 600, 
     desc: 'Highly volatile cargo intercepted from a localized stellar collapse. Packed with time-sensitive cosmic anomalies.', 
     cat: 'EVENT', 

@@ -5,33 +5,37 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const session = await auth();
-    
-    // If no session, return 401 Unauthorized, not 404
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        balance: true,
-        activeLuck: true,
-        activeDiscount: true,
-        hasExclusivePack: true,
-        activeXpBoost: true,
-      },
+      include: {
+        inventory: {
+          include: { item: true }
+        },
+        openings: true,
+      }
     });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json(user);
-  } catch (error) {
+    // Dynamically calculate total drops unboxed from actual opening history logs
+    const totalDropsUnboxed = user.openings.length;
+
+    // Dynamically calculate net inventory value
+    const netInventoryValue = user.inventory.reduce((sum, inv) => sum + (inv.item?.value || 0), 0);
+
+    return NextResponse.json({
+      ...user,
+      totalDropsUnboxed,
+      netInventoryValue,
+    });
+  } catch (error: any) {
     console.error("Profile API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
   }
 }

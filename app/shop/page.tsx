@@ -1,10 +1,11 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, Smartphone } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
+import WonScreen from "@/components/WonScreen"; 
 import { RewardedAdService } from "@/lib/adService";
 import { notificationService } from "@/lib/notificationService";
 
@@ -58,13 +59,28 @@ interface ApiPack {
   price: number | string;
 }
 
+interface PackTheme {
+  tier: string;
+  accent: string;
+  cardBg: string;
+  border: string;
+  glow: string;
+  halo: string;
+  badge: string;
+  priceFrom: string;
+  ribbon: string;
+  boxLid: string;
+  boxBody: string;
+}
+
+// Exactly 6 high-tier, professional-grade core item packs
 const FALLBACK_PACKS: PackBasic[] = [
-  { id: "76796f88-c7d0-442a-bfeb-380c3863c8b7", name: "Cosmic Vault", price: 1000 },
-  { id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f", name: "Starter Cache", price: 100 },
-  { id: "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f", name: "Event Crate", price: 500 },
-  { id: "02ada6c5-4bb7-4d2c-953d-3228f28855eb", name: "Void Box", price: 2000 },
-  { id: "b38e2c41-9d5a-4f17-8c63-7a1f9b4e2d04", name: "Singularity Crate", price: 5000 },
-  { id: "5fd47c89-8fd5-4946-9f09-00d90055c6e5", name: "Promo Bundle", price: 0 },
+  { id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f", name: "ALPHA ARSENAL", price: 100 },
+  { id: "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f", name: "APEX MATRIX", price: 500 },
+  { id: "76796f88-c7d0-442a-bfeb-380c3863c8b7", name: "CHRONO VAULT", price: 1000 },
+  { id: "02ada6c5-4bb7-4d2c-953d-3228f28855eb", name: "VOID SINGULARITY", price: 2000 },
+  { id: "b38e2c41-9d5a-4f17-8c63-7a1f9b4e2d04", name: "ECLIPSE OVERLORD", price: 5000 },
+  { id: "5fd47c89-8fd5-4946-9f09-00d90055c6e5", name: "QUANTUM PROMO", price: 10000 },
 ];
 
 const getIsIOS = () => {
@@ -78,8 +94,98 @@ const getIsStandalone = () => {
   return window.matchMedia("(display-mode: standalone)").matches || navigatorWithStandalone.standalone === true;
 };
 
+const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
+  if (isExclusive) {
+    return {
+      tier: "EXCLUSIVE",
+      accent: "indigo",
+      cardBg: "bg-gradient-to-br from-indigo-950/90 via-[#0c0c0c] to-[#0c0c0c]",
+      border: "border-indigo-400/60",
+      glow: "from-indigo-500/30 via-fuchsia-500/20 to-transparent",
+      halo: "bg-indigo-500",
+      badge: "bg-indigo-500 text-white",
+      priceFrom: "from-indigo-300 to-fuchsia-300",
+      ribbon: "from-indigo-400 via-fuchsia-400 to-indigo-400",
+      boxLid: "from-indigo-500/80 to-fuchsia-500/80",
+      boxBody: "from-indigo-700/70 to-[#0a0a0a]",
+    };
+  }
+  if (basePrice >= 5000) {
+    return {
+      tier: "OMEGA",
+      accent: "omega",
+      cardBg: "bg-gradient-to-br from-black via-zinc-950 to-[#0a0a0a]",
+      border: "border-white/40",
+      glow: "from-white/30 via-fuchsia-500/20 to-red-500/20",
+      halo: "bg-white",
+      badge: "bg-gradient-to-r from-white via-fuchsia-300 to-red-400 text-black shadow-[0_0_18px_rgba(255,255,255,0.5)]",
+      priceFrom: "from-white via-fuchsia-200 to-red-300",
+      ribbon: "from-white via-fuchsia-300 to-red-400",
+      boxLid: "from-white/90 via-fuchsia-400/80 to-red-500/80",
+      boxBody: "from-zinc-900 via-black to-red-950/60",
+    };
+  }
+  if (basePrice >= 2000) {
+    return {
+      tier: "MYTHIC",
+      accent: "red",
+      cardBg: "bg-gradient-to-br from-red-950/60 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-red-500/50",
+      glow: "from-red-500/30 via-orange-500/15 to-transparent",
+      halo: "bg-red-500",
+      badge: "bg-gradient-to-r from-red-500 to-orange-400 text-black",
+      priceFrom: "from-red-300 to-orange-300",
+      ribbon: "from-red-400 via-orange-400 to-red-400",
+      boxLid: "from-red-500/80 to-orange-500/80",
+      boxBody: "from-red-900/70 to-[#0a0a0a]",
+    };
+  }
+  if (basePrice >= 1000) {
+    return {
+      tier: "LEGENDARY",
+      accent: "amber",
+      cardBg: "bg-gradient-to-br from-amber-950/50 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-amber-400/50",
+      glow: "from-amber-400/25 via-yellow-500/10 to-transparent",
+      halo: "bg-amber-400",
+      badge: "bg-gradient-to-r from-amber-300 to-yellow-400 text-black",
+      priceFrom: "from-amber-200 to-yellow-200",
+      ribbon: "from-amber-300 via-yellow-300 to-amber-300",
+      boxLid: "from-amber-400/80 to-yellow-500/80",
+      boxBody: "from-amber-700/70 to-[#0a0a0a]",
+    };
+  }
+  if (basePrice >= 500) {
+    return {
+      tier: "EPIC",
+      accent: "purple",
+      cardBg: "bg-gradient-to-br from-purple-950/50 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-purple-400/50",
+      glow: "from-purple-500/25 via-fuchsia-500/10 to-transparent",
+      halo: "bg-purple-500",
+      badge: "bg-gradient-to-r from-purple-400 to-fuchsia-400 text-white",
+      priceFrom: "from-purple-200 to-fuchsia-200",
+      ribbon: "from-purple-400 via-fuchsia-400 to-purple-400",
+      boxLid: "from-purple-500/80 to-fuchsia-500/80",
+      boxBody: "from-purple-800/70 to-[#0a0a0a]",
+    };
+  }
+  return {
+    tier: "RARE",
+    accent: "sky",
+    cardBg: "bg-gradient-to-br from-sky-950/40 via-[#0a0a0a] to-[#0c0c0c]",
+    border: "border-sky-400/40",
+    glow: "from-sky-400/20 via-cyan-400/10 to-transparent",
+    halo: "bg-sky-400",
+    badge: "bg-gradient-to-r from-sky-300 to-cyan-300 text-black",
+    priceFrom: "from-sky-200 to-cyan-200",
+    ribbon: "from-sky-300 via-cyan-300 to-sky-300",
+    boxLid: "from-sky-400/80 to-cyan-500/80",
+    boxBody: "from-sky-700/70 to-[#0a0a0a]",
+  };
+};
+
 export default function ShopPage() {
-  // --- States ---
   const searchParams = useSearchParams();
   const [packs, setPacks] = useState<PackBasic[]>(FALLBACK_PACKS);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -112,19 +218,12 @@ export default function ShopPage() {
   const [modalQuantity, setModalQuantity] = useState(1);
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
 
-  const getGridCols = (count: number): number => {
-    if (count <= 1) return 1;
-    if (count <= 4) return 2;
-    if (count <= 9) return 3;
-    return 4;
-  };
-
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getInitialNotificationPermission);
   const [showBanner, setShowBanner] = useState(true);
 
-  // Prevent body scroll when modals are open
+  // Lock body scroll logic
   useEffect(() => {
     const shouldLockScroll = wonItems.length > 0 || showAdModal || isOpening || pendingPack;
     
@@ -148,7 +247,6 @@ export default function ShopPage() {
     };
   }, [wonItems.length, showAdModal, isOpening, pendingPack]);
 
-  // --- Active Gameplay Buff States ---
   const [activeDiscount, setActiveDiscount] = useState<number>(0);
   const [activeLuck, setActiveLuck] = useState<number>(1);
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
@@ -156,7 +254,6 @@ export default function ShopPage() {
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
   const [adStatus, setAdStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'completed'>('idle');
 
-  // --- Formatting Time Left Helper ---
   const formatTimeLeft = (expirationTime: string | Date | null | undefined): string => {
     if (!expirationTime) return "";
     const msLeft = new Date(expirationTime).getTime() - Date.now();
@@ -175,7 +272,6 @@ export default function ShopPage() {
   const [discountTimeLeft, setDiscountTimeLeft] = useState("");
   const [xpTimeLeft, setXpTimeLeft] = useState("");
 
-  // --- Refs ---
   const userIdRef = useRef<string | undefined>(undefined);
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
@@ -184,7 +280,6 @@ export default function ShopPage() {
   const lastNotificationTimeRef = useRef<number>(0);
   const initializeFetchGuardRef = useRef(false);
 
-  // --- Core Logic ---
   const syncUserState = useCallback((userData: UserProfile) => {
     setUser((current) => ({ ...current, ...userData }));
     if (userData.id) {
@@ -212,7 +307,6 @@ export default function ShopPage() {
     }
   }, []);
 
-  // Live expiration ticker running every second
   useEffect(() => {
     if (!user) return;
 
@@ -288,8 +382,6 @@ export default function ShopPage() {
 
   const applyBuff = useCallback(async (buff: string) => {
     if (!buff) return;
-    console.log("Applying buff from URL:", buff);
-    if (!BUFF_MAP[buff]) console.warn("Unknown buff type:", buff);
     try {
       const res = await fetch("/api/rewards/apply-buff", {
         method: "POST",
@@ -310,81 +402,45 @@ export default function ShopPage() {
     }
   }, [syncUserState]);
 
-  const handleTimerComplete = useCallback(async () => {
-    if (timerCompletedRef.current || !isWaiting) return;
+  const handleAdRewarded = useCallback(async (amount: number) => {
+    if (timerCompletedRef.current) return;
 
     timerCompletedRef.current = true;
     setIsWaiting(false);
     setAdStatus('success');
+    targetTimeRef.current = null;
 
     try {
-      let currentUserId = userIdRef.current;
-
-      if (!currentUserId) {
-        try {
-          const userData = await fetchUserData();
-          currentUserId = userData?.id;
-          if (userData?.id) userIdRef.current = userData.id;
-        } catch (err) {
-          console.error("Failed to fetch user data for ad reward:", err);
-        }
-      }
-
-      if (currentUserId) {
-        try {
-          await fetch("/api/send-notification", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: currentUserId,
-              title: "Ad Reward Earned!",
-              message: "Your 500 coins are waiting. Tap to claim!",
-              ref: "reward-claim"
-            }),
-          }).catch(err => console.warn("Notification failed (non-critical):", err));
-        } catch (notificationError) {
-          console.warn("Notification service error:", notificationError);
-        }
-
-        const addCoinsResponse = await fetch("/api/user/add-coins", {
+      const userId = userIdRef.current || (await fetchUserData())?.id;
+      if (userId) {
+        await fetch("/api/send-notification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: 500, suppressNotification: true })
-        });
-
-        if (!addCoinsResponse.ok) {
-          throw new Error(`Failed to award ad reward: ${addCoinsResponse.status}`);
-        }
-
-        await fetchUserData();
-        setAdStatus('completed');
-
-        setTimeout(() => {
-          setAdStatus('idle');
-        }, 3000);
-      } else {
-        throw new Error("Unable to identify user for reward");
+          body: JSON.stringify({
+            userId: userId,
+            title: "Ad Reward Earned!",
+            message: `You've earned ${amount} coins!`,
+            ref: ""
+          }),
+        }).catch(err => console.warn("Reward notification failed to send:", err));
       }
+
+      await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
+      await fetchUserData();
+      setAdStatus('completed');
+      setTimeout(() => { setAdStatus('idle'); }, 3000);
     } catch (error) {
       console.error("Failed to process ad reward:", error);
       setAdStatus('error');
-      setErrorDialog({ message: "Failed to process your reward. Please try again." });
-      setTimeout(() => {
-        setAdStatus('idle');
-      }, 3000);
-    } finally {
-      targetTimeRef.current = null;
-      if (isWaiting) setIsWaiting(false);
+      setTimeout(() => { setAdStatus('idle'); setIsWaiting(false); }, 5000);
     }
-  }, [isWaiting, fetchUserData]);
+  }, [fetchUserData]);
 
   const loadShopData = useCallback(async () => {
     if (isFetchingPacks) return;
     setIsFetchingPacks(true);
     try {
       setPackError(null);
-      console.log("[Shop] Loading shop data...");
-
       try {
         const packRes = await fetch("/api/packs");
         if (packRes.ok) {
@@ -402,7 +458,7 @@ export default function ShopPage() {
           setPacks(FALLBACK_PACKS);
         }
       } catch (packErr) {
-        console.warn("[Shop] Failed to fetch packs, using fallback packs:", packErr);
+        console.warn("[Shop] Failed to fetch packs, using premium fallback items:", packErr);
         setPacks(FALLBACK_PACKS);
       }
 
@@ -429,7 +485,6 @@ export default function ShopPage() {
       } catch { console.error("Auto-claim failed"); }
     } else if (ref === "reward-claim") {
       try {
-        console.log("Handling reward claim notification - awarding coins");
         setAdStatus('completed');
         await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
         await fetchUserData();
@@ -503,52 +558,18 @@ export default function ShopPage() {
       }
     }
 
-    const adTimer = setTimeout(() => {
+    setTimeout(() => {
       if (isWaiting) {
         handleAdRewarded(amount);
       }
     }, 10000);
   };
 
-  const handleAdRewarded = useCallback(async (amount: number) => {
-    if (timerCompletedRef.current) return;
-
-    timerCompletedRef.current = true;
-    setIsWaiting(false);
-    setAdStatus('success');
-    targetTimeRef.current = null;
-
-    try {
-      const userId = userIdRef.current || (await fetchUserData())?.id;
-      if (userId) {
-        await fetch("/api/send-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: userId,
-            title: "Ad Reward Earned!",
-            message: `You've earned ${amount} coins!`,
-            ref: ""
-          }),
-        });
-      }
-
-      await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
-      await fetchUserData();
-      setAdStatus('completed');
-      setTimeout(() => { setAdStatus('idle'); }, 3000);
-    } catch (error) {
-      console.error("Failed to process ad reward:", error);
-      setAdStatus('error');
-      setTimeout(() => { setAdStatus('idle'); setIsWaiting(false); }, 5000);
-    }
-  }, [fetchUserData]);
-
   const requestOpenPack = (packId: string) => {
     const pack = packs.find((p) => p.id === packId);
     if (!pack && packId !== "exclusive_vault_pack") return;
     const target: PackBasic =
-      pack ?? ({ id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic);
+      pack ?? ({ id: "exclusive_vault_pack", name: "🔥 APOCALYPSE VAULT", price: 0 } as PackBasic);
     setModalQuantity(openQuantity > 0 ? openQuantity : 1);
     setPendingPack(target);
   };
@@ -623,7 +644,6 @@ export default function ShopPage() {
     initializeFetchGuardRef.current = true;
 
     loadShopData();
-
     adService.current = new RewardedAdService();
 
     const handleServiceWorkerMessage = (event: MessageEvent) => {
@@ -724,18 +744,10 @@ export default function ShopPage() {
     };
   }, [user, permission]);
 
-  const getRarityStyles = (rarity?: string) => {
-    const r = rarity?.toLowerCase() || "common";
-    if (r.includes("legend") || r.includes("mythic") || r.includes("omega")) return { bg: "bg-yellow-500/10", border: "border-yellow-400", text: "text-yellow-400", glow: "from-yellow-400/40", shadow: "shadow-[0_0_40px_rgba(250,204,21,0.4)]" };
-    if (r.includes("epic") || r.includes("void")) return { bg: "bg-purple-500/10", border: "border-purple-400", text: "text-purple-400", glow: "from-purple-500/40", shadow: "shadow-[0_0_40px_rgba(168,85,247,0.4)]" };
-    if (r.includes("rare") || r.includes("galactic")) return { bg: "bg-blue-500/10", border: "border-blue-400", text: "text-blue-400", glow: "from-blue-500/40", shadow: "shadow-[0_0_40px_rgba(59,130,246,0.4)]" };
-    return { bg: "bg-zinc-800/50", border: "border-zinc-500/50", text: "text-zinc-300", glow: "from-zinc-500/20", shadow: "shadow-xl" };
-  };
-
-  const displayPacks = (() => {
+  const displayPacks = useMemo(() => {
     const real = packs.filter((p) => p && p.id !== "exclusive_vault_pack");
     const exclusive = hasExclusivePack
-      ? [{ id: "exclusive_vault_pack", name: "🔥 Secret Vault Pack", price: 0 } as PackBasic]
+      ? [{ id: "exclusive_vault_pack", name: "🔥 APOCALYPSE VAULT", price: 0 } as PackBasic]
       : [];
     real.sort((a, b) => {
       const pa = typeof a.price === "string" ? parseInt(a.price) : a.price;
@@ -743,113 +755,7 @@ export default function ShopPage() {
       return (pa || 0) - (pb || 0);
     });
     return [...real, ...exclusive];
-  })();
-
-  const getPackTheme = (basePrice: number, isExclusive: boolean) => {
-    if (isExclusive) {
-      return {
-        tier: "EXCLUSIVE",
-        accent: "indigo",
-        cardBg: "bg-gradient-to-br from-indigo-950/90 via-[#0c0c0c] to-[#0c0c0c]",
-        border: "border-indigo-400/60",
-        glow: "from-indigo-500/30 via-fuchsia-500/20 to-transparent",
-        halo: "bg-indigo-500",
-        badge: "bg-indigo-500 text-white",
-        priceFrom: "from-indigo-300 to-fuchsia-300",
-        ribbon: "from-indigo-400 via-fuchsia-400 to-indigo-400",
-        boxLid: "from-indigo-500/80 to-fuchsia-500/80",
-        boxBody: "from-indigo-700/70 to-[#0a0a0a]",
-      };
-    }
-    if (basePrice >= 4000) {
-      return {
-        tier: "OMEGA",
-        accent: "omega",
-        cardBg: "bg-gradient-to-br from-black via-zinc-950 to-[#0a0a0a]",
-        border: "border-white/40",
-        glow: "from-white/30 via-fuchsia-500/20 to-red-500/20",
-        halo: "bg-white",
-        badge: "bg-gradient-to-r from-white via-fuchsia-300 to-red-400 text-black shadow-[0_0_18px_rgba(255,255,255,0.5)]",
-        priceFrom: "from-white via-fuchsia-200 to-red-300",
-        ribbon: "from-white via-fuchsia-300 to-red-400",
-        boxLid: "from-white/90 via-fuchsia-400/80 to-red-500/80",
-        boxBody: "from-zinc-900 via-black to-red-950/60",
-      };
-    }
-    if (basePrice >= 2000) {
-      return {
-        tier: "MYTHIC",
-        accent: "red",
-        cardBg: "bg-gradient-to-br from-red-950/60 via-[#0a0a0a] to-[#0c0c0c]",
-        border: "border-red-500/50",
-        glow: "from-red-500/30 via-orange-500/15 to-transparent",
-        halo: "bg-red-500",
-        badge: "bg-gradient-to-r from-red-500 to-orange-400 text-black",
-        priceFrom: "from-red-300 to-orange-300",
-        ribbon: "from-red-400 via-orange-400 to-red-400",
-        boxLid: "from-red-500/80 to-orange-500/80",
-        boxBody: "from-red-900/70 to-[#0a0a0a]",
-      };
-    }
-    if (basePrice >= 1000) {
-      return {
-        tier: "LEGENDARY",
-        accent: "amber",
-        cardBg: "bg-gradient-to-br from-amber-950/50 via-[#0a0a0a] to-[#0c0c0c]",
-        border: "border-amber-400/50",
-        glow: "from-amber-400/25 via-yellow-500/10 to-transparent",
-        halo: "bg-amber-400",
-        badge: "bg-gradient-to-r from-amber-300 to-yellow-400 text-black",
-        priceFrom: "from-amber-200 to-yellow-200",
-        ribbon: "from-amber-300 via-yellow-300 to-amber-300",
-        boxLid: "from-amber-400/80 to-yellow-500/80",
-        boxBody: "from-amber-700/70 to-[#0a0a0a]",
-      };
-    }
-    if (basePrice >= 500) {
-      return {
-        tier: "EPIC",
-        accent: "purple",
-        cardBg: "bg-gradient-to-br from-purple-950/50 via-[#0a0a0a] to-[#0c0c0c]",
-        border: "border-purple-400/50",
-        glow: "from-purple-500/25 via-fuchsia-500/10 to-transparent",
-        halo: "bg-purple-500",
-        badge: "bg-gradient-to-r from-purple-400 to-fuchsia-400 text-white",
-        priceFrom: "from-purple-200 to-fuchsia-200",
-        ribbon: "from-purple-400 via-fuchsia-400 to-purple-400",
-        boxLid: "from-purple-500/80 to-fuchsia-500/80",
-        boxBody: "from-purple-800/70 to-[#0a0a0a]",
-      };
-    }
-    if (basePrice >= 100) {
-      return {
-        tier: "RARE",
-        accent: "sky",
-        cardBg: "bg-gradient-to-br from-sky-950/40 via-[#0a0a0a] to-[#0c0c0c]",
-        border: "border-sky-400/40",
-        glow: "from-sky-400/20 via-cyan-400/10 to-transparent",
-        halo: "bg-sky-400",
-        badge: "bg-gradient-to-r from-sky-300 to-cyan-300 text-black",
-        priceFrom: "from-sky-200 to-cyan-200",
-        ribbon: "from-sky-300 via-cyan-300 to-sky-300",
-        boxLid: "from-sky-400/80 to-cyan-500/80",
-        boxBody: "from-sky-700/70 to-[#0a0a0a]",
-      };
-    }
-    return {
-      tier: "COMMON",
-      accent: "emerald",
-      cardBg: "bg-gradient-to-br from-emerald-950/30 via-[#0a0a0a] to-[#0c0c0c]",
-      border: "border-emerald-400/40",
-      glow: "from-emerald-400/20 via-teal-400/10 to-transparent",
-      halo: "bg-emerald-400",
-      badge: "bg-gradient-to-r from-emerald-300 to-teal-300 text-black",
-      priceFrom: "from-emerald-200 to-teal-200",
-      ribbon: "from-emerald-300 via-teal-300 to-emerald-300",
-      boxLid: "from-emerald-400/80 to-teal-500/80",
-      boxBody: "from-emerald-700/70 to-[#0a0a0a]",
-    };
-  };
+  }, [packs, hasExclusivePack]);
 
   if (packError) return <div className="min-h-screen flex h-[64vh] items-center justify-center bg-[#070707] text-red-400 text-center p-4">{packError}</div>;
 
@@ -873,7 +779,7 @@ export default function ShopPage() {
               🎁
             </motion.div>
             <h2 className="text-2xl font-black tracking-widest text-white uppercase animate-pulse">
-              Opening Packs...
+              Unlocking Vaults...
             </h2>
             <div className="w-64 h-1.5 bg-white/10 mt-6 rounded-full overflow-hidden">
               <motion.div
@@ -907,74 +813,13 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* WINNING ANIMATION OVERLAY - FULL REDESIGN */}
+      {/* WINNING ANIMATION OVERLAY */}
       <AnimatePresence>
         {wonItems.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 backdrop-blur-2xl p-4 sm:p-6 md:p-8 pointer-events-auto"
-          >
-            <button
-                onClick={(e) => { e.stopPropagation(); setWonItems([]); }}
-                className="fixed top-3 right-3 sm:top-6 sm:right-6 z-20 p-3 sm:p-4 bg-white/10 rounded-full hover:bg-white/20 transition-all"
-            >
-              <X size={20} />
-            </button>
-
-            <motion.div
-              initial={{ scale: 0 }} animate={{ scale: 1 }}
-              className="absolute w-[600px] h-[600px] bg-indigo-500/20 blur-[150px] rounded-full pointer-events-none"
-            />
-
-            <motion.div
-              initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-              className="relative z-10 w-full max-w-5xl min-h-full sm:min-h-0 flex flex-col items-center justify-center py-8 sm:py-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 text-white uppercase tracking-normal drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] text-center">
-                You Won!
-              </h2>
-
-              <div className={`grid w-full gap-2 sm:gap-3 px-2 sm:px-4 sm:grid-cols-1 md:grid-cols-${getGridCols(wonItems.length)}`}>
-                {wonItems.map((item, idx) => {
-                  const theme = getRarityStyles(item.rarity);
-                  const sizeClass = wonItems.length <= 3 ? "p-1.5" : wonItems.length <= 10 ? "p-2" : wonItems.length <= 20 ? "p-1" : "p-0.5";
-                  const minHeightClass = wonItems.length <= 3 ? "min-h-[70px]" : wonItems.length <= 10 ? "min-h-[90px]" : wonItems.length <= 20 ? "min-h-[100px]" : "min-h-[80px]";
-                  const textSizeClass = wonItems.length <= 10 ? "text-[9px] sm:text-[10px]" : wonItems.length <= 20 ? "text-[8px] sm:text-[9px]" : "text-[7px] sm:text-[8px]";
-                  return (
-                    <motion.div
-                      key={idx}
-                      initial={{ rotateX: -90, opacity: 0 }}
-                      animate={{ rotateX: 0, opacity: 1 }}
-                      transition={{ delay: idx * 0.15, type: "spring", stiffness: 200 }}
-                      className={`group relative min-w-0 bg-black/40 border border-white/10 backdrop-blur-xl ${sizeClass} ${minHeightClass} flex min-w-0 flex-col items-center text-center shadow-2xl overflow-hidden ${theme.border}`}
-                    >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${theme.glow} opacity-20 group-hover:opacity-40 transition-opacity`} />
-                      <span className={`relative z-10 max-w-full truncate ${textSizeClass} font-black uppercase tracking-normal sm:tracking-[0.16em] ${theme.text} mb-1.5`}>
-                        {item.rarity || "COMMON"}
-                      </span>
-                      <p className={`relative z-10 font-extrabold leading-tight ${textSizeClass} text-white mb-2 line-clamp-3 break-words`}>
-                        {item.name}
-                      </p>
-                      <div className="relative z-10 mt-auto max-w-full px-1 py-0.5 rounded-full bg-white/5 border border-white/10 text-white font-bold tracking-normal truncate">
-                        {item.value?.toLocaleString()} coins
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.05, boxShadow: "0 0 30px rgba(255,255,255,0.4)" }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setWonItems([])}
-                className="mt-6 sm:mt-10 w-full max-w-xs px-8 sm:px-12 py-3 sm:py-4 bg-white text-black font-black text-sm sm:text-lg rounded-xl sm:rounded-2xl transition-all hover:bg-amber-400"
-              >
-                COLLECT REWARDS
-              </motion.button>
-            </motion.div>
-          </motion.div>
+          <WonScreen 
+            items={wonItems} 
+            onClose={() => setWonItems([])} 
+          />
         )}
       </AnimatePresence>
 
@@ -1027,12 +872,12 @@ export default function ShopPage() {
                     </svg>
                     <span className="absolute text-2xl font-black">{countdown}</span>
                   </div>
-                  <h3 className="text-lg font-bold">Watching Ad</h3>
+                  <h3 className="text-lg font-bold">Processing Stream</h3>
                 </div>
               ) : (
                 <>
                   <h3 className="text-xl font-black mb-2 tracking-tight">Boost Balance</h3>
-                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 mt-4 rounded-xl font-black text-sm bg-amber-500/10 border border-amber-500/20 text-amber-500">WATCH AD (500)</button>
+                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 mt-4 rounded-xl font-black text-sm bg-amber-500/10 border border-amber-500/20 text-amber-500">WATCH AD (+500)</button>
                   <button onClick={() => setShowAdModal(false)} className="mt-4 text-xs text-zinc-600">Cancel</button>
                 </>
               )}
@@ -1046,7 +891,7 @@ export default function ShopPage() {
           initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
           className="text-3xl md:text-4xl font-black mb-4 tracking-tighter text-center text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-sm flex-shrink-0"
         >
-          VAULT
+          VAULT SHOP
         </motion.h1>
 
         {(activeDiscount > 0 || activeLuck > 1 || activeXpBoost) && (
@@ -1125,7 +970,7 @@ export default function ShopPage() {
                       <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">✦</span>
                       <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">✧</span>
                     </>
-                  ) : (theme.tier === "LEGENDARY" || theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
+                  ) : (theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
                     <>
                       <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">✦</span>
                       <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">✦</span>
@@ -1147,7 +992,7 @@ export default function ShopPage() {
                     {pack.name}
                   </h3>
                   <div className={`text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-3`}>
-                    {isExclusive ? "FREE EXCLUSIVE" : `FROM ${finalPrice.toLocaleString()} 🪙`}
+                    {isExclusive ? "FREE DROP" : `FROM ${finalPrice.toLocaleString()} 🪙`}
                   </div>
 
                   <button
@@ -1160,7 +1005,7 @@ export default function ShopPage() {
                   >
                     <span className="relative z-10">
                       {isExclusive
-                        ? "CLAIM (FREE)"
+                        ? "CLAIM"
                         : `OPEN ${openQuantity > 1 ? openQuantity : ""} • ${totalCost.toLocaleString()} 🪙`}
                     </span>
                   </button>
@@ -1177,23 +1022,9 @@ export default function ShopPage() {
 }
 
 // ---------------------------------------------------------------------------
-// PackPurchaseModal
+// PackPurchaseModal Components
 // ---------------------------------------------------------------------------
 const QUANTITY_CHIPS = [1, 3, 5, 10, 25, 50] as const;
-
-interface PackTheme {
-  tier: string;
-  accent: string;
-  cardBg: string;
-  border: string;
-  glow: string;
-  halo: string;
-  badge: string;
-  priceFrom: string;
-  ribbon: string;
-  boxLid: string;
-  boxBody: string;
-}
 
 interface PackPurchaseModalProps {
   pack: PackBasic;
@@ -1280,7 +1111,7 @@ export function PackPurchaseModal({
 
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">How many?</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">Select Bulk Quantity</span>
               <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">Qty {quantity}</span>
             </div>
             <div className="grid grid-cols-6 gap-1.5">
