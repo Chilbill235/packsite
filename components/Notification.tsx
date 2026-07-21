@@ -16,9 +16,9 @@ export default function Notification({
 }: NotificationProps) {
   // Prevent multiple rapid re-triggers
   const styles = {
-    success: { bg: "bg-emerald-600", icon: "?" },
-    error: { bg: "bg-rose-600", icon: "??" },
-    info: { bg: "bg-blue-600", icon: "??" },
+    success: { bg: "bg-emerald-600", icon: "✅" },
+    error: { bg: "bg-rose-600", icon: "❌" },
+    info: { bg: "bg-blue-600", icon: "ℹ️" },
   };
 
   const { bg, icon } = styles[type];

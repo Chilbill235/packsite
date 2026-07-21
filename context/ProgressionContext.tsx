@@ -67,9 +67,14 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
       const data = await res.json();
       if (data && data.xp !== undefined) {
         setAccountXp(data.xp);
-        // Trust server level directly to avoid floating-point drift
         if (typeof data.level === "number") {
-          setAccountLevel(data.level);
+          const minTotalXpForLevel = getTotalXpForLevel(data.level);
+          if (data.xp < minTotalXpForLevel) {
+            // Server level is inconsistent with actual XP; recalculate from XP
+            setAccountLevel(calculateLevelFromXp(data.xp));
+          } else {
+            setAccountLevel(data.level);
+          }
         } else {
           setAccountLevel(calculateLevelFromXp(data.xp));
         }
@@ -77,7 +82,7 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
     } catch (e) {
       console.error("Failed to sync progression pipeline:", e);
     }
-  }, [session, calculateLevelFromXp]);
+  }, [session, calculateLevelFromXp, getTotalXpForLevel]);
 
   const updateXpLocally = useCallback((newXp: number) => {
     const newLvl = calculateLevelFromXp(newXp);

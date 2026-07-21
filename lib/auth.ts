@@ -54,6 +54,16 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         token.sub = user.id;
         token.username = user.username;
         if (user.image) token.image = user.image;
+      } else if (token.sub) {
+        // Re-fetch profile from DB so username/image changes propagate across sessions
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { username: true, image: true },
+        });
+        if (dbUser) {
+          token.username = dbUser.username;
+          token.image = dbUser.image ?? undefined;
+        }
       }
       return token;
     },

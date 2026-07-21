@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Notification from "@/components/Notification";
+import ErrorDialog from "@/components/ErrorDialog";
 import type { InventoryWithItem } from "@/types";
 
 export default function InventoryPage() {
@@ -93,7 +94,7 @@ export default function InventoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to sell all items");
       setInventory([]);
-      document.dispatchEvent(new CustomEvent("balanceChanged", { detail: data.newBalance, bubbles: true }));
+      window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance } }));
       localStorage.setItem('userBalance', data.newBalance.toString());
       setNotification({ message: "All items sold successfully!", type: "success" });
     } catch (err) {
@@ -125,6 +126,7 @@ export default function InventoryPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-6">
         {notification && <Notification message={notification.message} type={notification.type} onClose={() => setNotification(null)} />}
+        {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} onRetry={errorDialog.onRetry} />}
         {inventory.length === 0 ? (
           <div className="text-center py-20 text-white">Your inventory is empty.</div>
         ) : (

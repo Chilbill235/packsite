@@ -5,7 +5,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Navbar from "@/components/Navbar";
 import { Analytics } from "@vercel/analytics/next";
-import { Volume2, VolumeX, Sparkles, X, Trophy, Swords, Zap, Gift } from "lucide-react";
+import { Volume2, VolumeX, Sparkles, X } from "lucide-react";
 
 const REWARD_AMOUNT = 50000;
 
@@ -14,13 +14,13 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { status } = useSession();
-  
+
   const [loading, setLoading] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
 
   // --- Immersive Ad States ---
   const [adActive, setAdActive] = useState(false);
-  const [adCountdown, setAdCountdown] = useState(5); 
+  const [adCountdown, setAdCountdown] = useState(5);
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardAmount] = useState(REWARD_AMOUNT);
   const [isMuted, setIsMuted] = useState(false);
@@ -28,9 +28,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   // Splash Screen Logic - Modified to only show on the home page ("/")
   useEffect(() => {
     if (status === "loading") return;
-    
+
     const isPublicPage = pathname === "/login" || pathname === "/register";
-    
+
     if (status !== "authenticated" && !isPublicPage) {
       router.replace("/login");
     } else if (status === "authenticated" && pathname === "/") {
@@ -53,7 +53,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   // --- Ad Engine Countdown ---
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
+
     if (adActive && adCountdown > 0) {
       interval = setInterval(() => {
         setAdCountdown((prev) => prev - 1);
@@ -110,7 +110,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
             <div className="flex flex-col items-center space-y-2">
               <div className="inline-flex items-center px-4 py-2 bg-black/50 border border-cyan-500/30 rounded-full">
-                <span className="text-[11px] font-black text-cyan-400 tracking-widest">REWARD SEQUENCE</span>
+                <span className="text-[11px] font-black text-cyan-400 tracking-widest">
+                  REWARD SEQUENCE
+                </span>
                 <span className="ml-2 text-2xl font-black text-amber-400">{adCountdown}</span>
               </div>
               <h2 className="text-xl font-black text-white tracking-tight uppercase">
@@ -122,7 +124,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="w-full max-w-xs h-2.5 bg-slate-900/70 rounded-full overflow-hidden border border-cyan-500/20">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 shadow-[0_0_15px_#3b82f6] transition-all duration-1000 ease-linear"
                 style={{ width: `${progressPercent}%` }}
               />
@@ -139,16 +141,19 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex flex-col items-center p-3 bg-black/40 rounded-xl border border-emerald-500/20">
                 <span className="text-[10px] text-slate-500 uppercase tracking-wider">Status</span>
-                <span className="text-sm font-black text-emerald-400 animate-pulse">VERIFYING</span>
+                <span className="text-sm font-black text-emerald-400 animate-pulse">
+                  VERIFYING
+                </span>
               </div>
             </div>
 
             <p className="text-slate-500 text-xs px-4 max-w-sm">
-              Your premium claim is being processed across multiple blockchain shards and challenge developers live in global servers!
+              Your premium claim is being processed across multiple blockchain shards and challenge
+              developers live in global servers!
             </p>
 
             <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-900 z-20">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 shadow-[0_0_15px_#3b82f6] transition-all duration-1000 ease-linear"
                 style={{ width: `${progressPercent}%` }}
               />
@@ -161,16 +166,21 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       {showRewardModal && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/85 backdrop-blur-md">
           <div className="relative bg-[#0d111c] border-2 border-amber-500/40 p-8 rounded-[2.5rem] max-w-sm w-full mx-4 shadow-[0_0_60px_rgba(245,158,11,0.25)] text-center flex flex-col items-center gap-6 overflow-hidden">
-            
             <div className="absolute top-[-50px] w-64 h-64 bg-amber-500/10 rounded-full blur-[60px] pointer-events-none" />
 
             <div className="relative w-24 h-24 bg-gradient-to-b from-amber-400 to-orange-600 text-slate-950 rounded-full flex items-center justify-center text-5xl font-black shadow-[0_0_40px_rgba(245,158,11,0.4)] border-4 border-[#0d111c] animate-bounce">
               🪙
-              <Sparkles className="absolute -top-1 -right-1 text-yellow-300 animate-spin" style={{ animationDuration: '6s' }} size={22} />
+              <Sparkles
+                className="absolute -top-1 -right-1 text-yellow-300 animate-spin"
+                style={{ animationDuration: "6s" }}
+                size={22}
+              />
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-3xl font-black text-white tracking-tighter uppercase">BOUNTY SECURED!</h3>
+              <h3 className="text-3xl font-black text-white tracking-tighter uppercase">
+                BOUNTY SECURED!
+              </h3>
               <p className="text-slate-400 text-sm px-2">
                 Verification complete. Your profile account has been directly credited with:
               </p>
@@ -184,7 +194,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 try {
                   const response = await fetch("/api/user/verify-ad-claim", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" }
+                    headers: { "Content-Type": "application/json" },
                   });
 
                   if (response.ok) {
@@ -217,19 +227,27 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       {/* Main Framework Content Container Layout */}
       <div className="min-h-screen flex flex-col bg-[#070707]">
         {pathname !== "/login" && pathname !== "/register" && <Navbar />}
-        
+
         {/* If loading is true and we're on the root route, you can render a placeholder splash element here if desired */}
         <main className="flex-grow w-full pt-6 bg-[#070707]">
           {loading && pathname === "/" ? (
-            <div className={`fixed inset-0 z-[99999] bg-black flex items-center justify-center transition-opacity duration-700 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}>
+            <div
+              className={`fixed inset-0 z-[99999] bg-[#070707] flex items-center justify-center transition-opacity duration-700 ${
+                fadeOut ? "opacity-0" : "opacity-100"
+              }`}
+            >
               <div className="text-center space-y-4">
                 <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                <h1 className="text-xl font-black tracking-widest text-white uppercase animate-pulse">Loading PackSite...</h1>
+                <h1 className="text-xl font-black tracking-widest text-white uppercase animate-pulse">
+                  Loading PackSite...
+                </h1>
               </div>
             </div>
-          ) : children}
+          ) : (
+            children
+          )}
         </main>
-        
+
         <Analytics />
       </div>
     </>

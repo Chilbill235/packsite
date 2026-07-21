@@ -32,36 +32,29 @@ model Session {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  username      String         @unique
-  email         String         @unique
-  password      String?
-  image         String?        // <--- Add this line
-  balance       Int            @default(100000)
-  createdAt     DateTime       @default(now())
-  lastAdWatched DateTime?
-  pendingReward Boolean        @default(false)
-
-  // --- NEW: Progression Tracks ---
-  level         Int            @default(1)    // User's current level
-  xp            Int            @default(0)    // User's current experience points
-
-  // --- Gameplay & Chance Modifiers ---
-  activeLuck       Float          @default(1.0)   // Multiplier for rare item drop rates (e.g., 2.0 for 2x, 3.0 for 3x)
-  activeDiscount   Float          @default(0.0)   // Percentage discount off store prices (e.g., 0.20 for 20% off)
-  hasExclusivePack Boolean        @default(false) // Grants access to pull from the limited-time secret vaults
-  activeXpBoost    Boolean        @default(false) // Doubles level progression speed when active
-  
-  // Buff expiration times
-  luckExpiresAt     DateTime?      // When luck boost expires (24 hours)
-  discountExpiresAt DateTime?      // When discount expires (48 hours)
-  xpBoostExpiresAt  DateTime?      // When XP boost expires (2 hours)
-
-  accounts      Account[]
-  inventory     Inventory[]
-  openings      Opening[]
-  sessions      Session[]
-  subscriptions Subscription[]
+  id                String        @id @default(cuid())
+  username          String        @unique
+  email             String        @unique
+  password          String?
+  balance           Int           @default(100000)
+  createdAt         DateTime      @default(now())
+  lastAdWatched     DateTime?
+  pendingReward     Boolean       @default(false)
+  activeLuck        Float         @default(1.0)
+  activeDiscount    Float         @default(0.0)
+  hasExclusivePack  Boolean       @default(false)
+  activeXpBoost     Boolean       @default(false)
+  discountExpiresAt DateTime?
+  luckExpiresAt     DateTime?
+  xpBoostExpiresAt  DateTime?
+  level             Int           @default(1)
+  xp                Int           @default(0)
+  image             String?
+  accounts          Account[]
+  inventory         Inventory[]
+  openings          Opening[]
+  sessions          Session[]
+  subscriptions     Subscription?
 }
 
 model Pack {
@@ -110,10 +103,9 @@ model Opening {
   packId    String
   itemId    String
   createdAt DateTime @default(now())
-
-  item Item @relation(fields: [itemId], references: [id])
-  pack Pack @relation(fields: [packId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  item      Item     @relation(fields: [itemId], references: [id])
+  pack      Pack     @relation(fields: [packId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([packId])

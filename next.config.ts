@@ -11,6 +11,11 @@ const withPWA = withPWAInit({
   },
 });
 
+// next.config.js
+module.exports = {
+  allowedDevOrigins: ['192.168.12.237', '*'],
+} 
+
 // 2. Define your base Next.js configuration
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/client", "pg"],

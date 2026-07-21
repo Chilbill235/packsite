@@ -1,7 +1,7 @@
-// 1. IMPORT ONESIGNAL (Must remain the first line)
+// 1. IMPORT ONESIGNAL (Must remain at the very top)
 importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
-// 2. THE 35 UNIQUE CAMPAIGN NOTIFICATIONS WITH GAMEPLAY BUFFS
+// 2. THE UNIQUE CAMPAIGN NOTIFICATIONS WITH GAMEPLAY BUFFS
 var campaigns = [
   // --- Modern Gameplay Buff Notifications ---
   { title: "🎁 Surprise Drop!", body: "A random drop just landed in the shop. Check it out!", url: "/shop?ref=periodic-alert-1&buff=exclusive_pack" },
@@ -51,20 +51,15 @@ function startPeriodicNotificationLoop(isFirstRun) {
 
   var delay;
   if (isFirstRun) {
-    // Generate a completely random time within the first 2 minutes (0 to 120,000 ms)
     delay = Math.floor(Math.random() * 120000);
-    console.log("[SW] First notification scheduled in " + Math.round(delay / 1000) + " seconds.");
   } else {
-    // Standard 10 minutes (600,000 ms) +/- 30 seconds (30,000 ms variance) to make it organic
     var tenMinutes = 600000;
     var variance = Math.floor((Math.random() * 60000) - 30000);
     delay = tenMinutes + variance;
-    console.log("[SW] Next notification scheduled in " + Math.round(delay / 1000 / 60) + " minutes.");
   }
 
   loopTimeoutId = setTimeout(function () {
     triggerPeriodicAlert();
-    // Subsequent loops are marked as false (no longer the first run)
     startPeriodicNotificationLoop(false);
   }, delay);
 }
@@ -84,7 +79,7 @@ function triggerPeriodicAlert() {
   });
 }
 
-// 4. EVENT LISTENERS
+// 4. EVENT LISTENERS WITH ONESIGNAL GUARDING
 self.addEventListener('install', function (event) {
   event.waitUntil(self.skipWaiting());
 });
@@ -92,7 +87,6 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     self.clients.claim().then(function() {
-      // Start the loop with "true" to enforce the < 2-minute randomized first drop
       startPeriodicNotificationLoop(true);
     })
   );
@@ -100,8 +94,12 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('message', function (event) {
   try {
-    // Guard against non-object event.data to prevent errors
     if (!event.data || typeof event.data !== 'object') return;
+
+    // Ignore OneSignal internal communication messages so they pass to OneSignal's handlers
+    if (event.data.command || event.data.type?.startsWith('OS_') || event.data.isOneSignal) {
+      return;
+    }
 
     if (event.data.type === 'FORCE_DEV_LOOP_TRIGGER') {
       triggerPeriodicAlert();
@@ -142,30 +140,15 @@ self.addEventListener('message', function (event) {
       );
     }
   } catch (err) {
-    // Prevent any errors in our handler from propagating and potentially
-    // interfering with OneSignal's message handling
     console.error("[SW] Error in message handler:", err);
   }
 });
 
-self.addEventListener('push', function (event) {
-  var payload = {};
-  try { payload = event.data ? event.data.json() : {}; } catch (e) { return; }
-  if (payload.custom || (payload.data && payload.data.custom)) return; 
-
-  var options = {
-    body: payload.body || "Tap to return to the app!",
-    icon: '/images/cup.png',
-    badge: '/images/apple-pay.png',
-    tag: payload.tag || 'general-broadcast-' + Date.now(),
-    renotify: true,
-    data: { url: payload.url || '/shop?ref=push-alert' }
-  };
-  event.waitUntil(self.registration.showNotification(payload.title || "Alert", options));
-});
-
 self.addEventListener('notificationclick', function (event) {
-  if (event.notification.data && (event.notification.data.custom || event.notification.data.OS_DATA)) return;
+  // Let OneSignal handle clicks on its own notifications
+  if (event.notification.data && (event.notification.data.custom || event.notification.data.OS_DATA)) {
+    return;
+  }
 
   event.notification.close();
 
@@ -175,8 +158,6 @@ self.addEventListener('notificationclick', function (event) {
     var rawUrl = event.notification.data.url;
     if (rawUrl !== 'undefined' && rawUrl !== 'null' && rawUrl !== '') {
       targetUrl = rawUrl;
-
-      // Keep existing parameters intact, but append fallback if missing
       if (targetUrl.indexOf('ref=') === -1) {
         targetUrl += (targetUrl.indexOf('?') === -1 ? '?' : '&') + 'ref=notification-click';
       }
@@ -199,21 +180,4 @@ self.addEventListener('notificationclick', function (event) {
       if (self.clients.openWindow) return self.clients.openWindow(destinationUrl);
     })
   );
-});
-
-self.addEventListener('notificationclose', function (event) {
-  // OneSignal may use this event for analytics or cleanup
-  // We don't need to do anything specific here, but we should not prevent
-  // OneSignal from handling it if they have their own listener
-});
-
-self.addEventListener('sync', function (event) {
-  // OneSignal may use sync events for background tasks
-  // Let it pass through to their handlers if they have any
-});
-
-self.addEventListener('periodicsync', function (event) {
-  if (event.tag === 'periodic-drops') {
-    event.waitUntil(new Promise(function(resolve) { triggerPeriodicAlert(); resolve(); }));
-  }
 });

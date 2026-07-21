@@ -1,11 +1,13 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X, Smartphone } from "lucide-react";
+import { Bell, X, Smartphone, Sparkles, Crown, Diamond, Zap } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import WonScreen from "@/components/WonScreen"; 
+import ExclusiveWonScreen from "@/components/ExclusiveWonScreen";
+
 import { RewardedAdService } from "@/lib/adService";
 import { notificationService } from "@/lib/notificationService";
 
@@ -18,20 +20,20 @@ interface BuffDetails {
 }
 
 const BUFF_MAP: Record<string, BuffDetails> = {
-  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
-  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop! Coins added to your account.", icon: "💎", color: "text-blue-400" },
-  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Your mythic pack odds are boosted by 1.5x on your next opening!", icon: "🍀", color: "text-green-400" },
-  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active! Open a pack now to use it.", icon: "🍀", color: "text-green-500" },
-  luck_boost_3x: { title: "3x Mythic Luck Active!", description: "Unbelievable luck active! Open a mythic pack now.", icon: "🦄", color: "text-purple-400" },
-  discount_10: { title: "10% Discount Unlocked!", description: "Enjoy 10% off all packs on your next open.", icon: "🔥", color: "text-red-400" },
-  discount_15: { title: "15% Discount Unlocked!", description: "Enjoy 15% off all packs on your next open.", icon: "🔥", color: "text-red-400" },
-  discount_20: { title: "20% Discount Unlocked!", description: "Massive 20% discount active for your next pack!", icon: "🔥", color: "text-red-500" },
-  exclusive_pack: { title: "Exclusive Pack Unlocked!", description: "A special vault pack has been unlocked in your shop!", icon: "📦", color: "text-indigo-400" },
-  xp_boost_2x: { title: "2x XP Buff Active!", description: "Earn double experience progression for your level!", icon: "👑", color: "text-orange-400" }
+  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "??", color: "text-yellow-400" },
+  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop! Coins added to your account.", icon: "??", color: "text-blue-400" },
+  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Your mythic pack odds are boosted by 1.5x on your next opening!", icon: "??", color: "text-green-400" },
+  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active! Open a pack now to use it.", icon: "??", color: "text-green-500" },
+  luck_boost_3x: { title: "3x Mythic Luck Active!", description: "Unbelievable luck active! Open a mythic pack now.", icon: "??", color: "text-purple-400" },
+  discount_10: { title: "10% Discount Unlocked!", description: "Enjoy 10% off all packs on your next open.", icon: "??", color: "text-red-400" },
+  discount_15: { title: "15% Discount Unlocked!", description: "Enjoy 15% off all packs on your next open.", icon: "??", color: "text-red-400" },
+  discount_20: { title: "20% Discount Unlocked!", description: "Massive 20% discount active for your next pack!", icon: "??", color: "text-red-500" },
+  exclusive_pack: { title: "Exclusive Pack Unlocked!", description: "A special vault pack has been unlocked in your shop!", icon: "??", color: "text-indigo-400" },
+  xp_boost_2x: { title: "2x XP Buff Active!", description: "Earn double experience progression for your level!", icon: "??", color: "text-orange-400" }
 };
 
 interface PackBasic {
@@ -217,6 +219,8 @@ export default function ShopPage() {
   const [pendingPack, setPendingPack] = useState<PackBasic | null>(null);
   const [modalQuantity, setModalQuantity] = useState(1);
   const [wonItems, setWonItems] = useState<{ name: string; rarity?: string; value?: number }[]>([]);
+  const [lastWasExclusive, setLastWasExclusive] = useState(false);
+  const [lastNewBalance, setLastNewBalance] = useState<number | undefined>(undefined);
 
   const [errorDialog, setErrorDialog] = useState<{ message: string } | null>(null);
   const [isFlashSaleActive, setIsFlashSaleActive] = useState(false);
@@ -569,7 +573,7 @@ export default function ShopPage() {
     const pack = packs.find((p) => p.id === packId);
     if (!pack && packId !== "exclusive_vault_pack") return;
     const target: PackBasic =
-      pack ?? ({ id: "exclusive_vault_pack", name: "🔥 APOCALYPSE VAULT", price: 0 } as PackBasic);
+      pack ?? ({ id: "exclusive_vault_pack", name: "?? APOCALYPSE VAULT", price: 0 } as PackBasic);
     setModalQuantity(openQuantity > 0 ? openQuantity : 1);
     setPendingPack(target);
   };
@@ -618,6 +622,10 @@ export default function ShopPage() {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       if (res.ok) {
+        const isExclusiveResult = packId === "exclusive_vault_pack";
+        setLastWasExclusive(isExclusiveResult);
+        setLastNewBalance(data.newBalance);
+
         setWonItems(Array.isArray(data.wonItems) ? data.wonItems : []);
         syncUserState({
           balance: data.newBalance,
@@ -747,7 +755,7 @@ export default function ShopPage() {
   const displayPacks = useMemo(() => {
     const real = packs.filter((p) => p && p.id !== "exclusive_vault_pack");
     const exclusive = hasExclusivePack
-      ? [{ id: "exclusive_vault_pack", name: "🔥 APOCALYPSE VAULT", price: 0 } as PackBasic]
+      ? [{ id: "exclusive_vault_pack", name: "?? APOCALYPSE VAULT", price: 0 } as PackBasic]
       : [];
     real.sort((a, b) => {
       const pa = typeof a.price === "string" ? parseInt(a.price) : a.price;
@@ -776,7 +784,7 @@ export default function ShopPage() {
               transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
               className="text-8xl mb-8"
             >
-              🎁
+              ??
             </motion.div>
             <h2 className="text-2xl font-black tracking-widest text-white uppercase animate-pulse">
               Unlocking Vaults...
@@ -813,12 +821,21 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* WINNING ANIMATION OVERLAY */}
-      <AnimatePresence>
-        {wonItems.length > 0 && (
-          <WonScreen 
-            items={wonItems} 
-            onClose={() => setWonItems([])} 
+      <AnimatePresence mode="wait">
+        {wonItems.length > 0 && lastWasExclusive && (
+          <ExclusiveWonScreen
+            key="exclusive"
+            items={wonItems}
+            newBalance={lastNewBalance}
+            onClose={() => { setWonItems([]); setLastWasExclusive(false); setLastNewBalance(undefined); }}
+          />
+        )}
+        {wonItems.length > 0 && !lastWasExclusive && (
+          <WonScreen
+            key="normal"
+            items={wonItems}
+            newBalance={lastNewBalance}
+            onClose={() => { setWonItems([]); setLastWasExclusive(false); setLastNewBalance(undefined); }}
           />
         )}
       </AnimatePresence>
@@ -898,17 +915,17 @@ export default function ShopPage() {
           <div className="flex flex-wrap gap-1 md:gap-1.5 mb-2 md:mb-3 justify-center items-center flex-shrink-0">
             {activeDiscount > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(239,68,68,0.1)]">
-                <span className="animate-pulse">🔥</span> {activeDiscount * 100}% Discount {discountTimeLeft && `(${discountTimeLeft})`}
+                <span className="animate-pulse">??</span> {activeDiscount * 100}% Discount {discountTimeLeft && `(${discountTimeLeft})`}
               </div>
             )}
             {activeLuck > 1 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(34,197,94,0.1)]">
-                <span className="animate-pulse">🍀</span> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
+                <span className="animate-pulse">??</span> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
               </div>
             )}
             {activeXpBoost && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(249,115,22,0.1)]">
-                <span className="animate-pulse">👑</span> 2x XP Active {xpTimeLeft && `(${xpTimeLeft})`}
+                <span className="animate-pulse">??</span> 2x XP Active {xpTimeLeft && `(${xpTimeLeft})`}
               </div>
             )}
           </div>
@@ -952,7 +969,7 @@ export default function ShopPage() {
                 <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
                   {onSale && (
                     <span className="text-[9px] font-black tracking-wider px-2 py-1 rounded-full bg-red-500 text-black shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse">
-                      FLASH −{Math.round((1 - discountMultiplier) * 100)}%
+                      FLASH -{Math.round((1 - discountMultiplier) * 100)}%
                     </span>
                   )}
                   {isExclusive && (
@@ -966,14 +983,14 @@ export default function ShopPage() {
                   <div className={`absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-60 ${theme.halo} group-hover:opacity-90 transition-opacity`} />
                   {theme.tier === "OMEGA" ? (
                     <>
-                      <span className="absolute top-2 left-6 text-fuchsia-300 text-xs animate-ping">✦</span>
-                      <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">✦</span>
-                      <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">✧</span>
+                      <span className="absolute top-2 left-6 text-fuchsia-300 text-xs animate-ping">?</span>
+                      <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">?</span>
+                      <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">?</span>
                     </>
                   ) : (theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
                     <>
-                      <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">✦</span>
-                      <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">✦</span>
+                      <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">?</span>
+                      <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">?</span>
                     </>
                   )}
                   <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
@@ -992,7 +1009,7 @@ export default function ShopPage() {
                     {pack.name}
                   </h3>
                   <div className={`text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-3`}>
-                    {isExclusive ? "FREE DROP" : `FROM ${finalPrice.toLocaleString()} 🪙`}
+                    {isExclusive ? "FREE DROP" : `FROM ${finalPrice.toLocaleString()} COINS`}
                   </div>
 
                   <button
@@ -1006,7 +1023,7 @@ export default function ShopPage() {
                     <span className="relative z-10">
                       {isExclusive
                         ? "CLAIM"
-                        : `OPEN ${openQuantity > 1 ? openQuantity : ""} • ${totalCost.toLocaleString()} 🪙`}
+                        : `OPEN ${openQuantity > 1 ? `${openQuantity} × ` : ""}${totalCost.toLocaleString()} COINS`}
                     </span>
                   </button>
                 </div>
@@ -1106,7 +1123,7 @@ export function PackPurchaseModal({
             {pack.name}
           </h2>
           <p className={`text-center text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-5`}>
-            {isExclusive ? "FREE EXCLUSIVE DROP" : `FROM ${finalPrice.toLocaleString()} 🪙 / PACK`}
+            {isExclusive ? "FREE EXCLUSIVE DROP" : `FROM ${finalPrice.toLocaleString()} ?? / PACK`}
           </p>
 
           <div className="mb-4">
@@ -1135,22 +1152,22 @@ export function PackPurchaseModal({
           <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-5 backdrop-blur">
             <div className="flex items-center justify-between text-xs text-white/60 mb-1.5">
               <span>Price per pack</span>
-              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}</span>
+              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} ??`}</span>
             </div>
             {discountMultiplier < 1 && (
               <div className="flex items-center justify-between text-[11px] text-emerald-300 mb-1.5">
                 <span>Discount</span>
-                <span className="font-bold">−{Math.round((1 - discountMultiplier) * 100)}%</span>
+                <span className="font-bold">-{Math.round((1 - discountMultiplier) * 100)}%</span>
               </div>
             )}
             <div className="flex items-center justify-between text-xs text-white/60 mb-2">
               <span>Quantity</span>
-              <span className="font-bold text-white/90">×{quantity}</span>
+              <span className="font-bold text-white/90">�{quantity}</span>
             </div>
             <div className="border-t border-white/10 pt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-white/80">Total Cost</span>
               <span className={`text-xl font-black bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent`}>
-                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}
+                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} ??`}
               </span>
             </div>
 
@@ -1158,12 +1175,12 @@ export function PackPurchaseModal({
               <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[10px] text-white/50">
                   <span>Current balance</span>
-                  <span>{balance.toLocaleString()} 🪙</span>
+                  <span>{balance.toLocaleString()} ??</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-white/70">
                   <span>Balance after purchase</span>
                   <span className={insufficient ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
-                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` : `${remainingBalance.toLocaleString()} 🪙`}
+                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} ??` : `${remainingBalance.toLocaleString()} ??`}
                   </span>
                 </div>
               </div>

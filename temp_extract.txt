@@ -1,0 +1,18 @@
+      {/* EXCLUSIVE WINNING ANIMATION OVERLAY */}
+      <AnimatePresence>
+        {wonItems.length > 0 && lastWasExclusive && (
+          <ExclusiveWonScreen
+            items={wonItems}
+            onClose={() => { setWonItems([]); setLastWasExclusive(false); }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {wonItems.length > 0 && !lastWasExclusive && (
+          <WonScreen 
+            items={wonItems} 
+            onClose={() => { setWonItems([]); setLastWasExclusive(false); }}
+          />
+        )}
+      </AnimatePresence>

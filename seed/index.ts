@@ -6,7 +6,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { v4 as uuidv4 } from "uuid";
 
-// Imports
+// Local Modules
 import { TIER_CONFIG, PACK_METADATA } from "./config";
 import { generateItem } from "./engine";
 import { logger } from "./utils";
@@ -16,19 +16,22 @@ import { AuditService } from "./audit";
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 
-// 3. Initialize Prisma Client with the adapter (Required in Prisma v7+)
+// 3. Initialize Prisma Client with the adapter (Prisma v7+)
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log("--- STARTING SEED ---");
-  
+  logger.info("--- STARTING SEED ---");
+
   try {
-    // Reset Database
-    await prisma.$executeRawUnsafe('TRUNCATE TABLE "Opening", "Inventory", "Item", "Pack", "User" RESTART IDENTITY CASCADE');
+    // Reset Database Tables
+    await prisma.$executeRawUnsafe(
+      'TRUNCATE TABLE "Opening", "Inventory", "Item", "Pack", "User" RESTART IDENTITY CASCADE;'
+    );
     logger.info("Database reset complete.");
 
-    // Create Packs
+    // Create Packs with explicit UUIDs
     const packIds: Record<string, string> = {};
+
     for (const p of PACK_METADATA) {
       const id = uuidv4();
       await prisma.pack.create({
@@ -37,30 +40,30 @@ async function main() {
           name: p.name,
           description: p.desc,
           price: p.price,
-          image: p.name.toUpperCase(),
-          category: p.cat
-        }
+          image: p.name.toUpperCase().replace(/\s+/g, "_"),
+          category: p.cat,
+        },
       });
       packIds[p.name] = id;
     }
-    logger.info("Packs created successfully.");
+    logger.info(`Successfully created ${Object.keys(packIds).length} packs.`);
 
-    // Generate and Insert Items for ALL packs
-    const itemBatch = [];
+    // Generate and Insert Items for ALL created packs
+    const itemBatch: ReturnType<typeof generateItem>[] = [];
+
     for (const packId of Object.values(packIds)) {
-      for (const [key, tier] of Object.entries(TIER_CONFIG)) {
+      for (const [tierKey, tier] of Object.entries(TIER_CONFIG)) {
         for (let i = 0; i < tier.qty; i++) {
-          // Now passing the dynamic packId instead of hardcoding 'Cosmic Vault'
-          itemBatch.push(generateItem(key, packId, i));
+          itemBatch.push(generateItem(tierKey, packId, i));
         }
       }
     }
-    
-    // Batch insert items
+
+    // Batch insert items in bulk for maximum performance
     await prisma.item.createMany({ data: itemBatch });
     logger.info(`Inserted ${itemBatch.length} items across all packs.`);
 
-    // Audit
+    // Execute System Audit
     const auditor = new AuditService(prisma);
     await auditor.runFullAudit();
 
@@ -68,8 +71,9 @@ async function main() {
   } catch (e) {
     logger.error("SEEDING FAILED");
     console.error(e);
+    process.exitCode = 1;
   } finally {
-    // Gracefully close both Prisma and the Postgres pool
+    // Gracefully close both Prisma Client and Postgres Pool
     await prisma.$disconnect();
     await pool.end();
   }

@@ -1,11 +1,13 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { Menu, X, LogOut } from "lucide-react";
+import { useBalanceSync } from "@/hooks/useBalanceSync";
 import Balance from "./Balance";
+import { useProgression } from "@/context/ProgressionContext";
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -14,43 +16,43 @@ export default function Navbar() {
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
   const [balance, setBalance] = useState<number>(0);
+  const { accountLevel } = useProgression();
 
-  const refreshBalance = useCallback(async () => {
-    try {
+  // Centralized balance sync: hook listens to global balanceUpdated events
+  useBalanceSync((newBalance) => setBalance(newBalance));
+
+  // Initial fetch on auth state change; hook picks up subsequent updates
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    fetch("/api/user/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && typeof data?.balance === "number") {
+          setBalance(data.balance);
+        }
+      })
+      .catch(() => {
+        if (process.env.NODE_ENV !== "development") {
+          window.console.error("Failed to sync live balance:", new Error("fetch failed"));
+        }
+      });
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
+
+  // Re-sync whenever the user returns to the tab
+  useEffect(() => {
+    const refresh = async () => {
+      if (!isAuthenticated) return;
       const res = await fetch("/api/user/profile");
       if (res.ok) {
         const data = await res.json();
-        setBalance(Number(data.balance));
+        if (typeof data?.balance === "number") setBalance(data.balance);
       }
-    } catch (err) {
-      if (process.env.NODE_ENV === 'development') {
-        window.console.warn("Dev: Could not fetch balance (server likely compiling).");
-      } else {
-        window.console.error("Failed to sync live balance:", err);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      refreshBalance();
-    }
-  }, [isAuthenticated, refreshBalance]);
-
-  useEffect(() => {
-    const handleBalanceUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ balance: number }>;
-      setBalance(customEvent.detail.balance);
     };
-
-    window.addEventListener("balanceUpdated", handleBalanceUpdate);
-    return () => window.removeEventListener("balanceUpdated", handleBalanceUpdate);
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener("focus", refreshBalance);
-    return () => window.removeEventListener("focus", refreshBalance);
-  }, [refreshBalance]);
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [isAuthenticated]);
 
   const navLinks = [
     { name: "Shop", href: "/shop" },
