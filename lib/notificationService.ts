@@ -1,4 +1,4 @@
-﻿// lib/notificationService.ts
+// lib/notificationService.ts
 
 export function isIOS(): boolean {
   if (typeof window === 'undefined') return false;
@@ -43,9 +43,6 @@ export function getPermissionDetail(): PermissionDetail {
   if (!("Notification" in window)) return "unsupported";
   return Notification.permission as PermissionDetail;
 }
-
-// Track if OneSignal login has been attempted for this session to prevent duplicates
-const loginAttempted = false;
 
 export const OneSignalNotificationService = {
   waitForInit: async (timeout = 10000): Promise<boolean> => {
@@ -162,6 +159,7 @@ export const OneSignalNotificationService = {
 
   getPermissionStatus: (): NotificationPermission | "unsupported" => {
     if (typeof window === 'undefined' ) return "unsupported";
+    if (!("Notification" in window)) return "unsupported";
     const detail = getPermissionDetail();
     if (detail === 'default' ) return 'default';  // iOS still shows as default to allow banner
     if (detail === 'unsupported' ) return 'unsupported';

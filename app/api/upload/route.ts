@@ -16,13 +16,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Optional: validate file type or size
-    const blob = await put(`uploads/${Date.now()}-${file.name}`, file, {
+    // Security: validate file size (max 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 5MB.' },
+        { status: 400 }
+      );
+    }
+
+    // Security: validate MIME type (images only)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.' },
+        { status: 400 }
+      );
+    }
+
+    // Sanitize filename - no path traversal, no special chars
+    const originalName = String(file.name || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const blob = await put(`uploads/${Date.now()}-${originalName}`, file, {
       access: 'public',
       contentType: file.type,
     });
 
-    return NextResponse.json(blob);
+    return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(

@@ -1,17 +1,30 @@
 // Extend NextAuth Session type to include custom fields
+declare module "@auth/core/jwt" {
+  interface JWT {
+    username?: string | null;
+    image?: string | null;
+  }
+}
+
 declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      username?: string;
-      email?: string | null;
+      email: string;
+      username?: string | null;
       name?: string | null;
+      image?: string | null;
     };
+  }
+  interface User {
+    username?: string | null;
+  }
+  interface JWT {
+    username?: string | null;
   }
 }
 
-// types/global.d.ts
-export {}; 
+export {};
 
 declare global {
   type OneSignalPermissionChangeHandler = (isGranted: boolean) => void;

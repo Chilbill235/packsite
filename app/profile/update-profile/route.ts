@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth"; // Fixed: Using the modern v5 auth helper directly
+import { auth } from "@/lib/auth"; 
 import { prisma } from "@/lib/prisma";   
 import bcrypt from "bcryptjs";            
 
-export async function POST(request: Request) {
+export async function PUT(request: Request) {
   try {
-    // Call the v5 auth method directly to securely check the JWT session
     const session = await auth();
 
     if (!session || !session.user || !session.user.email) {
@@ -16,13 +15,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { username, password } = body;
-    const updateData: { username?: string; password?: string } = {};
+    const { name, currentPassword, newPassword, image } = body;
+    const updateData: { username?: string; password?: string; image?: string } = {};
 
     // Validate and check username availability if changing
-    if (username && username.trim() !== "") {
+    if (name && name.trim() !== "") {
       const existingUser = await prisma.user.findUnique({
-        where: { username: username.trim() },
+        where: { username: name.trim() },
       });
 
       if (existingUser && existingUser.email !== session.user.email) {
@@ -31,18 +30,55 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      updateData.username = username.trim();
+      updateData.username = name.trim();
     }
 
-    // Securely hash password updates if provided
-    if (password && password.trim() !== "") {
-      if (password.length < 6) {
+    // Update avatar image URL if provided
+    if (image !== undefined) {
+      const trimmedImage = String(image).trim();
+      if (trimmedImage) {
+        updateData.image = trimmedImage;
+      }
+    }
+
+    // Securely verify and hash password updates if requested
+    if (newPassword && newPassword.trim() !== "") {
+      if (newPassword.length < 6) {
         return NextResponse.json(
-          { error: "Password must be at least 6 characters long." },
+          { error: "New password must be at least 6 characters long." },
           { status: 400 }
         );
       }
-      const hashedPassword = await bcrypt.hash(password, 10);
+
+      if (!currentPassword) {
+        return NextResponse.json(
+          { error: "Current password is required to set a new password." },
+          { status: 400 }
+        );
+      }
+
+      // Fetch user's current stored password hash
+      const userRecord = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { password: true },
+      });
+
+      if (!userRecord || !userRecord.password) {
+        return NextResponse.json(
+          { error: "User account security record not found." },
+          { status: 400 }
+        );
+      }
+
+      const passwordMatch = await bcrypt.compare(currentPassword, userRecord.password);
+      if (!passwordMatch) {
+        return NextResponse.json(
+          { error: "Incorrect current security key." },
+          { status: 400 }
+        );
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
       updateData.password = hashedPassword;
     }
 
@@ -61,6 +97,9 @@ export async function POST(request: Request) {
         username: true,
         email: true,
         balance: true,
+        image: true,
+        level: true,
+        xp: true,
       },
     });
 

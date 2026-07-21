@@ -4,6 +4,7 @@ interface PushPayload {
   headings: { en: string };
   contents: { en: string };
   data?: { type?: string; url?: string };
+  url?: string;
 }
 
 // Environment variables needed for OneSignal Server-Side API
@@ -50,6 +51,11 @@ export async function sendPushNotification(
     
     if (Object.keys(data).length > 0) {
       payload.data = data;
+    }
+
+    // OneSignal recognizes url at the top level to navigate on click
+    if (url) {
+      payload.url = url;
     }
 
     const response = await fetch("https://api.onesignal.com/notifications", {

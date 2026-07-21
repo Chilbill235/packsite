@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       if (ref === 'reward-claim' && userId) {
         await prisma.user.update({
           where: { id: userId },
-          data: { balance: { increment: 0 } }
+          data: { balance: { increment: 500 } }
         });
         console.log(`[Webhook] Success: 500 coins granted to ${userId}`);
       } else if (!userId) {

@@ -24,32 +24,41 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
   const [accountXp, setAccountXp] = useState(0);
   const [accountLevel, setAccountLevel] = useState(1);
 
-  // Core Progression Formula Matrix
-  const xpForCurrentLevel = useCallback((lvl: number) => {
-    if (lvl <= 1) return 0;
-    return ((lvl - 1) * lvl * 125) / 2;
+  // XP Formula - EXACT MATCH to backend (app/api/packs/open/route.ts)
+  const getXpForLevel = useCallback((level: number) => {
+    return Math.floor(100 * Math.pow(level, 1.5));
   }, []);
 
-  const xpForNextLevel = useCallback((lvl: number) => {
-    return lvl * 125;
-  }, []);
+  const calculateLevelFromXp = useCallback((xp: number): number => {
+    let level = 1;
+    let remainingXp = Math.max(0, xp);
+    while (remainingXp >= getXpForLevel(level)) {
+      remainingXp -= getXpForLevel(level);
+      level++;
+    }
+    return level;
+  }, [getXpForLevel]);
 
-  const calculateLevelFromXp = (xp: number): number => {
-    const calculated = Math.floor(1 + Math.sqrt(1 + (8 * xp) / 125)) / 2;
-    return Math.floor(calculated) || 1;
-  };
+  const getTotalXpForLevel = useCallback((level: number): number => {
+    let sum = 0;
+    for (let i = 1; i < level; i++) {
+      sum += getXpForLevel(i);
+    }
+    return sum;
+  }, [getXpForLevel]);
 
   const progressionMetrics = useMemo(() => {
-    const xpEarnedInCurrentLevel = accountXp - xpForCurrentLevel(accountLevel);
-    const xpNeededForNextLevel = xpForNextLevel(accountLevel);
+    const totalXpForCurrentLevel = getTotalXpForLevel(accountLevel);
+    const xpEarnedInCurrentLevel = accountXp - totalXpForCurrentLevel;
+    const xpNeededForNextLevel = getXpForLevel(accountLevel);
     const percentage = Math.min(Math.max((xpEarnedInCurrentLevel / xpNeededForNextLevel) * 100, 0), 100);
 
     return {
-      currentLevelXp: xpEarnedInCurrentLevel,
+      currentLevelXp: Math.max(0, xpEarnedInCurrentLevel),
       nextLevelXpThreshold: xpNeededForNextLevel,
       progressPercentage: percentage,
     };
-  }, [accountXp, accountLevel, xpForCurrentLevel, xpForNextLevel]);
+  }, [accountXp, accountLevel, getXpForLevel, getTotalXpForLevel]);
 
   const fetchProgress = useCallback(async () => {
     if (!session?.user) return;
@@ -58,20 +67,28 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
       const data = await res.json();
       if (data && data.xp !== undefined) {
         setAccountXp(data.xp);
-        setAccountLevel(calculateLevelFromXp(data.xp));
+        // Trust server level directly to avoid floating-point drift
+        if (typeof data.level === "number") {
+          setAccountLevel(data.level);
+        } else {
+          setAccountLevel(calculateLevelFromXp(data.xp));
+        }
       }
     } catch (e) {
       console.error("Failed to sync progression pipeline:", e);
     }
-  }, [session]);
+  }, [session, calculateLevelFromXp]);
 
   const updateXpLocally = useCallback((newXp: number) => {
+    const newLvl = calculateLevelFromXp(newXp);
     setAccountXp(newXp);
-    setAccountLevel(calculateLevelFromXp(newXp));
-  }, []);
+    setAccountLevel(newLvl);
+  }, [calculateLevelFromXp]);
 
   useEffect(() => {
     if (session?.user) {
+      // Sync progression data from backend whenever the session changes
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchProgress();
     }
   }, [session, fetchProgress]);
@@ -83,7 +100,7 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
       if (customEvent.detail?.xp !== undefined) {
         const targetXp = customEvent.detail.xp;
         const finalLvl = calculateLevelFromXp(targetXp);
-        
+
         setAccountLevel((prev) => {
           if (prev < finalLvl && prev !== 1) {
             // Dispatch standard browser event so pages can trigger their custom Level-Up animations
@@ -102,7 +119,7 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
       window.removeEventListener("xpUpdated", handleXpUpdateEvent);
       window.removeEventListener("balanceUpdated", fetchProgress);
     };
-  }, [fetchProgress]);
+  }, [fetchProgress, calculateLevelFromXp]);
 
   return (
     <ProgressionContext.Provider value={{ accountXp, accountLevel, progressionMetrics, fetchProgress, updateXpLocally }}>

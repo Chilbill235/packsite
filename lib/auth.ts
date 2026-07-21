@@ -4,26 +4,6 @@ import { prisma } from "@/lib/prisma";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
-// Extended TypeScript module declaration mappings
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      email: string;
-      username?: string | null;
-    };
-  }
-  interface User {
-    username?: string | null;
-  }
-}
-
-declare module "next-auth/jwt" {
-  interface JWT {
-    username?: string | null;
-  }
-}
-
 export const { auth, handlers, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -73,6 +53,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id;
         token.username = user.username;
+        if (user.image) token.image = user.image;
       }
       return token;
     },
@@ -80,6 +61,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (session.user) {
         if (token.sub) session.user.id = token.sub;
         if (token.username) session.user.username = token.username;
+        if (token.image) session.user.image = token.image;
+        if (!session.user.name && token.username) {
+          session.user.name = token.username;
+        }
       }
       return session;
     }

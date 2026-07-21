@@ -9,10 +9,10 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({ 
-      where: { email: session.user.email } 
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
     });
-  
+
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -20,12 +20,15 @@ export async function GET() {
     const inventory = await prisma.inventory.findMany({
       where: { userId: user.id },
       include: { item: true },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json({ inventory });
   } catch (error: any) {
     console.error("Inventory API Error:", error);
-    return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

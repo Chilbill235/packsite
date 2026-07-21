@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // Campaign pool for push notifications
 const CAMPAIGN_POOL = [
@@ -24,7 +24,7 @@ const CAMPAIGN_POOL = [
   { title: "Pack Refresh!", body: "The entire shop inventory has been refreshed.", url: "/shop?ref=refresh" }
 ];
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const cronKey = searchParams.get('key');
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
         included_segments: ['Subscribed Users'],
         headings: { en: campaign.title },
         contents: { en: campaign.body },
-        url: `https://packsite.vercel.app${campaign.url}`
+        url: `${request.nextUrl.protocol}://${request.nextUrl.host}${campaign.url}`
       })
     });
 

@@ -24,7 +24,9 @@ import {
   KeyRound,
   X,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Bell,
+  DollarSign
 } from "lucide-react";
 
 type Rarity = "common" | "rare" | "epic" | "legendary" | "omega";
@@ -46,6 +48,7 @@ export default function ProfilePage() {
   // Local Toast States linked to Global Event Pipeline
   const [showLevelUpAlert, setShowLevelUpAlert] = useState(false);
   const [leveledUpTo, setLeveledUpTo] = useState(1);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
 
   // Sorting and Filters
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "name">("value-desc");
@@ -63,14 +66,50 @@ export default function ProfilePage() {
   const [formStatus, setFormStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [updating, setUpdating] = useState(false);
 
+  // Single Item Selling Loader
+  const [sellingItemId, setSellingItemId] = useState<string | null>(null);
+
+  // Safe JSON Parsing Helper
+  const safeParseJson = async (res: Response) => {
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await res.json();
+    }
+    const htmlText = await res.text();
+    console.error("Received HTML/non-JSON response from server:", htmlText);
+    throw new Error(`Server returned unexpected format (Status: ${res.status})`);
+  };
+
+  // Ask for Push Notification Permission
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const perm = await Notification.requestPermission();
+      setPushPermission(perm);
+    }
+  }, []);
+
+  // Trigger Native Browser Push Notification
+  const sendLevelUpPushNotification = (newLevel: number) => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "granted") {
+        new Notification("🎉 Level Promoted!", {
+          body: `Congratulations! You've successfully upgraded to LVL ${newLevel}!`,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: "level-up-notification"
+        });
+      }
+    }
+  };
+
   // Main Database Sync Engine
   const fetchInventory = useCallback(async () => {
     try {
       const res = await fetch("/api/inventory");
-      const data = await res.json();
+      const data = await safeParseJson(res);
       setInventory(data.inventory || []);
     } catch (e) { 
-      console.error(e); 
+      console.error("Fetch Inventory Error:", e); 
     } finally { 
       setLoadingInventory(false); 
     }
@@ -79,10 +118,10 @@ export default function ProfilePage() {
   const fetchOpenings = useCallback(async () => {
     try {
       const res = await fetch("/api/openings");
-      const data = await res.json();
+      const data = await safeParseJson(res);
       setOpenings(data.openings || []);
     } catch (e) { 
-      console.error(e); 
+      console.error("Fetch Openings Error:", e); 
     } finally { 
       setLoadingActivity(false); 
     }
@@ -93,6 +132,10 @@ export default function ProfilePage() {
     fetchInventory();
     fetchOpenings();
 
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setPushPermission(Notification.permission);
+    }
+
     if (session?.user) {
       setNewUsername((session.user as any).username || "");
       setAvatarUrl((session.user as any).image || "");
@@ -101,8 +144,10 @@ export default function ProfilePage() {
     const handleLevelUpToast = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.level) {
-        setLeveledUpTo(customEvent.detail.level);
+        const newLvl = customEvent.detail.level;
+        setLeveledUpTo(newLvl);
         setShowLevelUpAlert(true);
+        sendLevelUpPushNotification(newLvl);
       }
       fetchOpenings();
       fetchInventory();
@@ -126,22 +171,57 @@ export default function ProfilePage() {
     });
   }, [inventory, sortBy, filterRarity]);
 
+  // SINGLE ITEM SELL HANDLER WITH SAFE JSON CHECK & BALANCE DISPATCH
+  const handleSellItem = async (inventoryItemId: string) => {
+    setSellingItemId(inventoryItemId);
+    try {
+      const res = await fetch("/api/inventory/sell", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inventoryItemId }),
+      });
+
+      const data = await safeParseJson(res);
+
+      if (res.ok) {
+        setInventory((prev) => prev.filter((i) => i.id !== inventoryItemId));
+        await fetchProgress();
+        await fetchOpenings();
+
+        // Broadcast updated coin balance across the application
+        window.dispatchEvent(
+          new CustomEvent("balanceUpdated", { detail: { newBalance: data.newBalance } })
+        );
+      } else {
+        console.error(data.error || "Failed to sell item");
+      }
+    } catch (e) {
+      console.error("Sell Item Error:", e);
+    } finally {
+      setSellingItemId(null);
+    }
+  };
+
+  // MASS SELL ALL HANDLER WITH SAFE JSON CHECK & BALANCE DISPATCH
   const handleSellAllConfirmed = async () => {
     setConfirmModal(null);
     try {
       const res = await fetch("/api/inventory/sell-all", { method: "POST" });
-      const data = await res.json();
+      const data = await safeParseJson(res);
       
       if (res.ok) {
         await fetchInventory();
         await fetchOpenings();
-        await fetchProgress(); // Resync global account statistics context
+        await fetchProgress();
         
-        // Dispatch custom event to instantly update navbar coin counters across the app
-        window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { newBalance: data.newBalance } }));
+        window.dispatchEvent(
+          new CustomEvent("balanceUpdated", { detail: { newBalance: data.newBalance } })
+        );
+      } else {
+        console.error(data.error || "Failed to sell all items");
       }
     } catch (e) { 
-      console.error(e); 
+      console.error("Sell All Error:", e); 
     }
   };
 
@@ -155,10 +235,13 @@ export default function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newUsername, image: avatarUrl, currentPassword, newPassword }),
       });
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data.error || "Something went wrong");
       
       setFormStatus({ type: "success", msg: "Security matrix updated successfully!" });
+      if (data.user?.image !== undefined) {
+        setAvatarUrl(data.user.image);
+      }
       await updateSession();
       setCurrentPassword("");
       setNewPassword("");
@@ -261,7 +344,7 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      {/* PROFILE SETTINGS & OVERRIDES MODAL */}
+      {/* PROFILE SETTINGS MODAL */}
       <AnimatePresence>
         {settingsModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
@@ -365,6 +448,13 @@ export default function ProfilePage() {
                   <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded border border-white/5">
                     <Calendar size={10} className="text-slate-500" /> Secure Matrix Active
                   </span>
+
+                  {pushPermission !== "granted" && (
+                    <button onClick={requestNotificationPermission} className="text-[10px] font-mono text-indigo-400 flex items-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-0.5 rounded border border-indigo-500/20 transition">
+                      <Bell size={10} /> Enable Push Alerts
+                    </button>
+                  )}
+
                   <button onClick={() => setSettingsModal(true)} className="text-[10px] font-mono text-amber-400 flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-0.5 rounded border border-amber-500/20 transition">
                     <Settings size={10} /> Edit Profile
                   </button>
@@ -372,7 +462,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* RESPONSIVE REAL-TIME RADIAL XP BAR CARD */}
+            {/* RADIAL XP BAR */}
             <div className="w-full lg:w-80 bg-slate-900/30 backdrop-blur-md border border-white/5 p-4 rounded-xl sm:rounded-2xl flex flex-col gap-2 relative">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] uppercase font-black tracking-widest text-slate-400 flex items-center gap-1">
@@ -464,6 +554,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     {processedInventory.map((invItem) => {
                       const rarity = getRarityConfig(invItem.item.rarity);
+                      const isSelling = sellingItemId === invItem.id;
                       return (
                         <motion.div layout key={invItem.id} whileHover={{ y: -4 }} className={`bg-gradient-to-b ${rarity.bg} border ${rarity.glow} rounded-xl p-3 flex flex-col justify-between items-start relative overflow-hidden transition-all duration-200 group`}>
                           <div className={`absolute top-0 left-0 right-0 h-[2px] ${rarity.accent}`} />
@@ -477,6 +568,15 @@ export default function ProfilePage() {
                             <h3 className="font-black text-[11px] truncate text-slate-200 group-hover:text-white">{invItem.item.name}</h3>
                             <p className="text-amber-400 text-[11px] font-black font-mono tracking-tighter">{invItem.item.value.toLocaleString()}</p>
                             <span className={`inline-block text-[7px] tracking-widest uppercase px-1.5 py-0.5 rounded ${rarity.badge}`}>{invItem.item.rarity}</span>
+                            
+                            <button
+                              onClick={() => handleSellItem(invItem.id)}
+                              disabled={isSelling}
+                              className="w-full mt-2 py-1 px-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-wider transition flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                              <DollarSign size={10} />
+                              {isSelling ? "Selling..." : "Sell"}
+                            </button>
                           </div>
                         </motion.div>
                       );

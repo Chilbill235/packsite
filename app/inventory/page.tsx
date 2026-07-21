@@ -39,8 +39,8 @@ export default function InventoryPage() {
       const newBalance = (event as CustomEvent<{ balance: number }>).detail.balance;
       localStorage.setItem('userBalance', newBalance.toString());
     };
-    document.addEventListener("balanceUpdated", handleBalanceChange);
-    return () => document.removeEventListener("balanceUpdated", handleBalanceChange);
+    window.addEventListener("balanceUpdated", handleBalanceChange);
+    return () => window.removeEventListener("balanceUpdated", handleBalanceChange);
   }, []);
 
   const filteredInventory = useMemo(() => {
@@ -73,7 +73,7 @@ export default function InventoryPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to sell item");
       setInventory(prev => prev.filter(i => i.id !== inventoryId));
-      document.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance }, bubbles: true }));
+      window.dispatchEvent(new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance } }));
       localStorage.setItem('userBalance', data.newBalance.toString());
       setNotification({ message: "Item sold successfully!", type: "success" });
     } catch (err) {

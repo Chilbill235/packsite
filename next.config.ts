@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   
   // Add your ngrok hostname here. 
   // You can also use "*.ngrok-free.dev" if you want to allow all ngrok subdomains.
-  allowedDevOrigins: ["192.168.12.237", "franklin-deputy-resolved-paso.trycloudflare.com"],
+  allowedDevOrigins: ["localhost", "127.0.0.1", "franklin-deputy-resolved-paso.trycloudflare.com"],
   
   turbopack: {},
 };

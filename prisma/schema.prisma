@@ -36,6 +36,7 @@ model User {
   username      String         @unique
   email         String         @unique
   password      String?
+  image         String?        // <--- Add this line
   balance       Int            @default(100000)
   createdAt     DateTime       @default(now())
   lastAdWatched DateTime?
