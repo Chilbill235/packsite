@@ -102,7 +102,10 @@ export default function HomePage() {
   useEffect(() => {
     setIsMounted(true);
 
-    // Check if user previously set their preference to shop automatically
+    // Ensure document body allows normal natural scrolling
+    document.body.style.overflowX = "hidden";
+    document.body.style.overflowY = "auto";
+
     const savedPreference = localStorage.getItem("vault_root_preference");
     if (savedPreference === "shop") {
       router.replace("/shop");
@@ -116,19 +119,19 @@ export default function HomePage() {
     };
 
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
   }, [mouseX, mouseY, router]);
 
   const handleEnterShop = () => {
     if (isNavigating) return;
     setIsNavigating(true);
 
-    // iOS Haptic feedback if available
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       navigator.vibrate(40);
     }
 
-    // Increased timeout to 1200ms to let the cinematic loader play fully before routing
     setTimeout(() => {
       router.push("/shop");
     }, 1200);
@@ -137,7 +140,7 @@ export default function HomePage() {
   if (!isMounted) return null;
 
   return (
-    <div className="relative min-h-screen bg-[#050507] text-white font-sans overflow-x-hidden flex flex-col justify-between selection:bg-amber-500/30 touch-manipulation">
+    <div className="relative min-h-screen bg-[#050507] text-white font-sans flex flex-col justify-between selection:bg-amber-500/30">
       
       {/* Dynamic Background Effects */}
       <ParticleCanvas />
@@ -153,7 +156,7 @@ export default function HomePage() {
         initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className="relative z-20 flex items-center justify-between px-5 sm:px-12 py-5 sm:py-7 max-w-7xl mx-auto w-full"
+        className="relative z-25 flex items-center justify-between px-5 sm:px-12 py-5 sm:py-7 max-w-7xl mx-auto w-full"
       >
         <div className="flex items-center gap-3 group cursor-pointer" onClick={handleEnterShop}>
           <div className="relative p-2.5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] group-hover:scale-105 transition-transform duration-300">
@@ -184,7 +187,7 @@ export default function HomePage() {
       </motion.header>
 
       {/* HERO SECTION */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-4 max-w-6xl mx-auto w-full py-8 sm:py-12">
+      <main className="relative z-20 flex-1 flex flex-col items-center justify-center text-center px-4 max-w-6xl mx-auto w-full py-8 sm:py-12">
         
         {/* Dynamic Status Pill */}
         <motion.div 
@@ -332,7 +335,7 @@ export default function HomePage() {
       </main>
 
       {/* FOOTER */}
-      <footer className="relative z-10 p-6 text-center text-slate-500 text-xs border-t border-white/5 max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="relative z-20 p-6 text-center text-slate-500 text-xs border-t border-white/5 max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Package size={16} className="text-amber-500" />
           <span className="font-extrabold text-slate-300">PACKSITE</span>
