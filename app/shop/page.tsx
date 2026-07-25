@@ -353,7 +353,7 @@ export default function ShopPage() {
       }
     } catch (err) { 
       console.error("Failed to refresh user:", err); 
-    } fontinally {
+    } finally {
       setIsFetchingUser(false);
     }
     return null;
