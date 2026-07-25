@@ -12,6 +12,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* iOS Touch and Viewport Fixes */
+html,
+body {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  /* Safe area padding handles iOS status bar and notch overlap */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* WonScreen item card with uniform responsive sizing */
 .won-card {
   display: flex;
@@ -54,12 +73,6 @@
 .item-count-30 .won-card .won-card-text, .item-count-31 .won-card .won-card-text, .item-count-32 .won-card .won-card-text, .item-count-33 .won-card .won-card-text, .item-count-34 .won-card .won-card-text, .item-count-35 .won-card .won-card-text { font-size: 0.5rem; }
 .item-count-36 .won-card .won-card-text, .item-count-37 .won-card .won-card-text, .item-count-38 .won-card .won-card-text, .item-count-39 .won-card .won-card-text, .item-count-40 .won-card .won-card-text { font-size: 0.45rem; }
 .item-count-41 .won-card .won-card-text, .item-count-42 .won-card .won-card-text, .item-count-43 .won-card .won-card-text, .item-count-44 .won-card .won-card-text, .item-count-45 .won-card .won-card-text, .item-count-46 .won-card .won-card-text, .item-count-47 .won-card .won-card-text, .item-count-48 .won-card .won-card-text, .item-count-49 .won-card .won-card-text, .item-count-50 .won-card .won-card-text { font-size: 0.4rem; }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
 
 .won-screen-overlay {
   position: fixed;

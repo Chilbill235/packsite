@@ -1,4 +1,4 @@
-import { Metadata, Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import LayoutContent from "./layout-content";
@@ -24,8 +24,6 @@ export const viewport: Viewport = {
   themeColor: "#070707",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover", // Vital for full-screen web apps & iOS notched displays
 };
 
