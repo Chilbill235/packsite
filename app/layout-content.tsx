@@ -25,6 +25,20 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const [rewardAmount] = useState(REWARD_AMOUNT);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Service Worker Registration
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/ServiceWorker.js")
+        .then((registration) => {
+          console.log("[ServiceWorker] Registered successfully:", registration.scope);
+        })
+        .catch((error) => {
+          console.error("[ServiceWorker] Registration failed:", error);
+        });
+    }
+  }, []);
+
   // Splash Screen Logic - Modified to only show on the home page ("/")
   useEffect(() => {
     if (status === "loading") return;
@@ -100,7 +114,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
         }
       `}</style>
 
-      {/* 50,000X BETTER ULTRA ARCADE AD STAGE OVERLAY */}
+      {/* ULTRA ARCADE AD STAGE OVERLAY */}
       {adActive && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-[#020205]/95 scanline-effect backdrop-blur-2xl">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_600px_400px_at_center,black_30%,transparent_80%)] opacity-40" />
@@ -228,7 +242,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex flex-col bg-[#070707]">
         {pathname !== "/login" && pathname !== "/register" && <Navbar />}
 
-        {/* If loading is true and we're on the root route, you can render a placeholder splash element here if desired */}
         <main className="flex-grow w-full pt-6 bg-[#070707]">
           {loading && pathname === "/" ? (
             <div
