@@ -26,17 +26,20 @@ function getXpForLevel(level: number): number {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    // Validate session user ID and email
+    if (!session?.user?.id || !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const userId = session.user.id;
     const body = await req.json();
     const { packId, quantity, isFlashSale } = body;
     const qty = Math.max(1, parseInt(quantity, 10) || 1);
 
     const result = await prisma.$transaction(async (tx) => {
+      // Query by user ID instead of email for better accuracy and speed
       const user = await tx.user.findUnique({
-        where: { email: session.user.email },
+        where: { id: userId },
       });
 
       if (!user) throw new Error("User profile not found.");
