@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Bell, X, Smartphone, Sparkles, Crown, Diamond, Zap, 
+  Bell, X, Smartphone, Sparkles, Crown, Zap, 
   Coins, Tag, Package, ChevronRight, AlertCircle, RefreshCw
 } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
@@ -15,19 +15,6 @@ import { RewardedAdService } from "@/lib/adService";
 import { notificationService } from "@/lib/notificationService";
 
 // --- Types ---
-interface BuffDetails {
-  title: string;
-  description: string;
-  icon: React.ElementType;
-  color: string;
-}
-
-interface PackBasic {
-  id: string;
-  name: string;
-  price: number;
-}
-
 interface UserProfile {
   id?: string;
   email?: string;
@@ -39,6 +26,12 @@ interface UserProfile {
   luckExpiresAt?: string | Date | null;
   discountExpiresAt?: string | Date | null;
   xpBoostExpiresAt?: string | Date | null;
+}
+
+interface PackBasic {
+  id: string;
+  name: string;
+  price: number;
 }
 
 interface ApiPack {
@@ -60,24 +53,6 @@ interface PackTheme {
   boxLid: string;
   boxBody: string;
 }
-
-// --- Buff Definitions ---
-const BUFF_MAP: Record<string, BuffDetails> = {
-  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop credited!", icon: Coins, color: "text-cyan-400" },
-  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Enhanced mythic pack odds.", icon: Sparkles, color: "text-emerald-400" },
-  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active!", icon: Sparkles, color: "text-emerald-400" },
-  luck_boost_3x: { title: "3x Luck Active!", description: "Peak mythic pack luck!", icon: Sparkles, color: "text-purple-400" },
-  discount_10: { title: "10% Discount!", description: "10% off your next opening.", icon: Tag, color: "text-rose-400" },
-  discount_15: { title: "15% Discount!", description: "15% off your next opening.", icon: Tag, color: "text-rose-400" },
-  discount_20: { title: "20% Discount!", description: "20% off your next opening.", icon: Tag, color: "text-rose-500" },
-  exclusive_pack: { title: "Vault Unlocked!", description: "A special pack is now available.", icon: Crown, color: "text-indigo-400" },
-  xp_boost_2x: { title: "2x XP Active!", description: "Double level progression.", icon: Zap, color: "text-orange-400" }
-};
 
 const FALLBACK_PACKS: PackBasic[] = [
   { id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f", name: "ALPHA ARSENAL", price: 100 },
@@ -225,7 +200,7 @@ export default function ShopPage() {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getInitialNotificationPermission);
   const [showBanner, setShowBanner] = useState(true);
 
-  // Lock scroll when modals/animations are up
+  // Lock scroll when modals/animations are active
   useEffect(() => {
     const shouldLockScroll = wonItems.length > 0 || showAdModal || isOpening || Boolean(pendingPack);
     if (shouldLockScroll) {
@@ -246,7 +221,6 @@ export default function ShopPage() {
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
   const [packError, setPackError] = useState<string | null>(null);
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
-  const [, setAdStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'completed'>('idle');
 
   const formatTimeLeft = (expirationTime: string | Date | null | undefined): string => {
     if (!expirationTime) return "";
@@ -270,8 +244,6 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
-  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastNotificationTimeRef = useRef<number>(0);
   const initializeFetchGuardRef = useRef(false);
 
   const syncUserState = useCallback((userData: UserProfile) => {
@@ -361,63 +333,24 @@ export default function ShopPage() {
     return null;
   }, [syncUserState, isFetchingUser]);
 
-  const applyBuff = useCallback(async (buff: string) => {
-    if (!buff) return;
-    try {
-      const res = await fetch("/api/rewards/apply-buff", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buffType: buff }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to apply reward");
-      }
-
-      const data = await res.json();
-      syncUserState(data);
-    } catch (err) {
-      console.error("Failed to apply buff:", err);
-      setErrorDialog({ message: err instanceof Error ? err.message : "Failed to apply reward" });
-    }
-  }, [syncUserState]);
-
   const handleAdRewarded = useCallback(async (amount: number) => {
     if (timerCompletedRef.current) return;
 
     timerCompletedRef.current = true;
     setIsWaiting(false);
-    setAdStatus('success');
     targetTimeRef.current = null;
 
     try {
-      const userId = userIdRef.current || (await fetchUserData())?.id;
-      if (userId) {
-        await fetch("/api/send-notification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            title: "Ad Reward Earned!",
-            message: `You've earned ${amount} coins!`,
-            ref: ""
-          }),
-        }).catch(err => console.warn("Reward notification failed to send:", err));
-      }
-
       await fetch("/api/user/add-coins", { 
         method: "POST", 
         headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ amount: 500, suppressNotification: true }) 
+        body: JSON.stringify({ amount: amount || 500, suppressNotification: true }) 
       });
       await fetchUserData();
-      setAdStatus('completed');
-      setTimeout(() => { setAdStatus('idle'); }, 3000);
+      setShowAdModal(false);
     } catch (error) {
       console.error("Failed to process ad reward:", error);
-      setAdStatus('error');
-      setTimeout(() => { setAdStatus('idle'); setIsWaiting(false); }, 5000);
+      setIsWaiting(false);
     }
   }, [fetchUserData]);
 
@@ -443,7 +376,7 @@ export default function ShopPage() {
           setPacks(FALLBACK_PACKS);
         }
       } catch (packErr) {
-        console.warn("[Shop] Failed to fetch packs, using premium fallback items:", packErr);
+        console.warn("[Shop] Failed to fetch packs, using fallback:", packErr);
         setPacks(FALLBACK_PACKS);
       }
 
@@ -452,39 +385,10 @@ export default function ShopPage() {
       console.error("[Shop] Error in loadShopData:", err);
       setPackError("An error occurred while loading packs");
       setPacks(FALLBACK_PACKS);
-    } finally { // ✅ Fixed
+    } finally {
       setIsFetchingPacks(false);
     }
-  }, [fetchUserData, isFetchingPacks]);;
-
-  const handleNotificationRouting = useCallback(async (ref: string) => {
-    const currentUser = user || await fetchUserData();
-    if (!currentUser) return;
-
-    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl"].includes(ref)) {
-      setIsFlashSaleActive(true);
-    } else if (["daily-bonus", "level-up", "streak"].includes(ref)) {
-      try {
-        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
-        await fetchUserData();
-      } catch { console.error("Auto-claim failed"); }
-    } else if (ref === "reward-claim") {
-      try {
-        setAdStatus('completed');
-        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
-        await fetchUserData();
-        setTimeout(() => { setAdStatus('idle'); }, 3000);
-      } catch (e) {
-        setAdStatus('error');
-        setTimeout(() => { setAdStatus('idle'); }, 3000);
-        setErrorDialog({ message: "Failed to claim reward: " + (e instanceof Error ? e.message : "Unknown error") });
-      }
-    } else if (["vault-drop", "mystery-box"].includes(ref)) {
-      setShowAdModal(true);
-    } else if (["new-item", "best-seller"].includes(ref)) {
-      loadShopData();
-    }
-  }, [fetchUserData, loadShopData, user]);
+  }, [fetchUserData, isFetchingPacks]);
 
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) {
@@ -510,23 +414,6 @@ export default function ShopPage() {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
-    setAdStatus('loading');
-
-    if (!adService.current) {
-      setIsWaiting(false);
-      setAdStatus('error');
-      return;
-    }
-
-    try {
-      const adResult = await adService.current.showAd(user?.email || "anon");
-      if (adResult && adResult.completed) {
-        await handleAdRewarded(amount);
-        return;
-      }
-    } catch (adError) {
-      console.error("Ad failed to show:", adError);
-    }
 
     setTimeout(() => {
       if (isWaiting) {
@@ -614,31 +501,16 @@ export default function ShopPage() {
     loadShopData();
     adService.current = new RewardedAdService();
 
+    // FIXED: Correctly listen for BOTH potential triggers from the Navbar
     const openModal = () => { setShowAdModal(true); };
+    window.addEventListener("openShopBalanceModal", openModal);
     window.addEventListener("openBalanceModal", openModal);
-    return () => window.removeEventListener("openBalanceModal", openModal);
-  }, [loadShopData]);
 
-  useEffect(() => {
-    const ref = searchParams.get("ref");
-    const buff = searchParams.get("buff");
-    if (!ref && !buff) return;
-
-    const routePayloads = async () => {
-      if (ref) await handleNotificationRouting(ref);
-      if (buff) await applyBuff(buff);
-
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("ref");
-      params.delete("buff");
-      const nextUrl = params.toString()
-        ? `${window.location.pathname}?${params.toString()}`
-        : window.location.pathname;
-      window.history.replaceState({}, document.title, nextUrl);
+    return () => {
+      window.removeEventListener("openShopBalanceModal", openModal);
+      window.removeEventListener("openBalanceModal", openModal);
     };
-
-    routePayloads();
-  }, [applyBuff, handleNotificationRouting, searchParams]);
+  }, [loadShopData]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -681,11 +553,11 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-[#070707] text-slate-100 font-sans relative overflow-hidden flex flex-col selection:bg-amber-500/30">
       
-      {/* Background Cyber Grid Effects */}
+      {/* Background Grid */}
       <div className="absolute inset-0 bg-[radial-gradient(#1f1f2e_1px,transparent_1px)] [background-size:24px_24px] opacity-30 pointer-events-none" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-amber-500/10 via-purple-500/5 to-transparent blur-[140px] rounded-full pointer-events-none" />
 
-      {/* PACK OPENING ANIMATION OVERLAY */}
+      {/* Opening Animation Overlay */}
       <AnimatePresence>
         {isOpening && (
           <motion.div
@@ -714,7 +586,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* PACK PURCHASE MODAL */}
+      {/* Purchase Modal */}
       <AnimatePresence>
         {pendingPack && (
           <PackPurchaseModal
@@ -753,7 +625,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* iOS Standalone Banner Notice */}
+      {/* iOS Banner */}
       {isMounted && isIOS && !isStandalone && (
         <div className="mx-4 mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 relative z-10 max-w-4xl mx-auto w-full backdrop-blur-md">
           <Smartphone className="text-amber-400 shrink-0" size={22} />
@@ -764,7 +636,7 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Permission Request Banner */}
+      {/* Notification Banner */}
       <AnimatePresence>
         {isMounted && permission === "default" && showBanner && (
           <motion.div 
@@ -788,7 +660,7 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* Watch Ad Payout Modal */}
+      {/* Watch Ad Boost Balance Modal */}
       <AnimatePresence>
         {showAdModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -820,10 +692,8 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* Main Content Area */}
+      {/* Main Shop View */}
       <div className="max-w-6xl mx-auto flex flex-col items-center w-full relative z-10 px-4 flex-1 py-6">
-        
-        {/* Header Title */}
         <div className="text-center mb-6">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-amber-400 mb-3">
             <Sparkles size={14} /> EXCLUSIVE VAULT STORE
@@ -836,7 +706,7 @@ export default function ShopPage() {
           </motion.h1>
         </div>
 
-        {/* Active Buffs Pill Displays */}
+        {/* Active Buff Badges */}
         {(activeDiscount > 0 || activeLuck > 1 || activeXpBoost) && (
           <div className="flex flex-wrap gap-2 mb-6 justify-center items-center">
             {activeDiscount > 0 && (
@@ -885,7 +755,6 @@ export default function ShopPage() {
               >
                 <div className={`pointer-events-none absolute -top-24 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
 
-                {/* Top Badges */}
                 <div className="flex items-center justify-between w-full relative z-20 mb-4">
                   <span className={`text-[10px] font-black tracking-widest px-2.5 py-1 rounded-md ${theme.badge}`}>
                     {theme.tier}
@@ -904,7 +773,6 @@ export default function ShopPage() {
                   </div>
                 </div>
 
-                {/* Pack Box Visual */}
                 <div className="relative h-28 flex items-center justify-center my-2">
                   <div className={`absolute w-24 h-24 rounded-full blur-2xl opacity-50 ${theme.halo} group-hover:scale-125 transition-transform duration-500`} />
                   <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
@@ -916,7 +784,6 @@ export default function ShopPage() {
                   </div>
                 </div>
 
-                {/* Pack Meta */}
                 <div className="relative z-10 flex flex-col items-center text-center mt-2">
                   <h3 className="font-black text-lg text-white mb-1 group-hover:text-amber-300 transition-colors">
                     {pack.name}
@@ -1022,7 +889,6 @@ export function PackPurchaseModal({
           <h2 className="text-2xl font-black text-white text-center mb-1">{pack.name}</h2>
           <p className="text-xs text-slate-400 mb-6">Select total vaults to decrypt</p>
 
-          {/* Quantity Selectors */}
           <div className="w-full mb-6">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-medium">
               <span>UNITS TO OPEN</span>
@@ -1045,7 +911,6 @@ export function PackPurchaseModal({
             </div>
           </div>
 
-          {/* Summary Details */}
           <div className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 mb-6 space-y-2 text-xs">
             <div className="flex justify-between text-slate-400">
               <span>Unit Price</span>
@@ -1076,7 +941,6 @@ export function PackPurchaseModal({
             )}
           </div>
 
-          {/* Confirm Button */}
           <button
             onClick={onConfirm}
             disabled={insufficient}
