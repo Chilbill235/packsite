@@ -61,6 +61,24 @@ interface PackTheme {
   boxBody: string;
 }
 
+// --- Buff Definitions ---
+const BUFF_MAP: Record<string, BuffDetails> = {
+  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
+  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
+  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
+  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
+  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
+  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop credited!", icon: Coins, color: "text-cyan-400" },
+  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Enhanced mythic pack odds.", icon: Sparkles, color: "text-emerald-400" },
+  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active!", icon: Sparkles, color: "text-emerald-400" },
+  luck_boost_3x: { title: "3x Luck Active!", description: "Peak mythic pack luck!", icon: Sparkles, color: "text-purple-400" },
+  discount_10: { title: "10% Discount!", description: "10% off your next opening.", icon: Tag, color: "text-rose-400" },
+  discount_15: { title: "15% Discount!", description: "15% off your next opening.", icon: Tag, color: "text-rose-400" },
+  discount_20: { title: "20% Discount!", description: "20% off your next opening.", icon: Tag, color: "text-rose-500" },
+  exclusive_pack: { title: "Vault Unlocked!", description: "A special pack is now available.", icon: Crown, color: "text-indigo-400" },
+  xp_boost_2x: { title: "2x XP Active!", description: "Double level progression.", icon: Zap, color: "text-orange-400" }
+};
+
 const FALLBACK_PACKS: PackBasic[] = [
   { id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f", name: "ALPHA ARSENAL", price: 100 },
   { id: "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f", name: "APEX MATRIX", price: 500 },
@@ -86,8 +104,8 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
     return {
       tier: "EXCLUSIVE",
       accent: "indigo",
-      cardBg: "bg-gradient-to-br from-indigo-950/80 via-black to-slate-950",
-      border: "border-indigo-500/50 hover:border-indigo-400",
+      cardBg: "bg-gradient-to-br from-indigo-950/70 via-black to-slate-950",
+      border: "border-indigo-500/40 hover:border-indigo-400",
       glow: "from-indigo-500/20 via-fuchsia-500/10 to-transparent",
       halo: "bg-indigo-500",
       badge: "bg-indigo-500/20 border border-indigo-400/50 text-indigo-300",
@@ -102,7 +120,7 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
       tier: "OMEGA",
       accent: "omega",
       cardBg: "bg-gradient-to-br from-zinc-950 via-black to-fuchsia-950/40",
-      border: "border-fuchsia-500/40 hover:border-fuchsia-400/60",
+      border: "border-fuchsia-500/30 hover:border-fuchsia-400/60",
       glow: "from-fuchsia-500/20 via-rose-500/10 to-transparent",
       halo: "bg-fuchsia-400",
       badge: "bg-gradient-to-r from-fuchsia-500/20 to-rose-500/20 border border-fuchsia-400/40 text-fuchsia-200",
@@ -117,7 +135,7 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
       tier: "MYTHIC",
       accent: "red",
       cardBg: "bg-gradient-to-br from-rose-950/40 via-black to-zinc-950",
-      border: "border-rose-500/40 hover:border-rose-400/60",
+      border: "border-rose-500/30 hover:border-rose-400/60",
       glow: "from-rose-500/20 via-orange-500/10 to-transparent",
       halo: "bg-rose-500",
       badge: "bg-rose-500/20 border border-rose-400/40 text-rose-300",
@@ -132,7 +150,7 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
       tier: "LEGENDARY",
       accent: "amber",
       cardBg: "bg-gradient-to-br from-amber-950/40 via-black to-zinc-950",
-      border: "border-amber-500/40 hover:border-amber-400/60",
+      border: "border-amber-500/30 hover:border-amber-400/60",
       glow: "from-amber-500/20 via-yellow-500/10 to-transparent",
       halo: "bg-amber-400",
       badge: "bg-amber-500/20 border border-amber-400/40 text-amber-300",
@@ -147,7 +165,7 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
       tier: "EPIC",
       accent: "purple",
       cardBg: "bg-gradient-to-br from-purple-950/40 via-black to-zinc-950",
-      border: "border-purple-500/40 hover:border-purple-400/60",
+      border: "border-purple-500/30 hover:border-purple-400/60",
       glow: "from-purple-500/20 via-fuchsia-500/10 to-transparent",
       halo: "bg-purple-500",
       badge: "bg-purple-500/20 border border-purple-400/40 text-purple-300",
@@ -160,8 +178,8 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
   return {
     tier: "RARE",
     accent: "sky",
-    cardBg: "bg-gradient-to-br from-sky-950/40 via-black to-zinc-950",
-    border: "border-sky-500/40 hover:border-sky-400/60",
+    cardBg: "bg-gradient-to-br from-sky-950/30 via-black to-zinc-950",
+    border: "border-sky-500/30 hover:border-sky-400/60",
     glow: "from-sky-500/20 via-cyan-500/10 to-transparent",
     halo: "bg-sky-400",
     badge: "bg-sky-500/20 border border-sky-400/40 text-sky-300",
@@ -335,7 +353,7 @@ export default function ShopPage() {
       }
     } catch (err) { 
       console.error("Failed to refresh user:", err); 
-    } finally {
+    } fontinally {
       setIsFetchingUser(false);
     }
     return null;
@@ -423,7 +441,7 @@ export default function ShopPage() {
           setPacks(FALLBACK_PACKS);
         }
       } catch (packErr) {
-        console.warn("[Shop] Failed to fetch packs, using fallback items:", packErr);
+        console.warn("[Shop] Failed to fetch packs, using premium fallback items:", packErr);
         setPacks(FALLBACK_PACKS);
       }
 
@@ -460,7 +478,7 @@ export default function ShopPage() {
         setErrorDialog({ message: "Failed to claim reward: " + (e instanceof Error ? e.message : "Unknown error") });
       }
     } else if (["vault-drop", "mystery-box"].includes(ref)) {
-      setShowAdModal(true);
+      window.dispatchEvent(new Event("openShopBalanceModal"));
     } else if (["new-item", "best-seller"].includes(ref)) {
       loadShopData();
     }
@@ -545,7 +563,7 @@ export default function ShopPage() {
     const totalCost = finalPrice * qty;
 
     if (user && (user.balance ?? 0) < totalCost) {
-      setErrorDialog({ message: "Insufficient coins! Watch an ad or claim rewards." });
+      setErrorDialog({ message: "Insufficient coins! Earn coins through ads or bounties." });
       return;
     }
 
@@ -651,7 +669,7 @@ export default function ShopPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#070707] text-rose-400 p-6 text-center">
         <AlertCircle size={48} className="mb-4 text-rose-500 animate-bounce" />
         <p className="text-lg font-bold">{packError}</p>
-        <button onClick={loadShopData} className="mt-4 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl font-bold flex items-center gap-2 hover:bg-rose-500/20 transition active:scale-95">
+        <button onClick={loadShopData} className="mt-4 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl font-bold flex items-center gap-2 hover:bg-rose-500/20 transition">
           <RefreshCw size={16} /> Retry Connection
         </button>
       </div>
@@ -659,30 +677,30 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070707] text-slate-100 font-sans relative overflow-x-hidden flex flex-col selection:bg-amber-500/30">
+    <div className="min-h-screen bg-[#070707] text-slate-100 font-sans relative overflow-hidden flex flex-col selection:bg-amber-500/30">
       
-      {/* Cyber Grid Backgrounds */}
+      {/* Background Cyber Grid Effects */}
       <div className="absolute inset-0 bg-[radial-gradient(#1f1f2e_1px,transparent_1px)] [background-size:24px_24px] opacity-30 pointer-events-none" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[300px] bg-gradient-to-b from-amber-500/10 via-purple-500/5 to-transparent blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-amber-500/10 via-purple-500/5 to-transparent blur-[140px] rounded-full pointer-events-none" />
 
       {/* PACK OPENING ANIMATION OVERLAY */}
       <AnimatePresence>
         {isOpening && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/90 backdrop-blur-2xl pointer-events-auto px-4"
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/90 backdrop-blur-2xl pointer-events-auto"
           >
             <motion.div
-              animate={{ rotate: [0, -8, 8, -8, 8, 0], scale: [1, 1.1, 1] }}
+              animate={{ rotate: [0, -8, 8, -8, 8, 0], scale: [1, 1.12, 1] }}
               transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
-              className="relative p-5 sm:p-6 rounded-3xl bg-gradient-to-b from-amber-500/20 to-transparent border border-amber-500/30 shadow-[0_0_50px_rgba(245,158,11,0.2)] mb-6"
+              className="relative p-6 rounded-3xl bg-gradient-to-b from-amber-500/20 to-transparent border border-amber-500/30 shadow-[0_0_50px_rgba(245,158,11,0.2)] mb-8"
             >
-              <Package size={64} className="text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
+              <Package size={80} className="text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
             </motion.div>
-            <h2 className="text-lg sm:text-2xl font-black tracking-widest text-white uppercase animate-pulse text-center">
+            <h2 className="text-xl sm:text-2xl font-black tracking-widest text-white uppercase animate-pulse">
               Decrypting Cyber Vault...
             </h2>
-            <div className="w-56 sm:w-64 h-2 bg-white/10 mt-6 rounded-full overflow-hidden border border-white/5">
+            <div className="w-64 h-2 bg-white/10 mt-6 rounded-full overflow-hidden border border-white/5">
               <motion.div
                 className="h-full bg-gradient-to-r from-amber-500 via-fuchsia-500 to-amber-300"
                 initial={{ width: "0%" }}
@@ -733,67 +751,66 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* iOS Safari Standalone Notice */}
+      {/* iOS Standalone Banner Notice */}
       {isMounted && isIOS && !isStandalone && (
-        <div className="mx-3 mt-16 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5 relative z-10 max-w-4xl sm:mx-auto w-[calc(100%-1.5rem)] backdrop-blur-md">
-          <Smartphone className="text-amber-400 shrink-0" size={18} />
-          <div className="text-[11px] leading-snug">
-            <span className="font-bold text-amber-400">iOS Setup: </span>
+        <div className="mx-4 mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 relative z-10 max-w-4xl mx-auto w-full backdrop-blur-md">
+          <Smartphone className="text-amber-400 shrink-0" size={22} />
+          <div className="text-xs">
+            <span className="font-bold text-amber-400">Enable Safari Alerts: </span>
             <span className="text-slate-300">Tap <strong className="text-white">Share</strong> & choose <strong className="text-white">&quot;Add to Home Screen&quot;</strong> for instant payouts!</span>
           </div>
         </div>
       )}
 
-      {/* Notifications Banner */}
+      {/* Permission Request Banner */}
       <AnimatePresence>
         {isMounted && permission === "default" && showBanner && (
           <motion.div 
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
-            className="mx-3 mt-3 relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 backdrop-blur-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 z-10 max-w-4xl sm:mx-auto w-[calc(100%-1.5rem)] shadow-xl"
+            initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
+            className="m-4 relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto w-full shadow-xl"
           >
-            <div className="flex items-center gap-3 relative z-10 w-full sm:w-auto">
-              <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 shrink-0">
-                <Bell size={18} />
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+                <Bell size={20} />
               </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-xs text-white">Enable Notifications</h4>
-                <p className="text-slate-400 text-[11px] leading-tight">Get flash coin sales & drop alerts.</p>
+              <div>
+                <h4 className="font-bold text-sm text-white">Enable Notifications</h4>
+                <p className="text-slate-400 text-xs">Stay tuned for rare vault drops and flash coin sales.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 relative z-10 w-full sm:w-auto shrink-0">
-              <button onClick={handleEnableNotifications} className="flex-1 sm:flex-initial px-4 py-2 text-xs bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-md active:scale-95">ALLOW</button>
-              <button onClick={() => setShowBanner(false)} className="p-2 text-slate-500 hover:text-white transition-colors active:scale-95"><X size={16} /></button>
+            <div className="flex items-center gap-2 relative z-10 w-full sm:w-auto">
+              <button onClick={handleEnableNotifications} className="w-full sm:w-auto px-4 py-2 text-xs bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-lg shadow-amber-500/20">ALLOW</button>
+              <button onClick={() => setShowBanner(false)} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Watch Ad Modal */}
+      {/* Direct Fallback Ad Modal */}
       <AnimatePresence>
         {showAdModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div className="bg-slate-900 border border-white/10 p-5 sm:p-6 rounded-3xl w-full max-w-xs text-center relative overflow-hidden shadow-2xl">
+            <motion.div className="bg-slate-900 border border-white/10 p-6 rounded-3xl w-full max-w-xs text-center relative overflow-hidden shadow-2xl">
               {isWaiting ? (
                 <div className="flex flex-col items-center py-4">
-                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 mb-3 flex items-center justify-center">
+                  <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
                     <svg className="w-full h-full rotate-[-90deg]">
-                      <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800 sm:hidden" />
-                      <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800 hidden sm:block" />
+                      <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800" />
                       <motion.circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-amber-500" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 10, ease: "linear" }} />
                     </svg>
-                    <span className="absolute text-xl sm:text-2xl font-black text-white">{countdown}</span>
+                    <span className="absolute text-2xl font-black text-white">{countdown}</span>
                   </div>
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-300">Processing Stream...</h3>
+                  <h3 className="text-sm font-bold text-slate-300">Processing Stream...</h3>
                 </div>
               ) : (
                 <>
                   <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 w-fit rounded-2xl mx-auto mb-3">
-                    <Coins size={24} />
+                    <Coins size={28} />
                   </div>
-                  <h3 className="text-base font-black mb-1 text-white">Boost Balance</h3>
-                  <p className="text-xs text-slate-400 mb-4">Watch a stream to claim bonus coins instantly.</p>
-                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black transition-all shadow-lg active:scale-95">WATCH AD (+500)</button>
-                  <button onClick={() => setShowAdModal(false)} className="mt-3 text-xs text-slate-500 hover:text-slate-300 active:scale-95">Cancel</button>
+                  <h3 className="text-lg font-black mb-1 text-white">Boost Balance</h3>
+                  <p className="text-xs text-slate-400 mb-4">Watch a quick stream to claim bonus coins instantly.</p>
+                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black transition-all shadow-lg shadow-amber-500/20">WATCH AD (+500)</button>
+                  <button onClick={() => setShowAdModal(false)} className="mt-3 text-xs text-slate-500 hover:text-slate-300">Cancel</button>
                 </>
               )}
             </motion.div>
@@ -801,45 +818,45 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* Main Responsive Store Viewport */}
-      <main className="max-w-6xl mx-auto flex flex-col items-center w-full relative z-10 px-3 sm:px-6 flex-1 pt-20 sm:pt-28 pb-16">
+      {/* Main Content Area */}
+      <div className="max-w-6xl mx-auto flex flex-col items-center w-full relative z-10 px-4 flex-1 py-6">
         
-        {/* Header Header clearance */}
-        <div className="text-center mb-5 sm:mb-8">
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] sm:text-xs font-bold text-amber-400 mb-2">
-            <Sparkles size={12} /> EXCLUSIVE VAULT STORE
+        {/* Header Title */}
+        <div className="text-center mb-6">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-amber-400 mb-3">
+            <Sparkles size={14} /> EXCLUSIVE VAULT STORE
           </motion.div>
           <motion.h1
-            initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="text-3xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500 uppercase"
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500"
           >
             VAULT SHOP
           </motion.h1>
         </div>
 
-        {/* Buff Pill Indicator Strip */}
+        {/* Active Buffs Pill Displays */}
         {(activeDiscount > 0 || activeLuck > 1 || activeXpBoost) && (
-          <div className="flex flex-wrap gap-1.5 mb-5 justify-center items-center max-w-md mx-auto">
+          <div className="flex flex-wrap gap-2 mb-6 justify-center items-center">
             {activeDiscount > 0 && (
-              <div className="flex items-center gap-1 px-2.5 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-[10px] sm:text-xs font-bold">
-                <Tag size={12} className="animate-pulse" /> {activeDiscount * 100}% Off {discountTimeLeft && `(${discountTimeLeft})`}
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-xs font-bold shadow-lg shadow-rose-500/5">
+                <Tag size={13} className="animate-pulse" /> {activeDiscount * 100}% Off {discountTimeLeft && `(${discountTimeLeft})`}
               </div>
             )}
             {activeLuck > 1 && (
-              <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-[10px] sm:text-xs font-bold">
-                <Sparkles size={12} className="animate-pulse" /> {activeLuck}x Luck {luckTimeLeft && `(${luckTimeLeft})`}
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-bold shadow-lg shadow-emerald-500/5">
+                <Sparkles size={13} className="animate-pulse" /> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
               </div>
             )}
             {activeXpBoost && (
-              <div className="flex items-center gap-1 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-[10px] sm:text-xs font-bold">
-                <Zap size={12} className="animate-pulse" /> 2x XP {xpTimeLeft && `(${xpTimeLeft})`}
+              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-xs font-bold shadow-lg shadow-orange-500/5">
+                <Zap size={13} className="animate-pulse" /> 2x XP Boost {xpTimeLeft && `(${xpTimeLeft})`}
               </div>
             )}
           </div>
         )}
 
-        {/* Packs Grid - Optimized Mobile 2-Column */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-5 w-full">
+        {/* Packs Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 w-full">
           {displayPacks.map((pack, idx) => {
             if (!pack || typeof pack !== 'object' || !pack.id) return null;
 
@@ -857,79 +874,79 @@ export default function ShopPage() {
             return (
               <motion.div
                 key={pack.id}
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03, type: "spring", stiffness: 120 }}
-                whileTap={{ scale: 0.98 }}
+                transition={{ delay: idx * 0.05, type: "spring", stiffness: 120 }}
+                whileHover={{ y: -4 }}
                 onClick={() => requestOpenPack(pack.id)}
-                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 p-3 sm:p-5 flex flex-col justify-between touch-manipulation`}
+                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/5 p-5 flex flex-col justify-between`}
               >
-                <div className={`pointer-events-none absolute -top-20 -inset-x-10 h-40 bg-gradient-to-b ${theme.glow} blur-xl opacity-60 group-hover:opacity-100 transition-opacity`} />
+                <div className={`pointer-events-none absolute -top-24 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
 
-                {/* Card Badges */}
-                <div className="flex items-center justify-between w-full relative z-20 mb-2">
-                  <span className={`text-[9px] sm:text-[10px] font-black tracking-wider px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-md ${theme.badge}`}>
+                {/* Top Badges */}
+                <div className="flex items-center justify-between w-full relative z-20 mb-4">
+                  <span className={`text-[10px] font-black tracking-widest px-2.5 py-1 rounded-md ${theme.badge}`}>
                     {theme.tier}
                   </span>
                   <div className="flex gap-1">
                     {onSale && (
-                      <span className="text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded bg-rose-500 text-black animate-pulse">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-500 text-black animate-pulse">
                         -{Math.round((1 - discountMultiplier) * 100)}%
                       </span>
                     )}
                     {isExclusive && (
-                      <span className="text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded bg-fuchsia-500 text-white animate-pulse">
-                        FREE
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-fuchsia-500 text-white animate-pulse">
+                        EXCLUSIVE
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Box Artwork */}
-                <div className="relative h-20 sm:h-28 flex items-center justify-center my-1 sm:my-2">
-                  <div className={`absolute w-16 h-16 sm:w-24 sm:h-24 rounded-full blur-xl opacity-40 ${theme.halo} group-hover:scale-125 transition-transform`} />
-                  <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300 scale-90 sm:scale-100">
-                    <div className={`relative h-4 sm:h-6 w-16 sm:w-24 rounded-t bg-gradient-to-b ${theme.boxLid} border border-white/20 shadow-md`} />
-                    <div className={`relative h-10 sm:h-14 w-14 sm:w-20 rounded-b bg-gradient-to-b ${theme.boxBody} border border-white/20 border-t-0 shadow-xl flex items-center justify-center`}>
-                      <Package size={16} className="text-white/40 group-hover:text-white/80 transition-colors" />
-                      <div className={`absolute inset-y-0 w-2 bg-gradient-to-b ${theme.ribbon} opacity-80`} />
+                {/* Pack Box Visual */}
+                <div className="relative h-28 flex items-center justify-center my-2">
+                  <div className={`absolute w-24 h-24 rounded-full blur-2xl opacity-50 ${theme.halo} group-hover:scale-125 transition-transform duration-500`} />
+                  <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
+                    <div className={`relative h-6 w-24 rounded-t-lg bg-gradient-to-b ${theme.boxLid} border border-white/20 shadow-lg`} />
+                    <div className={`relative h-14 w-20 rounded-b-lg bg-gradient-to-b ${theme.boxBody} border border-white/20 border-t-0 shadow-2xl flex items-center justify-center`}>
+                      <Package size={22} className="text-white/40 group-hover:text-white/80 transition-colors" />
+                      <div className={`absolute inset-y-0 w-2.5 bg-gradient-to-b ${theme.ribbon} opacity-80`} />
                     </div>
                   </div>
                 </div>
 
                 {/* Pack Meta */}
-                <div className="relative z-10 flex flex-col items-center text-center mt-1">
-                  <h3 className="font-black text-xs sm:text-lg text-white mb-0.5 sm:mb-1 truncate w-full group-hover:text-amber-300 transition-colors">
+                <div className="relative z-10 flex flex-col items-center text-center mt-2">
+                  <h3 className="font-black text-lg text-white mb-1 group-hover:text-amber-300 transition-colors">
                     {pack.name}
                   </h3>
-                  <div className={`text-[10px] sm:text-xs font-bold tracking-wider uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-2 sm:mb-4 flex items-center gap-1`}>
+                  <div className={`text-xs font-bold tracking-wider uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-4 flex items-center gap-1`}>
                     {isExclusive ? (
                       "FREE DROP"
                     ) : (
                       <>
-                        <Coins size={10} className="text-amber-400 shrink-0 sm:w-3 sm:h-3" />
-                        <span>{finalPrice.toLocaleString()}</span>
+                        <Coins size={12} className="text-amber-400 shrink-0" />
+                        <span>{finalPrice.toLocaleString()} COINS</span>
                       </>
                     )}
                   </div>
 
                   <button
                     onClick={(e) => { e.stopPropagation(); requestOpenPack(pack.id); }}
-                    className={`w-full py-2 sm:py-3 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1 active:scale-95 ${
+                    className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 ${
                       isExclusive
-                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-md"
+                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
                         : "bg-white/10 hover:bg-white text-white hover:text-black border border-white/10"
                     }`}
                   >
-                    <span>OPEN</span>
-                    <ChevronRight size={12} className="sm:w-3.5 sm:h-3.5" />
+                    <span>OPEN VAULT</span>
+                    <ChevronRight size={14} />
                   </button>
                 </div>
               </motion.div>
             );
           })}
         </div>
-      </main>
+      </div>
 
       {errorDialog && <ErrorDialog message={errorDialog.message} onClose={() => setErrorDialog(null)} />}
     </div>
@@ -984,27 +1001,27 @@ export function PackPurchaseModal({
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md"
+      className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
     >
       <motion.div
-        initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-md overflow-hidden rounded-t-3xl sm:rounded-3xl ${theme.cardBg} ${theme.border} border p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto`}
+        className={`relative w-full max-w-md overflow-hidden rounded-3xl ${theme.cardBg} ${theme.border} border p-6 shadow-2xl`}
       >
-        <button onClick={onClose} className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/5 text-slate-400 hover:text-white transition-colors active:scale-95">
+        <button onClick={onClose} className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
           <X size={18} />
         </button>
 
         <div className="relative z-10 flex flex-col items-center">
-          <span className={`text-[10px] font-black tracking-widest px-3 py-0.5 rounded-md mb-2 ${theme.badge}`}>
+          <span className={`text-[10px] font-black tracking-widest px-3 py-1 rounded-md mb-4 ${theme.badge}`}>
             {theme.tier}
           </span>
 
-          <h2 className="text-xl sm:text-2xl font-black text-white text-center mb-0.5">{pack.name}</h2>
-          <p className="text-[11px] sm:text-xs text-slate-400 mb-4">Select total vaults to decrypt</p>
+          <h2 className="text-2xl font-black text-white text-center mb-1">{pack.name}</h2>
+          <p className="text-xs text-slate-400 mb-6">Select total vaults to decrypt</p>
 
           {/* Quantity Selectors */}
-          <div className="w-full mb-4">
+          <div className="w-full mb-6">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-medium">
               <span>UNITS TO OPEN</span>
               <span className="text-amber-400 font-bold">{quantity} Vaults</span>
@@ -1014,9 +1031,9 @@ export function PackPurchaseModal({
                 <button
                   key={q}
                   onClick={() => setQuantity(q)}
-                  className={`py-2 rounded-xl text-xs font-black transition-all active:scale-95 ${
+                  className={`py-2 rounded-xl text-xs font-black transition-all ${
                     quantity === q 
-                      ? "bg-amber-500 text-black shadow-md shadow-amber-500/20" 
+                      ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20" 
                       : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
                   }`}
                 >
@@ -1026,8 +1043,8 @@ export function PackPurchaseModal({
             </div>
           </div>
 
-          {/* Cost Summary */}
-          <div className="w-full bg-black/40 border border-white/5 rounded-2xl p-3.5 mb-5 space-y-1.5 text-xs">
+          {/* Summary Details */}
+          <div className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 mb-6 space-y-2 text-xs">
             <div className="flex justify-between text-slate-400">
               <span>Unit Price</span>
               <span className="text-slate-200 font-bold">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}</span>
@@ -1038,39 +1055,50 @@ export function PackPurchaseModal({
                 <span className="font-bold">-{Math.round((1 - discountMultiplier) * 100)}%</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-400 border-b border-white/5 pb-1.5">
+            <div className="flex justify-between text-slate-400 border-b border-white/5 pb-2">
               <span>Quantity</span>
               <span className="text-slate-200 font-bold">{quantity}</span>
             </div>
-            <div className="flex justify-between text-xs sm:text-sm font-bold text-white pt-1">
+            <div className="flex justify-between text-sm font-bold text-white pt-1">
               <span>Total Cost</span>
               <span className="text-amber-400">{isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}</span>
             </div>
 
             {!isExclusive && (
-              <div className="pt-1.5 border-t border-white/5 flex justify-between text-[10px] sm:text-[11px]">
+              <div className="pt-2 border-t border-white/5 flex justify-between text-[11px]">
                 <span className="text-slate-500">Remaining Balance</span>
-                <span className={insufficient ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                  {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` : `${remainingBalance.toLocaleString()} 🪙`}
+                <span className={insufficient ? "text-rose-400 font-bold" : "text-slate-300"}>
+                  {remainingBalance.toLocaleString()} 🪙
                 </span>
               </div>
             )}
           </div>
 
           {/* Action Button */}
-          <button
-            onClick={onConfirm}
-            disabled={insufficient}
-            className={`w-full py-3.5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all active:scale-95 ${
-              isExclusive
-                ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg"
-                : insufficient
-                ? "bg-white/10 text-slate-500 cursor-not-allowed"
-                : "bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20"
-            }`}
-          >
-            {isExclusive ? "CLAIM FREE VAULT" : insufficient ? "INSUFFICIENT FUNDS" : `OPEN ${quantity} VAULT${quantity > 1 ? "S" : ""}`}
-          </button>
+          {insufficient ? (
+            <button
+              onClick={() => {
+                onClose();
+                window.dispatchEvent(new Event("openShopBalanceModal"));
+              }}
+              className="w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-lg shadow-amber-500/20 hover:brightness-110 active:scale-98 transition-all flex items-center justify-center gap-2"
+            >
+              <Coins size={16} />
+              <span>EARN MORE COINS</span>
+            </button>
+          ) : (
+            <button
+              onClick={onConfirm}
+              className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-98 transition-all flex items-center justify-center gap-2 ${
+                isExclusive
+                  ? "bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-indigo-500 text-white shadow-indigo-500/25 hover:brightness-110"
+                  : "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20"
+              }`}
+            >
+              <span>CONFIRM & OPEN ({totalCost.toLocaleString()} 🪙)</span>
+              <ChevronRight size={16} />
+            </button>
+          )}
         </div>
       </motion.div>
     </motion.div>
