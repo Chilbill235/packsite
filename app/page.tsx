@@ -9,14 +9,11 @@ import {
   Zap, 
   ArrowRight, 
   ShieldCheck, 
-  Coins, 
   Flame,
   Crown,
   Lock,
   ChevronRight,
-  Gift,
-  User,
-  ShoppingBag
+  Gift
 } from "lucide-react";
 
 // --- High-Performance Optimized Particle Field ---
@@ -41,11 +38,11 @@ function ParticleCanvas() {
 
     window.addEventListener("resize", handleResize);
 
-    const particles = Array.from({ length: 50 }, () => ({
+    const particles = Array.from({ length: 55 }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
       radius: Math.random() * 2 + 0.8,
-      vy: -(Math.random() * 0.3 + 0.1),
+      vy: -(Math.random() * 0.35 + 0.1),
       vx: (Math.random() - 0.5) * 0.2,
       alpha: Math.random() * 0.7 + 0.2,
       color: Math.random() > 0.4 ? "#f59e0b" : "#ec4899",
@@ -92,6 +89,7 @@ function ParticleCanvas() {
 export default function HomePage() {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
 
   // 3D Mouse Parallax Effect for Desktop
@@ -122,17 +120,40 @@ export default function HomePage() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [mouseX, mouseY, router]);
 
+  // Cinematic Loading Sequence Simulator
+  useEffect(() => {
+    if (!isNavigating) {
+      setLoadingProgress(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 4;
+      });
+    }, 30);
+
+    const timer = setTimeout(() => {
+      router.push("/shop");
+    }, 1100);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
+  }, [isNavigating, router]);
+
   const handleEnterShop = () => {
     if (isNavigating) return;
     setIsNavigating(true);
 
     if (typeof window !== "undefined" && "vibrate" in navigator) {
-      navigator.vibrate(40);
+      navigator.vibrate(50);
     }
-
-    setTimeout(() => {
-      router.push("/shop");
-    }, 1100);
   };
 
   if (!isMounted) return null;
@@ -172,27 +193,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action Controls & User Metrics */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/10 backdrop-blur-xl shadow-inner">
-            <Coins size={15} className="text-amber-400" />
-            <span className="text-xs font-black tracking-wider text-amber-300">65,190 COINS</span>
-          </div>
-
+        {/* Clean Action Launch Control */}
+        <div className="flex items-center gap-3">
           <button 
             onClick={handleEnterShop}
-            className="group relative px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-white hover:bg-amber-500/25 transition-all duration-300 flex items-center gap-2 text-xs font-black tracking-wider uppercase active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.1)] cursor-pointer backdrop-blur-md"
+            className="group relative px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-black font-black text-xs sm:text-sm uppercase tracking-widest shadow-[0_0_25px_rgba(245,158,11,0.35)] hover:shadow-[0_0_45px_rgba(245,158,11,0.6)] hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2 cursor-pointer"
           >
-            <ShoppingBag size={14} className="text-amber-400 group-hover:scale-110 transition-transform" />
-            <span>Shop</span>
-          </button>
-
-          <button 
-            onClick={handleEnterShop}
-            className="group relative px-5 py-2.5 rounded-xl bg-amber-500 text-black hover:bg-amber-400 transition-all duration-300 flex items-center gap-2 text-xs font-black tracking-wider uppercase active:scale-95 shadow-[0_0_25px_rgba(245,158,11,0.4)] cursor-pointer"
-          >
-            <span>Launch Vault</span>
-            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            <span>LAUNCH VAULT</span>
+            <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
       </motion.header>
@@ -328,10 +336,10 @@ export default function HomePage() {
 
           <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-xl flex flex-col items-center text-center hover:border-amber-500/40 hover:bg-white/[0.05] transition-all group">
             <div className="p-3.5 rounded-2xl bg-purple-500/10 text-purple-400 mb-4 group-hover:scale-110 transition-transform shadow-inner">
-              <Coins size={24} />
+              <Package size={24} />
             </div>
-            <h3 className="font-black text-white text-sm tracking-wide">Watch Ads & Earn</h3>
-            <p className="text-slate-400 text-xs mt-2 leading-relaxed">Top up your balance instantly with high-reward streams.</p>
+            <h3 className="font-black text-white text-sm tracking-wide">Provably Fair Drops</h3>
+            <p className="text-slate-400 text-xs mt-2 leading-relaxed">Cryptographically verified unboxing odds across all active vaults.</p>
           </div>
 
           <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-xl flex flex-col items-center text-center hover:border-amber-500/40 hover:bg-white/[0.05] transition-all group">
@@ -359,7 +367,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* CINEMATIC TRANSITION LOADER OVERLAY */}
+      {/* BREATHTAKING CYBERPUNK VAULT DECRYPTION LOADING OVERLAY */}
       <AnimatePresence>
         {isNavigating && (
           <motion.div 
@@ -367,33 +375,52 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-[300] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center pointer-events-auto"
+            className="fixed inset-0 z-[300] bg-[#020204]/95 backdrop-blur-2xl flex flex-col items-center justify-center pointer-events-auto overflow-hidden"
           >
-            <motion.div
-              initial={{ scale: 0.7, rotate: -15, opacity: 0 }}
-              animate={{ scale: [1, 1.25, 1], rotate: [0, 10, -10, 0], opacity: 1 }}
-              transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
-              className="p-7 rounded-3xl bg-gradient-to-br from-amber-500/30 via-orange-500/20 to-amber-500/10 border border-amber-500/50 shadow-[0_0_100px_rgba(245,158,11,0.4)] mb-6"
-            >
-              <Package size={72} className="text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]" />
-            </motion.div>
+            {/* Glowing Scanning Grid Backdrop */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293715_1px,transparent_1px),linear-gradient(to_bottom,#1f293715_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none" />
+
+            {/* Rotating Cyber Rings */}
+            <div className="relative mb-8 flex items-center justify-center">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+                className="absolute w-36 h-36 rounded-full border border-dashed border-amber-500/40"
+              />
+              <motion.div 
+                animate={{ rotate: -360 }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                className="absolute w-28 h-28 rounded-full border border-fuchsia-500/30"
+              />
+
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: [1, 1.15, 1], opacity: 1 }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+                className="relative z-10 p-6 rounded-3xl bg-gradient-to-br from-amber-500/30 via-orange-500/20 to-amber-500/10 border border-amber-500/60 shadow-[0_0_80px_rgba(245,158,11,0.5)]"
+              >
+                <Package size={56} className="text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.9)] animate-pulse" />
+              </motion.div>
+            </div>
 
             <motion.div 
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col items-center gap-3"
+              className="flex flex-col items-center gap-3 relative z-10 w-full max-w-xs px-4"
             >
-              <h2 className="font-black text-white text-2xl tracking-widest uppercase">
-                DECRYPTING VAULT OS
-              </h2>
-              <div className="w-52 h-1.5 bg-white/10 rounded-full overflow-hidden border border-white/10">
+              <div className="flex items-center justify-between w-full text-xs font-black tracking-widest uppercase">
+                <span className="text-amber-400 animate-pulse">DECRYPTING VAULT OS</span>
+                <span className="text-slate-400">{loadingProgress}%</span>
+              </div>
+
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden border border-white/10 p-0.5">
                 <motion.div 
-                  className="h-full bg-gradient-to-r from-amber-500 via-orange-400 to-amber-300"
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 0.8, ease: "easeInOut" }}
+                  className="h-full bg-gradient-to-r from-amber-500 via-orange-400 to-amber-300 rounded-full shadow-[0_0_15px_rgba(245,158,11,0.8)]"
+                  style={{ width: `${loadingProgress}%` }}
                 />
               </div>
+
+              <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mt-1">ESTABLISHING SECURE CONNECTION</span>
             </motion.div>
           </motion.div>
         )}
