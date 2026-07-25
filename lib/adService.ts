@@ -13,11 +13,24 @@ export class RewardedAdService {
       ? `${this.directLinkUrl}?userId=${encodeURIComponent(userId)}`
       : this.directLinkUrl;
 
-    const popup = window.open(
-      trackingUrl,
-      "_blank",
-      "width=500,height=600,noopener,noreferrer"
-    );
+    // Check if the user is on iOS / mobile Safari where window.open restrictions apply
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    let popup: Window | null = null;
+
+    if (isIOS) {
+      // iOS Safari requires a clean window.open without strict sizing or features 
+      // to avoid automatic popup blocking.
+      popup = window.open(trackingUrl, "_blank");
+    } else {
+      // Standard Desktop / Android behavior
+      popup = window.open(
+        trackingUrl,
+        "_blank",
+        "width=500,height=600,noopener,noreferrer"
+      );
+    }
 
     if (popup) {
       try {
