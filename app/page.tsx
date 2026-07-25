@@ -101,6 +101,14 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
+
+    // Check if user previously set their preference to shop automatically
+    const savedPreference = localStorage.getItem("vault_root_preference");
+    if (savedPreference === "shop") {
+      router.replace("/shop");
+      return;
+    }
+
     const handleMouseMove = (e: MouseEvent) => {
       const { innerWidth, innerHeight } = window;
       mouseX.set(e.clientX - innerWidth / 2);
@@ -109,7 +117,7 @@ export default function HomePage() {
 
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
+  }, [mouseX, mouseY, router]);
 
   const handleEnterShop = () => {
     if (isNavigating) return;
@@ -167,7 +175,7 @@ export default function HomePage() {
         <div className="flex items-center gap-3">
           <button 
             onClick={handleEnterShop}
-            className="group relative px-4 sm:px-6 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-white hover:bg-amber-500/20 transition-all duration-300 flex items-center gap-2 text-xs font-black tracking-wider uppercase active:scale-95 shadow-lg shadow-amber-500/5"
+            className="group relative px-4 sm:px-6 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 hover:border-amber-400 text-amber-300 hover:text-white hover:bg-amber-500/20 transition-all duration-300 flex items-center gap-2 text-xs font-black tracking-wider uppercase active:scale-95 shadow-lg shadow-amber-500/5 cursor-pointer"
           >
             <span>LAUNCH VAULT</span>
             <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform text-amber-400" />
@@ -222,7 +230,7 @@ export default function HomePage() {
         >
           <button 
             onClick={handleEnterShop}
-            className="group relative w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-black font-black text-sm sm:text-base uppercase tracking-widest shadow-[0_0_50px_rgba(245,158,11,0.4)] hover:shadow-[0_0_80px_rgba(245,158,11,0.7)] hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden"
+            className="group relative w-full sm:w-auto px-10 py-4 sm:py-5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-black font-black text-sm sm:text-base uppercase tracking-widest shadow-[0_0_50px_rgba(245,158,11,0.4)] hover:shadow-[0_0_80px_rgba(245,158,11,0.7)] hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden cursor-pointer"
           >
             <div className="absolute inset-0 bg-white/30 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
             <Sparkles size={20} className="relative z-10 text-black animate-spin-slow" />
