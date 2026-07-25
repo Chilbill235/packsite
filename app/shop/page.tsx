@@ -501,7 +501,7 @@ export default function ShopPage() {
     loadShopData();
     adService.current = new RewardedAdService();
 
-    // FIXED: Correctly listen for BOTH potential triggers from the Navbar
+    // Listen for both event handlers from header/nav components
     const openModal = () => { setShowAdModal(true); };
     window.addEventListener("openShopBalanceModal", openModal);
     window.addEventListener("openBalanceModal", openModal);
