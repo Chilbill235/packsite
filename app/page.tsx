@@ -120,9 +120,10 @@ export default function HomePage() {
       navigator.vibrate(40);
     }
 
+    // Increased timeout to 1200ms to let the cinematic loader play fully before routing
     setTimeout(() => {
       router.push("/shop");
-    }, 850);
+    }, 1200);
   };
 
   if (!isMounted) return null;
@@ -230,7 +231,7 @@ export default function HomePage() {
           </button>
         </motion.div>
 
-        {/* 3D INTERACTIVE HERO PACK PREVIEW SHOWCASE (PC Tilt / Mobile Touch Responsive) */}
+        {/* 3D INTERACTIVE HERO PACK PREVIEW SHOWCASE */}
         <motion.div 
           style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
           initial={{ opacity: 0, scale: 0.9 }}
