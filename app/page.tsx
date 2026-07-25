@@ -1,4 +1,6 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿"use client";
+
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { 
