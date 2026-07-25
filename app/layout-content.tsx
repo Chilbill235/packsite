@@ -15,6 +15,8 @@ import {
   Volume2,
   VolumeX,
   Lock,
+  Store,
+  Home,
 } from "lucide-react";
 import { adService } from "@/lib/adService";
 
@@ -37,6 +39,9 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [adToken, setAdToken] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Shop Redirection Choice Modal State
+  const [showHomeChoicePrompt, setShowHomeChoicePrompt] = useState(false);
 
   const adPopupRef = useRef<Window | null>(null);
 
@@ -184,7 +189,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [adActive, adCountdown, adToken, errorMessage, isVerifying, playSound, soundEnabled]);
 
-  // Page Routing Logic
+  // Page Routing Logic (Only handle auth guards and root preference choice for logged-in users)
   useEffect(() => {
     if (status === "loading") return;
 
@@ -193,7 +198,18 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
     if (status !== "authenticated" && !isPublicPage) {
       router.replace("/login");
     } else if (status === "authenticated" && pathname === "/") {
-      router.replace("/shop");
+      // Check if user previously saved a preference to stay on home vs shop
+      const savedPreference = localStorage.getItem("vault_root_preference");
+      if (savedPreference === "shop") {
+        router.replace("/shop");
+      } else if (savedPreference === "home") {
+        setShowHomeChoicePrompt(false);
+      } else {
+        // First time hitting root while logged in, ask them what they prefer
+        setShowHomeChoicePrompt(true);
+      }
+    } else {
+      setShowHomeChoicePrompt(false);
     }
   }, [status, pathname, router]);
 
@@ -220,6 +236,51 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
         .animate-radar-sweep { animation: radarSweep 3s linear infinite; }
       `}</style>
 
+      {/* ROOT PREFERENCE CHOICE MODAL */}
+      {showHomeChoicePrompt && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl">
+          <div className="relative bg-[#0b0c10] border border-cyan-500/40 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center flex flex-col items-center gap-6 shadow-[0_0_80px_rgba(6,182,212,0.2)] overflow-hidden">
+            <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-cyan-400">
+              <Store size={36} />
+            </div>
+
+            <div className="space-y-2 z-10">
+              <h3 className="text-2xl font-black text-white tracking-tight uppercase">
+                Welcome Back, Operative
+              </h3>
+              <p className="text-zinc-400 text-xs sm:text-sm max-w-xs leading-relaxed font-medium">
+                Where would you like to land when you visit the main Vault OS page? You can change this anytime.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 w-full z-10">
+              <button
+                onClick={() => {
+                  localStorage.setItem("vault_root_preference", "home");
+                  setShowHomeChoicePrompt(false);
+                }}
+                className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white transition-all group cursor-pointer"
+              >
+                <Home size={20} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-black uppercase tracking-wider">Stay Home</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  localStorage.setItem("vault_root_preference", "shop");
+                  setShowHomeChoicePrompt(false);
+                  router.replace("/shop");
+                }}
+                className="flex flex-col items-center justify-center gap-2 p-4 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 rounded-2xl text-cyan-300 transition-all group cursor-pointer"
+              >
+                <Store size={20} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-black uppercase tracking-wider">Go To Shop</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AD OVERLAY STAGE */}
       {adActive && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-[#020308]/95 backdrop-blur-3xl overflow-hidden select-none">
@@ -238,7 +299,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
 
               <button
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white transition-all"
+                className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white transition-all cursor-pointer"
               >
                 {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
               </button>
@@ -256,7 +317,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
                 </p>
                 <button
                   onClick={() => setAdActive(false)}
-                  className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-black text-xs tracking-wider rounded-xl transition-all uppercase"
+                  className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 font-black text-xs tracking-wider rounded-xl transition-all uppercase cursor-pointer"
                 >
                   Close Window
                 </button>
@@ -280,7 +341,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
                       setPopupBlocked(false);
                     }
                   }}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-black font-black text-xs tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all uppercase"
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-black font-black text-xs tracking-wider rounded-xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all uppercase cursor-pointer"
                 >
                   <ExternalLink size={16} /> Open Ad Tab
                 </button>
