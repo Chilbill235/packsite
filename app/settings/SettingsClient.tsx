@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { updateUserSettings } from '@/app/actions/settings'
+import { updateUserSettings } from '@/app/actions'
 
 type UserSettings = {
   theme: string | null
