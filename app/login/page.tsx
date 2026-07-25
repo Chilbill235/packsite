@@ -22,10 +22,10 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      // 🌟 FIXED: Passing 'identifier' as a single key to match your Prisma OR auth configuration backend
+      // 🌟 FIXED: Mapping 'identifier' to 'email' key so lib/auth.ts receives the payload
       const res = await signIn("credentials", {
         redirect: false,
-        identifier: identifier,
+        email: identifier, // 👈 CHANGED FROM 'identifier: identifier' TO 'email: identifier'
         password,
       });
 
@@ -137,7 +137,7 @@ export default function LoginPage() {
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
       <Suspense fallback={
         <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="animate-spin h-8 w-8 border-4 border-amber-500 border-t-transparent rounded-full" />
+          <div className="animate-spin h-8 w-8 border-amber-500 border-t-transparent rounded-full border-4" />
           <div className="text-zinc-400 text-sm font-light">Loading portal security...</div>
         </div>
       }>

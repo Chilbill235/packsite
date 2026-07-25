@@ -15,8 +15,8 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { name, currentPassword, newPassword, image } = body;
-    const updateData: { username?: string; password?: string; image?: string } = {};
+    const { name, currentPassword, newPassword, image, bio, location } = body;
+    const updateData: { username?: string; password?: string; image?: string; bio?: string; location?: string } = {};
 
     // Validate and check username availability if changing
     if (name && name.trim() !== "") {
@@ -39,6 +39,18 @@ export async function PUT(request: Request) {
       if (trimmedImage) {
         updateData.image = trimmedImage;
       }
+    }
+
+    // Update bio if provided
+    if (bio !== undefined) {
+      const trimmedBio = String(bio).trim();
+      updateData.bio = trimmedBio || undefined;
+    }
+
+    // Update location if provided
+    if (location !== undefined) {
+      const trimmedLocation = String(location).trim();
+      updateData.location = trimmedLocation || undefined;
     }
 
     // Securely verify and hash password updates if requested

@@ -1,40 +1,34 @@
+// auth.ts
 import NextAuth from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
-import CredentialsProvider from "next-auth/providers/credentials";
+import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 
-export const { auth, handlers, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-  },
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  session: { strategy: "jwt" },
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: "Credentials",
       credentials: {
-        identifier: { label: "Username or Email", type: "text" },
-        password: { label: "Password", type: "password" }
+        email: { label: "Email or Username", type: "text" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.identifier || !credentials?.password) return null;
-
-        const identifier = credentials.identifier as string;
-        const password = credentials.password as string;
+        if (!credentials?.email || !credentials?.password) return null;
 
         const user = await prisma.user.findFirst({
           where: {
             OR: [
-              { email: identifier },
-              { username: identifier }
-            ]
-          }
+              { email: credentials.email as string },
+              { username: credentials.email as string },
+            ],
+          },
         });
 
         if (!user || !user.password) return null;
 
         const isValid = await bcrypt.compare(
-          password,
+          credentials.password as string,
           user.password
         );
 
@@ -43,40 +37,42 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         return {
           id: user.id,
           email: user.email,
-          username: user.username,
+          username: user.username || undefined,
+          image: user.image || undefined,
+          balance: user.balance,
         };
-      }
-    })
+      },
+    }),
   ],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        token.username = user.username;
-        if (user.image) token.image = user.image;
+        token.balance = (user as any).balance;
       } else if (token.sub) {
-        // Re-fetch profile from DB so username/image changes propagate across sessions
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { username: true, image: true },
+          select: { email: true, username: true, image: true, balance: true },
         });
         if (dbUser) {
+          token.balance = dbUser.balance;
+          token.email = dbUser.email;
           token.username = dbUser.username;
-          token.image = dbUser.image ?? undefined;
+          token.picture = dbUser.image;
         }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        if (token.sub) session.user.id = token.sub;
-        if (token.username) session.user.username = token.username;
-        if (token.image) session.user.image = token.image;
-        if (!session.user.name && token.username) {
-          session.user.name = token.username;
-        }
+        session.user.id = token.sub as string;
+        (session.user as any).balance = token.balance as number;
       }
       return session;
-    }
-  }
+    },
+  },
+  pages: {
+    signIn: "/login",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 });

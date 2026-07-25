@@ -6,6 +6,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -36,6 +41,7 @@ model User {
   username          String        @unique
   email             String        @unique
   password          String?
+  role              Role          @default(USER)
   balance           Int           @default(100000)
   createdAt         DateTime      @default(now())
   lastAdWatched     DateTime?
@@ -50,6 +56,18 @@ model User {
   level             Int           @default(1)
   xp                Int           @default(0)
   image             String?
+  bio               String?
+  location          String?
+  
+  // Customization & Settings Fields
+  theme             String?       @default("dark")
+  pushNotifications Boolean       @default(true)
+  emailNotifications Boolean      @default(false)
+  showInventory     Boolean       @default(true)
+  showBalance       Boolean       @default(true)
+  showActivity      Boolean       @default(true)
+  publicProfile     Boolean       @default(true)
+
   accounts          Account[]
   inventory         Inventory[]
   openings          Opening[]

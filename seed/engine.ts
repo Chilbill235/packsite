@@ -4,7 +4,9 @@ import { getRandom } from "./utils";
 
 export const generateItem = (tierKey: string, packId: string, index: number) => {
   const tier = TIER_CONFIG[tierKey as keyof typeof TIER_CONFIG];
-  const name = `${getRandom(tier.prefixes)} ${tier.suffixes[0]} #${index}`;
+  const prefix = getRandom([...tier.prefixes]);
+  const suffix = getRandom([...tier.suffixes]);
+  const name = `${prefix} ${suffix} #${index}`;
   return {
     id: uuidv4(),
     name,
@@ -15,3 +17,4 @@ export const generateItem = (tierKey: string, packId: string, index: number) => 
     packId
   };
 };
+

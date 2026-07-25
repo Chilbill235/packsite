@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
+import { useTheme } from "next-themes";
 import { useProgression } from "@/context/ProgressionContext";
 import { 
   Trophy, 
@@ -20,7 +21,6 @@ import {
   TrendingUp,
   AlertTriangle,
   Settings,
-  Edit2,
   KeyRound,
   X,
   CheckCircle2,
@@ -31,11 +31,7 @@ import {
   Shield,
   Globe,
   Lock,
-  Unlock,
-  Monitor,
-  MousePointer,
-  RefreshCw,
-  Info
+  Unlock
 } from "lucide-react";
 
 type Rarity = "common" | "rare" | "epic" | "legendary" | "omega";
@@ -46,6 +42,7 @@ type Opening = { id: string; item: Item; createdAt: string; };
 export default function ProfilePage() {
   const { data: session, update: updateSession } = useSession();
   const { accountXp, accountLevel, progressionMetrics, fetchProgress } = useProgression();
+  const { setTheme: setNextTheme } = useTheme();
   
   // Terminal Metrics States
   const [loadingInventory, setLoadingInventory] = useState(true);
@@ -54,7 +51,7 @@ export default function ProfilePage() {
   const [openings, setOpenings] = useState<Opening[]>([]);
   const [tabs, setTabs] = useState<"overview" | "inventory" | "activity">("overview");
 
-  // Local Toast States linked to Global Event Pipeline
+  // Local Toast States
   const [showLevelUpAlert, setShowLevelUpAlert] = useState(false);
   const [leveledUpTo, setLeveledUpTo] = useState(1);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
@@ -72,16 +69,18 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formStatus, setFormStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [updating, setUpdating] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [memberSince, setMemberSince] = useState<string>("");
   const [profileTab, setProfileTab] = useState<"profile" | "security" | "appearance" | "notifications" | "privacy">("profile");
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
-  const [theme, setTheme] = useState("cyber");
+  
+  // Theme, Alerts & Privacy Controls
+  const [theme, setTheme] = useState<"cyber" | "neon" | "dark" | "minimal">("dark");
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [showInventory, setShowInventory] = useState(true);
@@ -99,8 +98,14 @@ export default function ProfilePage() {
       return await res.json();
     }
     const htmlText = await res.text();
-    console.error("Received HTML/non-JSON response from server:", htmlText);
+    console.error("Received non-JSON response from server:", htmlText);
     throw new Error(`Server returned unexpected format (Status: ${res.status})`);
+  };
+
+  // Switch dynamic UI theme instantly across the app
+  const handleThemeSelect = (selectedTheme: "cyber" | "neon" | "dark" | "minimal") => {
+    setTheme(selectedTheme);
+    setNextTheme(selectedTheme);
   };
 
   // Ask for Push Notification Permission
@@ -108,12 +113,34 @@ export default function ProfilePage() {
     if (typeof window !== "undefined" && "Notification" in window) {
       const perm = await Notification.requestPermission();
       setPushPermission(perm);
+      if (perm === "granted") {
+        setPushNotifications(true);
+      } else {
+        setPushNotifications(false);
+      }
     }
   }, []);
 
+  // Handle Toggle Push Notifications Directly
+  const handlePushToggle = async () => {
+    if (!pushNotifications) {
+      if (typeof window !== "undefined" && "Notification" in window) {
+        const perm = await Notification.requestPermission();
+        setPushPermission(perm);
+        if (perm === "granted") {
+          setPushNotifications(true);
+        }
+      } else {
+        setPushNotifications(true);
+      }
+    } else {
+      setPushNotifications(false);
+    }
+  };
+
   // Trigger Native Browser Push Notification
   const sendLevelUpPushNotification = (newLevel: number) => {
-    if (typeof window !== "undefined" && "Notification" in window) {
+    if (typeof window !== "undefined" && "Notification" in window && pushNotifications) {
       if (Notification.permission === "granted") {
         new Notification("🎉 Level Promoted!", {
           body: `Congratulations! You've successfully upgraded to LVL ${newLevel}!`,
@@ -125,7 +152,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Main Database Sync Engine
+  // Fetch Inventory and Openings
   const fetchInventory = useCallback(async () => {
     try {
       const res = await fetch("/api/inventory");
@@ -150,7 +177,6 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // Hook into the Global Progression system events
   useEffect(() => {
     fetchInventory();
     fetchOpenings();
@@ -160,16 +186,43 @@ export default function ProfilePage() {
     }
 
     if (session?.user) {
-      setNewUsername((session.user as any).username || "");
+      setNewUsername((session.user as any).username || session.user.name || "");
       setAvatarUrl((session.user as any).image || "");
     }
 
-    // Fetch account creation date for profile display
-    fetch("/api/user/profile").
-      then((res) => res.ok ? res.json() : null).
-      then((data) => {
-        if (data?.createdAt) setMemberSince(new Date(data.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }));
-      }).catch(() => {});
+    // Fetch profile details for initial load
+    fetch("/api/user/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          if (data.createdAt) {
+            setMemberSince(
+              new Date(data.createdAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })
+            );
+          }
+          if (data.bio !== undefined) setBio(data.bio || "");
+          if (data.location !== undefined) setLocation(data.location || "");
+          if (data.username) setNewUsername(data.username);
+          if (data.image) setAvatarUrl(data.image);
+
+          // Populate Theme, Alerts & Privacy Settings from Server
+          if (data.theme) {
+            setTheme(data.theme);
+            setNextTheme(data.theme);
+          }
+          if (data.pushNotifications !== undefined) setPushNotifications(data.pushNotifications);
+          if (data.emailNotifications !== undefined) setEmailNotifications(data.emailNotifications);
+          if (data.showInventory !== undefined) setShowInventory(data.showInventory);
+          if (data.showBalance !== undefined) setShowBalance(data.showBalance);
+          if (data.showActivity !== undefined) setShowActivity(data.showActivity);
+          if (data.publicProfile !== undefined) setPublicProfile(data.publicProfile);
+        }
+      })
+      .catch(() => {});
 
     const handleLevelUpToast = (e: Event) => {
       const customEvent = e as CustomEvent;
@@ -187,14 +240,12 @@ export default function ProfilePage() {
     return () => {
       window.removeEventListener("triggerLevelUpToast", handleLevelUpToast);
     };
-  }, [fetchInventory, fetchOpenings, session]);
+  }, [fetchInventory, fetchOpenings, session, setNextTheme]);
 
-  // Sync local balance state when any part of the app emits balanceUpdated
   useEffect(() => {
     const handleBalanceChange = (event: Event) => {
       const customEvent = event as CustomEvent<{ balance: number }>;
-      // Force a lightweight re-sync so the profile page reflects any external balance change
-      if (typeof customEvent.detail.balance === "number") {
+      if (typeof customEvent.detail?.balance === "number") {
         fetchProgress();
       }
     };
@@ -215,7 +266,7 @@ export default function ProfilePage() {
     });
   }, [inventory, sortBy, filterRarity]);
 
-  // SINGLE ITEM SELL HANDLER WITH SAFE JSON CHECK & BALANCE DISPATCH
+  // SINGLE ITEM SELL HANDLER
   const handleSellItem = async (inventoryItemId: string) => {
     setSellingItemId(inventoryItemId);
     try {
@@ -232,7 +283,6 @@ export default function ProfilePage() {
         await fetchProgress();
         await fetchOpenings();
 
-        // Broadcast updated coin balance across the application
         window.dispatchEvent(
           new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance } })
         );
@@ -246,7 +296,7 @@ export default function ProfilePage() {
     }
   };
 
-  // MASS SELL ALL HANDLER WITH SAFE JSON CHECK & BALANCE DISPATCH
+  // MASS SELL ALL HANDLER
   const handleSellAllConfirmed = async () => {
     setConfirmModal(null);
     try {
@@ -259,7 +309,7 @@ export default function ProfilePage() {
         await fetchProgress();
         
         window.dispatchEvent(
-          new CustomEvent("balanceUpdated", { detail: { newBalance: data.newBalance } })
+          new CustomEvent("balanceUpdated", { detail: { balance: data.newBalance } })
         );
       } else {
         console.error(data.error || "Failed to sell all items");
@@ -269,103 +319,89 @@ export default function ProfilePage() {
     }
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setUpdating(true);
-    setFormStatus(null);
-    try {
-      const res = await fetch("/profile/update-profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newUsername, image: avatarUrl, currentPassword, newPassword }),
-      });
-      const data = await safeParseJson(res);
-      if (!res.ok) throw new Error(data.error || "Something went wrong");
-      
-      setFormStatus({ type: "success", msg: "Security matrix updated successfully!" });
-      // Sync all updated fields from server response into local state immediately
-      if (data.user?.image !== undefined) {
-        setAvatarUrl(data.user.image);
-      }
-      if (data.user?.username) {
-        setNewUsername(data.user.username);
-      }
-      // Push updates into NextAuth session so every component in the app updates instantly
-      await updateSession({
-        user: {
-          image: data.user?.image ?? avatarUrl,
-          name: data.user?.username ?? newUsername,
-          username: data.user?.username ?? newUsername,
-        }
-      });
-      setCurrentPassword("");
-      setNewPassword("");
-    } catch (err: any) {
-      setFormStatus({ type: "error", msg: err.message });
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // AVATAR FILE SELECTOR
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       setAvatarError("Please select a valid image file.");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setAvatarError("Image must be smaller than 5MB.");
       return;
     }
 
     setAvatarError(null);
-    setUploadingAvatar(true);
+    setSelectedFile(file);
+    setAvatarUrl(URL.createObjectURL(file));
+  };
+
+  // UNIFIED UPLOAD & PROFILE UPDATE HANDLER
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdating(true);
+    setFormStatus(null);
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+
+      if (selectedFile) {
+        formData.append("file", selectedFile);
+      } else if (avatarUrl) {
+        formData.append("image", avatarUrl);
+      }
+
+      if (newUsername) formData.append("name", newUsername);
+      if (bio !== undefined) formData.append("bio", bio);
+      if (location !== undefined) formData.append("location", location);
+      if (currentPassword) formData.append("currentPassword", currentPassword);
+      if (newPassword) formData.append("newPassword", newPassword);
+
+      // Append Appearance, Alerts & Privacy Fields
+      formData.append("theme", theme);
+      formData.append("pushNotifications", String(pushNotifications));
+      formData.append("emailNotifications", String(emailNotifications));
+      formData.append("showInventory", String(showInventory));
+      formData.append("showBalance", String(showBalance));
+      formData.append("showActivity", String(showActivity));
+      formData.append("publicProfile", String(publicProfile));
 
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
+      
+      const data = await safeParseJson(res);
+      if (!res.ok) throw new Error(data.error || "Failed to update profile and settings");
 
-      const data = await res.json();
+      setFormStatus({ type: "success", msg: "Profile updated successfully!" });
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to upload image");
-      }
+      // Synchronize Live States
+      if (data.user?.image) setAvatarUrl(data.user.image);
+      if (data.user?.username) setNewUsername(data.user.username);
+      if (data.user?.bio !== undefined) setBio(data.user.bio);
+      if (data.user?.location !== undefined) setLocation(data.user.location);
+      if (data.user?.theme) handleThemeSelect(data.user.theme);
 
-      if (data.url) {
-        // Optimistically update avatar so user sees it immediately
-        setAvatarUrl(data.url);
-        // Autosave the new avatar to the profile by updating the session
-        await updateSession({
-          user: {
-            image: data.url,
-            name: newUsername || (session?.user as any)?.name,
-            username: newUsername || (session?.user as any)?.username,
-          }
-        });
-        // Also persist to DB
-        fetch("/profile/update-profile", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newUsername, image: data.url }),
-        }).catch(() => {
-          setAvatarError("Image uploaded but profile save failed. Please click Apply to retry.");
-        });
-      }
+      // Trigger NextAuth Session Update
+      await updateSession({
+        user: {
+          image: data.user?.image ?? avatarUrl,
+          name: data.user?.username ?? newUsername,
+          username: data.user?.username ?? newUsername,
+        },
+      });
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setSelectedFile(null);
     } catch (err: any) {
-      setAvatarError(err.message || "Upload failed");
+      setFormStatus({ type: "error", msg: err.message });
     } finally {
-      setUploadingAvatar(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setUpdating(false);
     }
   };
 
@@ -418,7 +454,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-[#020205] text-slate-100 p-3 sm:p-6 md:p-8 relative overflow-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f111a_1px,transparent_1px),linear-gradient(to_bottom,#0f111a_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-25 pointer-events-none" />
       
-      {/* REAL-TIME DYNAMIC LEVEL UP SYSTEM TOAST CELEBRATION */}
+      {/* LEVEL UP TOAST */}
       <AnimatePresence>
         {showLevelUpAlert && (
           <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.9 }} className="fixed top-6 left-4 right-4 sm:left-auto sm:right-6 z-[999999] sm:w-96 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 p-[2px] rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.4)]">
@@ -461,7 +497,7 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      {/* PROFILE SETTINGS MODAL - TABBED */}
+      {/* PROFILE SETTINGS MODAL */}
       <AnimatePresence>
         {settingsModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
@@ -486,7 +522,7 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* Tabs */}
+              {/* Navigation Tabs */}
               <div className="flex flex-wrap gap-2 mb-6">
                 {[
                   { key: "profile", label: "Profile", icon: User },
@@ -495,190 +531,198 @@ export default function ProfilePage() {
                   { key: "notifications", label: "Alerts", icon: Bell },
                   { key: "privacy", label: "Privacy", icon: Shield }
                 ].map((tab) => (
-                  <button key={tab.key} onClick={() => setProfileTab(tab.key as any)} className={"flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border " + (profileTab === tab.key ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-slate-900/50 border-white/5 text-slate-400 hover:text-white")}>
+                  <button key={tab.key} type="button" onClick={() => setProfileTab(tab.key as any)} className={"flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border " + (profileTab === tab.key ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-slate-900/50 border-white/5 text-slate-400 hover:text-white")}>
                     <tab.icon size={12} /> {tab.label}
                   </button>
                 ))}
               </div>
 
-              {/* Profile Tab */}
-              {profileTab === "profile" && (
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1 space-y-3">
-                      <label className="text-[10px] uppercase font-bold text-slate-400">Operator Username</label>
-                      <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="Username" />
-                    </div>
-                    <div className="flex-1 space-y-3">
-                      <label className="text-[10px] uppercase font-bold text-slate-400">Avatar Image URL</label>
-                      <div className="flex gap-2">
-                        <input type="text" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} className="flex-1 bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="https://..." />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingAvatar} className="px-3 py-2 bg-slate-800 border border-white/10 rounded-xl text-xs text-slate-300 hover:bg-slate-700 transition disabled:opacity-50">
-                          {uploadingAvatar ? "..." : "Upload"}
-                        </button>
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                {/* Profile Tab */}
+                {profileTab === "profile" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex-1 space-y-3">
+                        <label className="text-[10px] uppercase font-bold text-slate-400">Operator Username</label>
+                        <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="Username" />
                       </div>
-                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                      {avatarError && <p className="text-red-400 text-[10px] font-bold">{avatarError}</p>}
+                      <div className="flex-1 space-y-3">
+                        <label className="text-[10px] uppercase font-bold text-slate-400">Avatar Image</label>
+                        <div className="flex gap-2">
+                          <input type="text" value={avatarUrl} onChange={(e) => { setAvatarUrl(e.target.value); setSelectedFile(null); }} className="flex-1 bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="https://..." />
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="px-3 py-2 bg-slate-800 border border-white/10 rounded-xl text-xs text-slate-300 hover:bg-slate-700 transition">
+                            {selectedFile ? "Selected" : "Browse"}
+                          </button>
+                        </div>
+                        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                        {avatarError && <p className="text-red-400 text-[10px] font-bold">{avatarError}</p>}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] uppercase font-bold text-slate-400">Bio</label>
+                      <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition resize-none" placeholder="Tell the world about yourself..." />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="text-[10px] uppercase font-bold text-slate-400">Location</label>
+                      <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="City, Country" />
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase font-bold text-slate-400">Bio</label>
-                    <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition resize-none" placeholder="Tell the world about yourself..." />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase font-bold text-slate-400">Location</label>
-                    <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="City, Country" />
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* Security Tab */}
-              {profileTab === "security" && (
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><KeyRound size={10}/> Security Key Overrides</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-slate-400">Current Security Key</label>
-                        <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="Required for password reset" />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-slate-400">New Security Key</label>
-                        <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="Min 6 characters" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Appearance Tab */}
-              {profileTab === "appearance" && (
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Palette size={10}/> Theme Selection</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {["cyber","neon","dark","minimal"].map((t) => (
-                        <button key={t} type="button" onClick={() => setTheme(t)} className={"p-4 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all " + (theme === t ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-white/10 bg-slate-900 text-slate-400 hover:text-white")}>
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase font-bold text-slate-400">Preview Avatar</label>
-                    <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 p-[1.5px]">
-                        <div className="w-full h-full bg-[#05060b] rounded-[14px] flex items-center justify-center overflow-hidden">
-                          {avatarUrl ? (
-                            <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="text-slate-400 w-6 h-6" />
-                          )}
+                {/* Security Tab */}
+                {profileTab === "security" && (
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><KeyRound size={10}/> Security Key Overrides</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase font-bold text-slate-400">Current Security Key</label>
+                          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="Required for password reset" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase font-bold text-slate-400">New Security Key</label>
+                          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-900 border border-white/10 p-3 rounded-xl text-xs text-white focus:border-amber-500/50 outline-none transition" placeholder="Min 6 characters" />
                         </div>
                       </div>
-                      <div className="text-xs text-slate-400">
-                        <p>Current avatar preview</p>
-                        <p className="text-[10px]">Upload or paste URL above</p>
-n                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Notifications Tab */}
-              {profileTab === "notifications" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      <Bell size={16} className="text-amber-400" />
-                      <div>
-                        <p className="text-xs font-bold text-white">Push Notifications</p>
-                        <p className="text-[10px] text-slate-400">Receive push alerts on this device</p>
+                {/* Appearance Tab */}
+                {profileTab === "appearance" && (
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1"><Palette size={10}/> Theme Selection</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {(["cyber", "neon", "dark", "minimal"] as const).map((t) => (
+                          <button 
+                            key={t} 
+                            type="button" 
+                            onClick={() => handleThemeSelect(t)} 
+                            className={"p-4 rounded-xl border-2 text-xs font-black uppercase tracking-widest transition-all " + (theme === t ? "border-amber-500 bg-amber-500/10 text-amber-400" : "border-white/10 bg-slate-900 text-slate-400 hover:text-white")}
+                          >
+                            {t}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <button type="button" onClick={() => setPushNotifications(!pushNotifications)} className={"w-12 h-6 rounded-full transition-all " + (pushNotifications ? "bg-amber-500" : "bg-slate-700")}>
-                      <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (pushNotifications ? "translate-x-6" : "translate-x-0.5")} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      <Globe size={16} className="text-sky-400" />
-                      <div>
-                        <p className="text-xs font-bold text-white">Email Digests</p>
-                        <p className="text-[10px] text-slate-400">Weekly summary of drops</p>
+                    <div className="space-y-3">
+                      <label className="text-[10px] uppercase font-bold text-slate-400">Preview Avatar</label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 p-[1.5px]">
+                          <div className="w-full h-full bg-[#05060b] rounded-[14px] flex items-center justify-center overflow-hidden">
+                            {avatarUrl && avatarUrl.trim() !== "" ? (
+                              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" onError={() => setAvatarUrl("")} />
+                            ) : (
+                              <User className="text-slate-400 w-6 h-6" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          <p className="font-bold text-white">Current avatar preview</p>
+                          <p className="text-[10px]">Changes upload on submission</p>
+                        </div>
                       </div>
                     </div>
-                    <button type="button" onClick={() => setEmailNotifications(!emailNotifications)} className={"w-12 h-6 rounded-full transition-all " + (emailNotifications ? "bg-sky-500" : "bg-slate-700")}>
-                      <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (emailNotifications ? "translate-x-6" : "translate-x-0.5")} />
-                    </button>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Privacy Tab */}
-              {profileTab === "privacy" && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      {showInventory ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
-                      <div>
-                        <p className="text-xs font-bold text-white">Show Inventory</p>
-                        <p className="text-[10px] text-slate-400">Let others see your items</p>
+                {/* Alerts / Notifications Tab */}
+                {profileTab === "notifications" && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <Bell size={16} className="text-amber-400" />
+                        <div>
+                          <p className="text-xs font-bold text-white">Push Notifications</p>
+                          <p className="text-[10px] text-slate-400">Receive push alerts on this device</p>
+                        </div>
                       </div>
+                      <button type="button" onClick={handlePushToggle} className={"w-12 h-6 rounded-full transition-all relative p-0.5 " + (pushNotifications ? "bg-amber-500" : "bg-slate-700")}>
+                        <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (pushNotifications ? "translate-x-6" : "translate-x-0")} />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => setShowInventory(!showInventory)} className={"w-12 h-6 rounded-full transition-all " + (showInventory ? "bg-emerald-500" : "bg-slate-700")}>
-                      <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (showInventory ? "translate-x-6" : "translate-x-0.5")} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      {showBalance ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
-                      <div>
-                        <p className="text-xs font-bold text-white">Show Balance</p>
-                        <p className="text-[10px] text-slate-400">Display coin count publicly</p>
+                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <Globe size={16} className="text-sky-400" />
+                        <div>
+                          <p className="text-xs font-bold text-white">Email Digests</p>
+                          <p className="text-[10px] text-slate-400">Weekly summary of drops</p>
+                        </div>
                       </div>
+                      <button type="button" onClick={() => setEmailNotifications(!emailNotifications)} className={"w-12 h-6 rounded-full transition-all relative p-0.5 " + (emailNotifications ? "bg-sky-500" : "bg-slate-700")}>
+                        <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (emailNotifications ? "translate-x-6" : "translate-x-0")} />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => setShowBalance(!showBalance)} className={"w-12 h-6 rounded-full transition-all " + (showBalance ? "bg-emerald-500" : "bg-slate-700")}>
-                      <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (showBalance ? "translate-x-6" : "translate-x-0.5")} />
-                    </button>
                   </div>
-                  <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      {showActivity ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
-                      <div>
-                        <p className="text-xs font-bold text-white">Show Activity</p>
-                        <p className="text-[10px] text-slate-400">Let others see your openings</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => setShowActivity(!showActivity)} className={"w-12 h-6 rounded-full transition-all " + (showActivity ? "bg-emerald-500" : "bg-slate-700")}>
-                      <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (showActivity ? "translate-x-6" : "translate-x-0.5")} />
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      {publicProfile ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
-                      <div>
-                        <p className="text-xs font-bold text-white">Public Profile</p>
-                        <p className="text-[10px] text-slate-400">Allow anyone to view your profile</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => setPublicProfile(!publicProfile)} className={"w-12 h-6 rounded-full transition-all " + (publicProfile ? "bg-emerald-500" : "bg-slate-700")}>
-                      <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (publicProfile ? "translate-x-6" : "translate-x-0.5")} />
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
 
-              <div className="flex gap-3 pt-4 mt-4 border-t border-white/5">
-                <button type="button" onClick={() => setSettingsModal(false)} className="flex-1 py-3 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold uppercase transition hover:bg-slate-800">Close</button>
-                <button type="submit" disabled={updating} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-black text-xs text-slate-950 uppercase tracking-wider shadow-lg hover:brightness-110 transition disabled:opacity-50">
-                  {updating ? "Syncing..." : "Apply Changes"}
-                </button>
-              </div>
+                {/* Privacy Tab */}
+                {profileTab === "privacy" && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        {showInventory ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
+                        <div>
+                          <p className="text-xs font-bold text-white">Show Inventory</p>
+                          <p className="text-[10px] text-slate-400">Let others see your items</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setShowInventory(!showInventory)} className={"w-12 h-6 rounded-full transition-all relative p-0.5 " + (showInventory ? "bg-emerald-500" : "bg-slate-700")}>
+                        <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (showInventory ? "translate-x-6" : "translate-x-0")} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        {showBalance ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
+                        <div>
+                          <p className="text-xs font-bold text-white">Show Balance</p>
+                          <p className="text-[10px] text-slate-400">Display coin count publicly</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setShowBalance(!showBalance)} className={"w-12 h-6 rounded-full transition-all relative p-0.5 " + (showBalance ? "bg-emerald-500" : "bg-slate-700")}>
+                        <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (showBalance ? "translate-x-6" : "translate-x-0")} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        {showActivity ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
+                        <div>
+                          <p className="text-xs font-bold text-white">Show Activity</p>
+                          <p className="text-[10px] text-slate-400">Let others see your openings</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setShowActivity(!showActivity)} className={"w-12 h-6 rounded-full transition-all relative p-0.5 " + (showActivity ? "bg-emerald-500" : "bg-slate-700")}>
+                        <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (showActivity ? "translate-x-6" : "translate-x-0")} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3">
+                        {publicProfile ? <Unlock size={16} className="text-emerald-400" /> : <Lock size={16} className="text-slate-400" />}
+                        <div>
+                          <p className="text-xs font-bold text-white">Public Profile</p>
+                          <p className="text-[10px] text-slate-400">Allow anyone to view your profile</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setPublicProfile(!publicProfile)} className={"w-12 h-6 rounded-full transition-all relative p-0.5 " + (publicProfile ? "bg-emerald-500" : "bg-slate-700")}>
+                        <div className={"w-5 h-5 bg-white rounded-full shadow-sm transition-transform " + (publicProfile ? "translate-x-6" : "translate-x-0")} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 mt-4 border-t border-white/5">
+                  <button type="button" onClick={() => setSettingsModal(false)} className="flex-1 py-3 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold uppercase transition hover:bg-slate-800">Close</button>
+                  <button type="submit" disabled={updating} className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-black text-xs text-slate-950 uppercase tracking-wider shadow-lg hover:brightness-110 transition disabled:opacity-50">
+                    {updating ? "Applying..." : "Apply Changes"}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
       <div className="max-w-7xl mx-auto space-y-5 relative z-10">
         
         {/* CROSS-DEVICE UNIVERSAL PROFILE HUD CONTAINER */}
@@ -691,7 +735,7 @@ n                      </div>
               <div className="relative mx-auto sm:mx-0">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 p-[1.5px] shadow-xl">
                   <div className="w-full h-full bg-[#05060b] rounded-[14px] sm:rounded-[22px] flex items-center justify-center overflow-hidden">
-                    {avatarUrl ? (
+                    {avatarUrl && avatarUrl.trim() !== "" ? (
                       <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" onError={() => setAvatarUrl("")} />
                     ) : (
                       <User className="text-slate-400 w-6 h-6 sm:w-8 sm:h-8" />
@@ -706,13 +750,15 @@ n                      </div>
               <div className="text-center sm:text-left w-full sm:w-auto">
                 <div className="flex flex-col sm:flex-row items-center gap-2">
                   <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter">
-                    {session?.user?.name || session?.user?.email?.split('@')[0] || "OPERATOR"}
+                    {newUsername || session?.user?.name || session?.user?.email?.split('@')[0] || "OPERATOR"}
                   </h1>
                   <span className="flex items-center gap-1 text-[8px] font-black bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest">
                     <Zap size={8} className="fill-amber-400" /> PRO
                   </span>
                 </div>
                 
+                {bio && <p className="text-xs text-slate-400 mt-1 max-w-xs">{bio}</p>}
+
                 <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-2">
                   <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded border border-white/5">
                     <Calendar size={10} className="text-slate-500" /> {memberSince || "Secure Matrix Active"}
@@ -817,7 +863,11 @@ n                      </div>
                   </button>
                 </div>
                 
-                {processedInventory.length === 0 ? (
+                {!showInventory ? (
+                  <div className="text-center py-20 border border-white/5 rounded-2xl bg-slate-950/10 text-slate-500 text-xs font-mono uppercase tracking-widest flex items-center justify-center gap-2">
+                    <Lock size={14} /> Inventory displays are restricted by privacy settings
+                  </div>
+                ) : processedInventory.length === 0 ? (
                   <div className="text-center py-20 border border-dashed border-white/5 rounded-2xl bg-slate-950/10 text-slate-500 text-xs font-mono uppercase tracking-widest">No matching terminal storage data entries</div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -835,7 +885,11 @@ n                      </div>
                           </div>
                           <div className="w-full space-y-1">
                             <h3 className="font-black text-[11px] truncate text-slate-200 group-hover:text-white">{invItem.item.name}</h3>
-                            <p className="text-amber-400 text-[11px] font-black font-mono tracking-tighter">{invItem.item.value.toLocaleString()}</p>
+                            {showBalance ? (
+                              <p className="text-amber-400 text-[11px] font-black font-mono tracking-tighter">{invItem.item.value.toLocaleString()}</p>
+                            ) : (
+                              <p className="text-slate-500 text-[10px] font-mono tracking-tighter">HIDDEN</p>
+                            )}
                             <span className={`inline-block text-[7px] tracking-widest uppercase px-1.5 py-0.5 rounded ${rarity.badge}`}>{invItem.item.rarity}</span>
                             
                             <button
@@ -857,7 +911,11 @@ n                      </div>
 
             {tabs === "activity" && (
               <motion.div key="activity" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-2 max-w-3xl mx-auto">
-                {loadingActivity ? (
+                {!showActivity ? (
+                  <div className="text-center py-20 border border-white/5 rounded-2xl bg-slate-950/10 text-xs font-mono tracking-widest text-slate-500 uppercase flex items-center justify-center gap-2">
+                    <Lock size={14} /> Activity history is restricted by privacy settings
+                  </div>
+                ) : loadingActivity ? (
                   <div className="text-center py-20 text-[10px] font-mono text-slate-500 tracking-widest animate-pulse uppercase">Syncing server database arrays...</div>
                 ) : openings.length === 0 ? (
                   <div className="text-center py-20 border border-white/5 rounded-2xl bg-slate-950/10 text-xs font-mono tracking-widest text-slate-500 uppercase">No ledger operations recorded</div>

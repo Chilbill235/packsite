@@ -1,51 +1,65 @@
-import { put } from '@vercel/blob';
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+// app/api/upload/route.ts
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth"; // <-- Updated import for NextAuth v5
+import { prisma } from "@/lib/prisma";
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
+  // Call auth() directly in NextAuth v5
   const session = await auth();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const formData = await req.formData();
+    
+    const name = formData.get("name") as string | null;
+    const bio = formData.get("bio") as string | null;
+    const location = formData.get("location") as string | null;
+    const theme = formData.get("theme") as string | null;
+    
+    // Parse settings toggles
+    const pushNotifications = formData.get("pushNotifications") === "true";
+    const emailNotifications = formData.get("emailNotifications") === "true";
+    const showInventory = formData.get("showInventory") === "true";
+    const showBalance = formData.get("showBalance") === "true";
+    const showActivity = formData.get("showActivity") === "true";
+    const publicProfile = formData.get("publicProfile") === "true";
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    let imageUrl = formData.get("image") as string | null;
+    const file = formData.get("file") as File | null;
+
+    if (file && file.size > 0) {
+      // If you upload files to S3/Cloudflare/Vercel Blob, put that logic here:
+      // imageUrl = await uploadToStorage(file);
     }
 
-    // Security: validate file size (max 5MB)
-    const MAX_SIZE = 5 * 1024 * 1024;
-    if (file.size > MAX_SIZE) {
-      return NextResponse.json(
-        { error: 'File too large. Maximum size is 5MB.' },
-        { status: 400 }
-      );
-    }
-
-    // Security: validate MIME type (images only)
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.' },
-        { status: 400 }
-      );
-    }
-
-    // Sanitize filename - no path traversal, no special chars
-    const originalName = String(file.name || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const blob = await put(`uploads/${Date.now()}-${originalName}`, file, {
-      access: 'public',
-      contentType: file.type,
+    const updatedUser = await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        ...(name && { username: name }),
+        ...(bio !== null && { bio }),
+        ...(location !== null && { location }),
+        ...(imageUrl && { image: imageUrl }),
+        ...(theme && { theme }),
+        pushNotifications,
+        emailNotifications,
+        showInventory,
+        showBalance,
+        showActivity,
+        publicProfile,
+      },
     });
 
-    return NextResponse.json({ url: blob.url });
-  } catch (error) {
-    console.error('Upload error:', error);
+    return NextResponse.json({
+      success: true,
+      user: updatedUser,
+    });
+  } catch (error: any) {
+    console.error("Profile update error:", error);
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: error.message || "Internal server error" },
       { status: 500 }
     );
   }

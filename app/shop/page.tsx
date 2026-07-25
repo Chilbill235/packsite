@@ -1152,7 +1152,7 @@ export function PackPurchaseModal({
           <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-5 backdrop-blur">
             <div className="flex items-center justify-between text-xs text-white/60 mb-1.5">
               <span>Price per pack</span>
-              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} ??`}</span>
+              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}</span>
             </div>
             {discountMultiplier < 1 && (
               <div className="flex items-center justify-between text-[11px] text-emerald-300 mb-1.5">
@@ -1162,12 +1162,12 @@ export function PackPurchaseModal({
             )}
             <div className="flex items-center justify-between text-xs text-white/60 mb-2">
               <span>Quantity</span>
-              <span className="font-bold text-white/90">�{quantity}</span>
+              <span className="font-bold text-white/90">{quantity}</span>
             </div>
             <div className="border-t border-white/10 pt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-white/80">Total Cost</span>
               <span className={`text-xl font-black bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent`}>
-                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} ??`}
+                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}
               </span>
             </div>
 
@@ -1175,12 +1175,12 @@ export function PackPurchaseModal({
               <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[10px] text-white/50">
                   <span>Current balance</span>
-                  <span>{balance.toLocaleString()} ??</span>
+                  <span>{balance.toLocaleString()} 🪙</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-white/70">
                   <span>Balance after purchase</span>
                   <span className={insufficient ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
-                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} ??` : `${remainingBalance.toLocaleString()} ??`}
+                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` : `${remainingBalance.toLocaleString()} 🪙`}
                   </span>
                 </div>
               </div>

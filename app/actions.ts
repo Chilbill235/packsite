@@ -2,7 +2,11 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { rollItem } from "@/lib/openingEngine";
+import {
+  rollSmartItem,
+  getPackConfig,
+  type SmartRollOptions,
+} from "@/lib/openingEngine";
 
 // Utility type to extract the transaction client type directly from the prisma instance
 type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -19,7 +23,21 @@ export async function openPack(packId: string) {
     if (!pack) throw new Error("Pack not found");
     if (!user || user.balance < pack.price) throw new Error("Insufficient balance");
 
-    const wonItem = rollItem(pack.items);
+    const packConfig = getPackConfig(pack.name);
+    const smartOpts: SmartRollOptions = {
+      userLuck: 1.0,
+      packRarityMod: packConfig?.rarityMod ?? 1.0,
+    };
+    if (packConfig) {
+      smartOpts.minRarity = packConfig.minRarity;
+      smartOpts.allowedRarities = packConfig.allowedRarities;
+      if (packConfig.guaranteedRarity) {
+        smartOpts.guaranteedRarity = packConfig.guaranteedRarity;
+        smartOpts.guaranteedEvery = packConfig.guaranteedEvery;
+      }
+    }
+
+    const wonItem = rollSmartItem(pack.items, smartOpts);
     const updatedUser = await tx.user.update({
       where: { id: user.id },
       data: { balance: { decrement: pack.price } },

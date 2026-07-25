@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { rollItem } from "@/lib/openingEngine";
+import {
+  rollSmartItem,
+  getPackConfig,
+  getExclusiveRarities,
+  TIER_ORDER,
+  toTierKey,
+  type SmartRollOptions,
+} from "@/lib/openingEngine";
 
-// Dynamic XP rewards mapped by item rarity tier
 const XP_BY_RARITY: Record<string, number> = {
   STARDUST: 10,
   NEBULA: 25,
@@ -11,13 +17,6 @@ const XP_BY_RARITY: Record<string, number> = {
   VOID: 150,
   CELESTIAL: 500,
   OMEGA: 2500,
-
-  COMMON: 10,
-  RARE: 25,
-  EPIC: 60,
-  LEGENDARY: 150,
-  MYTHICAL: 500,
-  EXCLUSIVE: 1000,
 };
 
 function getXpForLevel(level: number): number {
@@ -35,142 +34,174 @@ export async function POST(req: Request) {
     const { packId, quantity, isFlashSale } = body;
     const qty = Math.max(1, parseInt(quantity, 10) || 1);
 
-    const result = await prisma.$transaction(
-      async (tx) => {
-        // 1. Fetch User Record
-        const user = await tx.user.findUnique({
-          where: { email: session.user.email },
+    const result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { email: session.user.email },
+      });
+
+      if (!user) throw new Error("User profile not found.");
+
+      const now = new Date();
+      const isLuckActive = Boolean(
+        user.luckExpiresAt && new Date(user.luckExpiresAt) > now
+      );
+      const isDiscountActive = Boolean(
+        user.discountExpiresAt && new Date(user.discountExpiresAt) > now
+      );
+      const isXpBoostActive =
+        user.activeXpBoost ||
+        (user.xpBoostExpiresAt && new Date(user.xpBoostExpiresAt) > now);
+
+      const currentLuck = isLuckActive ? (user.activeLuck ?? 1.0) : 1.0;
+      const currentDiscount = isDiscountActive
+        ? user.activeDiscount ?? 0
+        : 0;
+      const xpMultiplier = isXpBoostActive ? 2 : 1;
+
+      let basePrice = 0;
+      const isExclusive = packId === "exclusive_vault_pack";
+
+      if (!isExclusive) {
+        const pack = await tx.pack.findUnique({ where: { id: packId } });
+        if (!pack) throw new Error("Pack configuration not found.");
+        basePrice = pack.price;
+      } else if (!user.hasExclusivePack) {
+        throw new Error("No exclusive drop packs available to claim.");
+      }
+
+      let discountMultiplier = 1;
+      if (!isExclusive) {
+        if (isFlashSale) discountMultiplier = 0.5;
+        else if (currentDiscount > 0) discountMultiplier = 1 - currentDiscount;
+      }
+
+      const finalUnitPrice = Math.floor(basePrice * discountMultiplier);
+      const totalCost = finalUnitPrice * qty;
+
+      if (user.balance < totalCost) {
+        throw new Error("Insufficient balance for this purchase.");
+      }
+
+      let availableItems: any[] = [];
+      let rarityMod = 1.0;
+      let packConfig: ReturnType<typeof getPackConfig> | undefined;
+
+      if (isExclusive) {
+        availableItems = await tx.item.findMany({
+          where: { rarity: { in: getExclusiveRarities() } },
         });
-
-        if (!user) {
-          throw new Error("User profile not found.");
-        }
-
-        const now = new Date();
-
-        // 2. Read Active Buffs & Expirations
-        const isLuckActive = Boolean(user.luckExpiresAt && new Date(user.luckExpiresAt) > now);
-        const isDiscountActive = Boolean(user.discountExpiresAt && new Date(user.discountExpiresAt) > now);
-        const isXpBoostActive = Boolean(
-          user.activeXpBoost || (user.xpBoostExpiresAt && new Date(user.xpBoostExpiresAt) > now)
-        );
-
-        const currentLuck = isLuckActive ? (user.activeLuck ?? 1.0) : 1.0;
-        const currentDiscount = isDiscountActive ? (user.activeDiscount ?? 0) : 0;
-        const xpMultiplier = isXpBoostActive ? 2 : 1;
-
-        // 3. Resolve Pricing & Store Balance Check
-        let basePrice = 0;
-        const isExclusive = packId === "exclusive_vault_pack";
-
-        if (!isExclusive) {
-          const pack = await tx.pack.findUnique({ where: { id: packId } });
-          if (!pack) {
-            throw new Error("Pack configuration not found.");
-          }
-          basePrice = pack.price;
-        } else if (!user.hasExclusivePack) {
-          throw new Error("No exclusive drop packs available to claim.");
-        }
-
-        let discountMultiplier = 1;
-        if (!isExclusive) {
-          if (isFlashSale) discountMultiplier = 0.5;
-          else if (currentDiscount > 0) discountMultiplier = 1 - currentDiscount;
-        }
-
-        const finalUnitPrice = Math.floor(basePrice * discountMultiplier);
-        const totalCost = finalUnitPrice * qty;
-
-        if (user.balance < totalCost) {
-          throw new Error("Insufficient balance for this purchase.");
-        }
-
-        // 4. Load available Item records for this Pack
-        const availableItems = await tx.item.findMany({
-          where: isExclusive ? {} : { packId: packId },
+        rarityMod = 2.0;
+      } else {
+        availableItems = await tx.item.findMany({
+          where: { packId: packId },
         });
 
         if (availableItems.length === 0) {
-          throw new Error("No items found for this pack. Ensure database is seeded.");
+          throw new Error(
+            "No items found for this pack. Ensure database is seeded."
+          );
         }
 
-        // 5. Roll Loot Items using engine
-        let totalXpGained = 0;
-        const wonItems: { name: string; rarity: string; value: number }[] = [];
-        const openingsData: { userId: string; packId: string; itemId: string }[] = [];
-        const inventoryData: { userId: string; itemId: string }[] = [];
+        const pack = await tx.pack.findUnique({ where: { id: packId } });
+        packConfig = pack ? getPackConfig(pack.name) : undefined;
+        rarityMod = packConfig?.rarityMod ?? 1.0;
+      }
 
-        for (let i = 0; i < qty; i++) {
-          // Supports both object return or direct Item return from engine
-          const rolled = rollItem(availableItems, currentLuck);
-          const selectedItem = "item" in rolled ? (rolled as any).item : rolled;
+      let totalXpGained = 0;
+      const wonItems: { name: string; rarity: string; value: number }[] = [];
+      const openingsData: { userId: string; packId: string; itemId: string }[] = [];
+      const inventoryData: { userId: string; itemId: string }[] = [];
 
-          const rarityKey = (selectedItem.rarity || "STARDUST").toUpperCase();
-          const itemXp = (XP_BY_RARITY[rarityKey] || 10) * xpMultiplier;
-          totalXpGained += itemXp;
+      let guaranteedLowRolls = 0;
 
-          wonItems.push({
-            name: selectedItem.name,
-            rarity: selectedItem.rarity,
-            value: selectedItem.value,
-          });
+      for (let i = 0; i < qty; i++) {
+        const smartOpts: SmartRollOptions = {
+          userLuck: currentLuck,
+          packRarityMod: rarityMod,
+          pityCount: guaranteedLowRolls,
+        };
 
-          openingsData.push({
-            userId: user.id,
-            packId: isExclusive ? selectedItem.packId : packId,
-            itemId: selectedItem.id,
-          });
-
-          inventoryData.push({
-            userId: user.id,
-            itemId: selectedItem.id,
-          });
+        if (!isExclusive && packConfig) {
+          smartOpts.minRarity = packConfig.minRarity;
+          smartOpts.allowedRarities = packConfig.allowedRarities;
+          if (packConfig.guaranteedRarity) {
+            smartOpts.guaranteedRarity = packConfig.guaranteedRarity;
+            smartOpts.guaranteedEvery = packConfig.guaranteedEvery;
+          }
         }
 
-        // 6. Compute Progression Updates
-        let newXp = (user.xp ?? 0) + totalXpGained;
-        let newLevel = user.level ?? 1;
+        const rolled = rollSmartItem(availableItems, smartOpts);
 
-        while (newXp >= getXpForLevel(newLevel)) {
-          newXp -= getXpForLevel(newLevel);
-          newLevel += 1;
+        const rarityKey = (rolled.rarity || "STARDUST").toUpperCase();
+        const itemXp = (XP_BY_RARITY[rarityKey] || 10) * xpMultiplier;
+        totalXpGained += itemXp;
+
+        if (packConfig?.guaranteedRarity) {
+          const guaranteedOrder = TIER_ORDER[packConfig.guaranteedRarity] || 6;
+          const rollOrder = TIER_ORDER[toTierKey(rarityKey)] || 0;
+          if (rollOrder < guaranteedOrder) {
+            guaranteedLowRolls += 1;
+          } else {
+            guaranteedLowRolls = 0;
+          }
         }
 
-        // 7. Update User & Insert Inventory/Opening Relations
-        const updatedUser = await tx.user.update({
-          where: { id: user.id },
-          data: {
-            balance: user.balance - totalCost,
-            xp: newXp,
-            level: newLevel,
-            hasExclusivePack: isExclusive ? false : (user.hasExclusivePack ?? false),
-            activeLuck: isLuckActive ? (user.activeLuck ?? 1.0) : 1.0,
-            activeDiscount: isDiscountActive ? (user.activeDiscount ?? 0) : 0,
-            // Guaranteed strict non-null boolean payload
-            activeXpBoost: Boolean(isXpBoostActive),
-          },
+        wonItems.push({
+          name: rolled.name,
+          rarity: rolled.rarity,
+          value: rolled.value,
         });
 
-        if (openingsData.length > 0) {
-          await tx.opening.createMany({ data: openingsData });
-        }
+        openingsData.push({
+          userId: user.id,
+          packId: isExclusive ? rolled.packId : packId,
+          itemId: rolled.id,
+        });
 
-        if (inventoryData.length > 0) {
-          await tx.inventory.createMany({ data: inventoryData });
-        }
-
-        return {
-          newBalance: updatedUser.balance,
-          wonItems,
-          user: updatedUser,
-        };
-      },
-      {
-        maxWait: 10000,
-        timeout: 15000,
+        inventoryData.push({
+          userId: user.id,
+          itemId: rolled.id,
+        });
       }
-    );
+
+      let newXp = (user.xp ?? 0) + totalXpGained;
+      let newLevel = user.level ?? 1;
+
+      while (newXp >= getXpForLevel(newLevel)) {
+        newXp -= getXpForLevel(newLevel);
+        newLevel += 1;
+      }
+
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          balance: user.balance - totalCost,
+          xp: newXp,
+          level: newLevel,
+          hasExclusivePack: isExclusive ? false : (user.hasExclusivePack ?? false),
+          activeLuck: isLuckActive ? (user.activeLuck ?? 1.0) : 1.0,
+          luckExpiresAt: isLuckActive ? user.luckExpiresAt : null,
+          activeDiscount: isDiscountActive ? (user.activeDiscount ?? 0) : 0,
+          discountExpiresAt: isDiscountActive ? user.discountExpiresAt : null,
+          activeXpBoost: Boolean(isXpBoostActive),
+          xpBoostExpiresAt: Boolean(isXpBoostActive) ? user.xpBoostExpiresAt : null,
+        },
+      });
+
+      if (openingsData.length > 0) {
+        await tx.opening.createMany({ data: openingsData });
+      }
+
+      if (inventoryData.length > 0) {
+        await tx.inventory.createMany({ data: inventoryData });
+      }
+
+      return {
+        newBalance: updatedUser.balance,
+        wonItems,
+        user: updatedUser,
+      };
+    });
 
     return NextResponse.json(result);
   } catch (error: any) {

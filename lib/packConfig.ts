@@ -1,4 +1,3 @@
-// Inline seed config - duplicated from lib/packConfig so tsx can resolve it without @/ alias
 export const TIER_CONFIG = {
   STARDUST: {
     qty: 150,
@@ -124,20 +123,27 @@ export const PACK_CONFIGS: PackConfig[] = [
   },
 ];
 
-export function getPackConfig(name: string): PackConfig | undefined {
-  return PACK_CONFIGS.find(
-    (p) => p.name.toLowerCase() === name.toLowerCase()
-  );
-}
-
-export function getExclusiveRarities(): TierKey[] {
-  return ["VOID", "CELESTIAL", "OMEGA"];
-}
-
+/**
+ * Safely converts an arbitrary string to a valid TierKey, falling back to STARDUST.
+ */
 export function toTierKey(rarity?: string | null): TierKey {
   if (!rarity) return "STARDUST";
   const key = rarity.toUpperCase() as TierKey;
   return key in TIER_CONFIG ? key : "STARDUST";
 }
 
-export { PACK_CONFIGS as PACK_METADATA };
+/**
+ * Helper to fetch pack configuration by pack name.
+ */
+export function getPackConfig(name: string): PackConfig | undefined {
+  return PACK_CONFIGS.find(
+    (p) => p.name.toLowerCase() === name.toLowerCase()
+  );
+}
+
+/**
+ * Returns top-tier rarities reserved for exclusive drops.
+ */
+export function getExclusiveRarities(): TierKey[] {
+  return ["VOID", "CELESTIAL", "OMEGA"];
+}
