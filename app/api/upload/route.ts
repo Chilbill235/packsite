@@ -28,8 +28,27 @@ export async function POST(req: Request) {
     let imageUrl = formData.get("image") as string | null;
     const file = formData.get("file") as File | null;
 
+    // Handle uploaded file or mobile camera roll images
     if (file && file.size > 0) {
-      // Storage upload logic here
+      // If the client sent a local blob URL string disguised or passed as a file, 
+      // or standard binary upload data from a camera roll / file picker:
+      if (file instanceof File) {
+        // Convert the File/Blob into an array buffer and handle storage upload 
+        // or transform it into a base64 Data URL / external cloud upload (e.g., Vercel Blob, S3, Cloudinary).
+        // Below is a robust base64 conversion fallback suitable for handling direct camera roll buffers:
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const base64String = buffer.toString("base64");
+        const mimeType = file.type || "image/jpeg";
+        
+        imageUrl = `data:${mimeType};base64,${base64String}`;
+      }
+    }
+
+    // Safety check: if 'image' field accidentally contains a client-side blob URL string (e.g., "blob:https://..."),
+    // blob URLs cannot be resolved server-side. Ignore it or keep the old image if no valid file/data was provided.
+    if (imageUrl && imageUrl.startsWith("blob:")) {
+      imageUrl = null; 
     }
 
     // Verify user exists before attempting update
