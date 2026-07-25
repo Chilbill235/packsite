@@ -24,7 +24,9 @@ export default auth((req) => {
   return null;
 });
 
-// Configure the matcher to exclude API routes and static files[cite: 1]
+// Configure the matcher to exclude API routes, static files, and ServiceWorker
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|ServiceWorker.js|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
