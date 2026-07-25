@@ -452,10 +452,10 @@ export default function ShopPage() {
       console.error("[Shop] Error in loadShopData:", err);
       setPackError("An error occurred while loading packs");
       setPacks(FALLBACK_PACKS);
-    } fontally {
+    } finally { // ✅ Fixed
       setIsFetchingPacks(false);
     }
-  }, [fetchUserData, isFetchingPacks]);
+  }, [fetchUserData, isFetchingPacks]);;
 
   const handleNotificationRouting = useCallback(async (ref: string) => {
     const currentUser = user || await fetchUserData();
