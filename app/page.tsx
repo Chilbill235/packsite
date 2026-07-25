@@ -170,40 +170,7 @@ export default function HomePage() {
       <div className="absolute top-[25%] left-[-100px] w-[500px] h-[500px] bg-indigo-600/10 blur-[160px] rounded-full pointer-events-none z-0" />
       <div className="absolute bottom-[-50px] right-[-50px] w-[600px] h-[600px] bg-fuchsia-600/10 blur-[180px] rounded-full pointer-events-none z-0" />
 
-      {/* HEADER / FLOATING NAVIGATION BAR */}
-      <motion.header 
-        initial={{ y: -25, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-30 flex items-center justify-between px-6 sm:px-12 py-6 max-w-7xl mx-auto w-full"
-      >
-        <div className="flex items-center gap-3.5 group cursor-pointer" onClick={handleEnterShop}>
-          <div className="relative p-2.5 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 text-black shadow-[0_0_25px_rgba(245,158,11,0.5)] group-hover:scale-105 transition-transform duration-300">
-            <Package size={22} className="stroke-[2.5]" />
-            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-300"></span>
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-black tracking-widest text-xl sm:text-2xl bg-gradient-to-r from-white via-slate-100 to-amber-400 bg-clip-text text-transparent leading-none drop-shadow-sm">
-              PACKSITE
-            </span>
-            <span className="text-[10px] font-extrabold text-amber-400/90 tracking-widest uppercase mt-1">VAULT OS v2.4</span>
-          </div>
-        </div>
-
-        {/* Clean Action Launch Control */}
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handleEnterShop}
-            className="group relative px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 text-black font-black text-xs sm:text-sm uppercase tracking-widest shadow-[0_0_25px_rgba(245,158,11,0.35)] hover:shadow-[0_0_45px_rgba(245,158,11,0.6)] hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-2 cursor-pointer"
-          >
-            <span>LAUNCH VAULT</span>
-            <ArrowRight size={15} className="group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
-      </motion.header>
+      
 
       {/* HERO SECTION */}
       <main className="relative z-20 flex-1 flex flex-col items-center justify-center text-center px-4 max-w-6xl mx-auto w-full py-10 sm:py-16">
