@@ -1,7 +1,7 @@
-// app/api/upload/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -25,17 +25,15 @@ export async function POST(req: Request) {
     const showActivity = formData.get("showActivity") === "true";
     const publicProfile = formData.get("publicProfile") === "true";
 
+    const currentPassword = formData.get("currentPassword") as string | null;
+    const newPassword = formData.get("newPassword") as string | null;
+
     let imageUrl = formData.get("image") as string | null;
     const file = formData.get("file") as File | null;
 
-    // Handle uploaded file or mobile camera roll images
+    // Handle uploaded file or mobile camera roll images from browse/file picker
     if (file && file.size > 0) {
-      // If the client sent a local blob URL string disguised or passed as a file, 
-      // or standard binary upload data from a camera roll / file picker:
       if (file instanceof File) {
-        // Convert the File/Blob into an array buffer and handle storage upload 
-        // or transform it into a base64 Data URL / external cloud upload (e.g., Vercel Blob, S3, Cloudinary).
-        // Below is a robust base64 conversion fallback suitable for handling direct camera roll buffers:
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         const base64String = buffer.toString("base64");
@@ -45,13 +43,40 @@ export async function POST(req: Request) {
       }
     }
 
-    // Safety check: if 'image' field accidentally contains a client-side blob URL string (e.g., "blob:https://..."),
-    // blob URLs cannot be resolved server-side. Ignore it or keep the old image if no valid file/data was provided.
+    // Ignore client-side blob URLs if passed directly without proper conversion
     if (imageUrl && imageUrl.startsWith("blob:")) {
       imageUrl = null; 
     }
 
-    // Verify user exists before attempting update
+    // Handle password update if requested
+    let passwordUpdateData = {};
+    if (newPassword && newPassword.trim() !== "") {
+      const userRecord = await prisma.user.findUnique({
+        where: { id: session.user.id },
+      });
+
+      if (!userRecord || !userRecord.password) {
+        return NextResponse.json({ error: "User account or security key record not found." }, { status: 400 });
+      }
+
+      if (!currentPassword) {
+        return NextResponse.json({ error: "Current security key is required to set a new one." }, { status: 400 });
+      }
+
+      const passwordMatch = await bcrypt.compare(currentPassword, userRecord.password);
+      if (!passwordMatch) {
+        return NextResponse.json({ error: "Incorrect current security key." }, { status: 400 });
+      }
+
+      if (newPassword.length < 6) {
+        return NextResponse.json({ error: "New security key must be at least 6 characters." }, { status: 400 });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      passwordUpdateData = { password: hashedPassword };
+    }
+
+    // Update user record with all settings, preferences, and metadata
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -66,6 +91,7 @@ export async function POST(req: Request) {
         showBalance,
         showActivity,
         publicProfile,
+        ...passwordUpdateData,
       },
     });
 
@@ -76,7 +102,6 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Profile update error:", error);
 
-    // Record not found in Prisma (Code P2025)
     if (error.code === "P2025") {
       return NextResponse.json(
         { error: "User session expired or user record not found. Please re-login." },

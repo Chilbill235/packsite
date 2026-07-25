@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import {
   rollSmartItem,
   getPackConfig,
@@ -77,4 +78,37 @@ export async function sellItem(inventoryId: string) {
 
     return { newBalance: updatedUser.balance };
   });
+}
+
+/**
+ * Handles updating user customization and preference states (themes, notifications, privacy toggles)
+ * directly aligned with your PostgreSQL Prisma schema fields.
+ */
+export async function updateUserSettings(data: {
+  theme?: string;
+  pushNotifications?: boolean;
+  emailNotifications?: boolean;
+  showInventory?: boolean;
+  showBalance?: boolean;
+  showActivity?: boolean;
+  publicProfile?: boolean;
+  bio?: string;
+  location?: string;
+  username?: string;
+}) {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) {
+    throw new Error("Unauthorized request");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { email },
+    data,
+  });
+
+  revalidatePath("/profile");
+  revalidatePath("/settings");
+
+  return { success: true, user: updatedUser };
 }

@@ -209,7 +209,6 @@ export default function ProfilePage() {
           if (data.username) setNewUsername(data.username);
           if (data.image) setAvatarUrl(data.image);
 
-          // Populate Theme, Alerts & Privacy Settings from Server
           if (data.theme) {
             setTheme(data.theme);
             setNextTheme(data.theme);
@@ -350,7 +349,7 @@ export default function ProfilePage() {
 
       if (selectedFile) {
         formData.append("file", selectedFile);
-      } else if (avatarUrl) {
+      } else if (avatarUrl && !avatarUrl.startsWith("blob:")) {
         formData.append("image", avatarUrl);
       }
 
@@ -377,16 +376,14 @@ export default function ProfilePage() {
       const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to update profile and settings");
 
-      setFormStatus({ type: "success", msg: "Profile updated successfully!" });
+      setFormStatus({ type: "success", msg: "Profile & settings updated successfully!" });
 
-      // Synchronize Live States
       if (data.user?.image) setAvatarUrl(data.user.image);
       if (data.user?.username) setNewUsername(data.user.username);
       if (data.user?.bio !== undefined) setBio(data.user.bio);
       if (data.user?.location !== undefined) setLocation(data.user.location);
       if (data.user?.theme) handleThemeSelect(data.user.theme);
 
-      // Trigger NextAuth Session Update
       await updateSession({
         user: {
           image: data.user?.image ?? avatarUrl,
@@ -606,24 +603,6 @@ export default function ProfilePage() {
                         ))}
                       </div>
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[10px] uppercase font-bold text-slate-400">Preview Avatar</label>
-                      <div className="flex items-center gap-3">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 p-[1.5px]">
-                          <div className="w-full h-full bg-[#05060b] rounded-[14px] flex items-center justify-center overflow-hidden">
-                            {avatarUrl && avatarUrl.trim() !== "" ? (
-                              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" onError={() => setAvatarUrl("")} />
-                            ) : (
-                              <User className="text-slate-400 w-6 h-6" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-xs text-slate-400">
-                          <p className="font-bold text-white">Current avatar preview</p>
-                          <p className="text-[10px]">Changes upload on submission</p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -826,7 +805,7 @@ export default function ProfilePage() {
                 {[
                   { title: "Total Drops Unboxed", icon: <Trophy size={18} />, val: openings.length, color: "from-blue-500 to-cyan-500" },
                   { title: "Vault Inventory Size", icon: <Layers size={18} />, val: inventory.length, color: "from-purple-500 to-indigo-500" },
-                  { title: "Net Vault Value Estimation", icon: <Coins size={18} />, val: inventory.reduce((acc, curr) => acc + curr.item.value, 0).toLocaleString(), color: "from-amber-500 to-orange-500" }
+                  { title: "Net Vault Value Estimation", icon: <Coins size={18} />, val: showBalance ? inventory.reduce((acc, curr) => acc + curr.item.value, 0).toLocaleString() : "HIDDEN", color: "from-amber-500 to-orange-500" }
                 ].map((card, idx) => (
                   <div key={idx} className="bg-gradient-to-b from-slate-950 to-[#0d1017] border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-white/10 transition duration-200">
                     <div className="flex justify-between items-center mb-3">
@@ -936,7 +915,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="flex-shrink-0 flex flex-col items-end">
                           <div className="flex items-center gap-0.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-emerald-400 font-black font-mono text-[11px]">
-                            <TrendingUp size={10} />+{op.item?.value?.toLocaleString() || 0}
+                            <TrendingUp size={10} />{showBalance ? `+${op.item?.value?.toLocaleString() || 0}` : "HIDDEN"}
                           </div>
                         </div>
                       </div>
