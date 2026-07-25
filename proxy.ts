@@ -24,9 +24,9 @@ export default auth((req) => {
   return null;
 });
 
-// Configure the matcher to exclude API routes, static files, and ServiceWorker
+// ✅ Excludes API routes, Next.js static builds, and ANY file with an extension
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|ServiceWorker.js|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.[a-zA-Z0-9]+$).*)",
   ],
 };
