@@ -1,10 +1,9 @@
 // app/api/upload/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth"; // <-- Updated import for NextAuth v5
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
-  // Call auth() directly in NextAuth v5
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -19,7 +18,6 @@ export async function POST(req: Request) {
     const location = formData.get("location") as string | null;
     const theme = formData.get("theme") as string | null;
     
-    // Parse settings toggles
     const pushNotifications = formData.get("pushNotifications") === "true";
     const emailNotifications = formData.get("emailNotifications") === "true";
     const showInventory = formData.get("showInventory") === "true";
@@ -31,10 +29,10 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File | null;
 
     if (file && file.size > 0) {
-      // If you upload files to S3/Cloudflare/Vercel Blob, put that logic here:
-      // imageUrl = await uploadToStorage(file);
+      // Storage upload logic here
     }
 
+    // Verify user exists before attempting update
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -58,6 +56,15 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("Profile update error:", error);
+
+    // Record not found in Prisma (Code P2025)
+    if (error.code === "P2025") {
+      return NextResponse.json(
+        { error: "User session expired or user record not found. Please re-login." },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }

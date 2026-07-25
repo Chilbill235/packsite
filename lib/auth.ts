@@ -1,8 +1,32 @@
 // auth.ts
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+
+// Module augmentation for TypeScript safety
+declare module "next-auth" {
+  interface User {
+    id?: string;
+    username?: string;
+    balance?: number;
+  }
+  interface Session {
+    user: {
+      id: string;
+      username?: string;
+      balance?: number;
+    } & DefaultSession["user"];
+  }
+}
+
+declare module "@auth/core/jwt" {
+  interface JWT {
+    sub?: string;
+    username?: string;
+    balance?: number;
+  }
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
@@ -46,28 +70,48 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // 1. Initial login: attach initial properties to the token
       if (user) {
         token.sub = user.id;
-        token.balance = (user as any).balance;
-      } else if (token.sub) {
+        token.balance = user.balance;
+        token.username = user.username;
+        return token;
+      }
+
+      // 2. Subsequent calls: sync token with latest DB state
+      if (token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
           select: { email: true, username: true, image: true, balance: true },
         });
-        if (dbUser) {
-          token.balance = dbUser.balance;
-          token.email = dbUser.email;
-          token.username = dbUser.username;
-          token.picture = dbUser.image;
+
+        // CRITICAL FIX: If the user no longer exists in DB, wipe the sub property
+        if (!dbUser) {
+          token.sub = undefined;
+          return token;
         }
+
+        token.balance = dbUser.balance;
+        token.email = dbUser.email;
+        token.username = dbUser.username || undefined;
+        token.picture = dbUser.image || undefined;
       }
+
       return token;
     },
+
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.sub as string;
-        (session.user as any).balance = token.balance as number;
+      // If token.sub was cleared because the DB user was missing, return empty session
+      if (!token.sub) {
+        return { ...session, user: { id: "" } as any };
       }
+
+      if (session.user) {
+        session.user.id = token.sub;
+        session.user.balance = token.balance;
+        session.user.username = token.username;
+      }
+
       return session;
     },
   },
