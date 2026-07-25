@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X, LogOut, Store, User } from "lucide-react";
 import { useBalanceSync } from "@/hooks/useBalanceSync";
 import Balance from "./Balance";
 import { useProgression } from "@/context/ProgressionContext";
@@ -18,10 +18,10 @@ export default function Navbar() {
   const [balance, setBalance] = useState<number>(0);
   const { accountLevel } = useProgression();
 
-  // Centralized balance sync: hook listens to global balanceUpdated events
+  // Centralized balance sync
   useBalanceSync((newBalance) => setBalance(newBalance));
 
-  // Initial fetch on auth state change; hook picks up subsequent updates
+  // Initial fetch on auth state change
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
@@ -37,10 +37,12 @@ export default function Navbar() {
           window.console.error("Failed to sync live balance:", new Error("fetch failed"));
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated]);
 
-  // Re-sync whenever the user returns to the tab
+  // Re-sync on tab focus
   useEffect(() => {
     const refresh = async () => {
       if (!isAuthenticated) return;
@@ -55,94 +57,135 @@ export default function Navbar() {
   }, [isAuthenticated]);
 
   const navLinks = [
-    { name: "Shop", href: "/shop" },
-    { name: "Profile", href: "/profile" },
+    { name: "Shop", href: "/shop", icon: Store },
+    { name: "Profile", href: "/profile", icon: User },
   ];
 
   return (
-    <nav className="sticky top-0 z-50 bg-black/90 backdrop-blur-lg border-b border-white/10 px-4 py-3">
-      <div className="flex items-center justify-between w-full px-6">
-        <div className="flex items-center space-x-3">
-          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent tracking-tighter">
-            PACKSITE
-          </Link>
-        </div>
-
-        <div className="hidden md:flex md:items-center md:space-x-6">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${pathname === link.href ? "bg-amber-600/20 text-amber-400" : "text-gray-300 hover:text-white hover:bg-white/5"}`}
+    <nav className="sticky top-0 z-50 bg-[#070707]/85 backdrop-blur-md border-b border-white/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          
+          {/* Logo Brand */}
+          <div className="flex items-center">
+            <Link 
+              href="/shop" 
+              className="text-2xl font-black bg-gradient-to-r from-amber-400 via-orange-400 to-amber-600 bg-clip-text text-transparent tracking-tight hover:opacity-90 transition-opacity"
             >
-              {link.name}
+              PACKSITE
             </Link>
-          ))}
-        </div>
+          </div>
 
-        <div className="flex items-center space-x-3">
-          {isAuthenticated ? (
-            <>
-              {/* FIXED: Clicking this fires a custom global event to open your balance/ad modal */}
-              <button
-                onClick={() => window.dispatchEvent(new Event("openShopBalanceModal"))}
-                className="hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500/50 rounded-lg"
-                title="Earn Balance / Watch Ads"
-              >
-                <Balance amount={balance} className="text-sm" />
-              </button>
+          {/* Desktop Navigation Links */}
+          <div className="hidden md:flex items-center space-x-1">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    isActive
+                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span>{link.name}</span>
+                </Link>
+              );
+            })}
+          </div>
 
-              {/* Desktop Log Out Button */}
-              <button
-                onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
-                className="hidden md:flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-950/20 transition-all"
-                aria-label="Log out"
-              >
-                <LogOut size={16} />
-                <span>Logout</span>
-              </button>
+          {/* Desktop & Mobile Action Area */}
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                {/* Balance Trigger */}
+                <button
+                  onClick={() => window.dispatchEvent(new Event("openShopBalanceModal"))}
+                  className="hover:scale-105 active:scale-95 transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-amber-500/50 rounded-xl"
+                  title="Earn Balance / Watch Ads"
+                >
+                  <Balance amount={balance} className="text-xs sm:text-sm font-bold" />
+                </button>
 
-              {/* Mobile menu toggle */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 rounded-lg hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-400 md:hidden"
-                aria-label="Toggle menu"
-              >
-                {mobileMenuOpen ? <X className="h-5 w-5 text-white" /> : <Menu className="h-5 w-5 text-white" />}
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 hover:bg-white/5">Sign In</Link>
-              <Link href="/register" className="px-3 py-2 rounded-md text-sm font-medium bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 hover:text-amber-300 transition-all">Register</Link>
-            </>
-          )}
+                {/* Desktop Logout */}
+                <button
+                  onClick={() => signOut({ callbackUrl: `${window.location.origin}/login` })}
+                  className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+                  aria-label="Log out"
+                >
+                  <LogOut size={16} />
+                  <span>Logout</span>
+                </button>
+
+                {/* Mobile Menu Toggle */}
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="p-2 rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:text-white hover:bg-white/10 focus:outline-none md:hidden"
+                  aria-label="Toggle menu"
+                >
+                  {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link 
+                  href="/login" 
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-zinc-300 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  Sign In
+                </Link>
+                <Link 
+                  href="/register" 
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:brightness-110 transition-all shadow-md shadow-amber-500/10"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* Mobile Menu Overlay Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden">
-          <div className="px-4 pt-2 pb-3 space-y-1 sm:px-6">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className="block px-3 py-2 rounded-md text-base font-medium text-white bg-amber-900/50 hover:bg-amber-900/70 hover:text-amber-300">
-                {link.name}
-              </Link>
-            ))}
-          </div>
-          <div className="px-4 pt-2 pb-4 space-y-1 sm:px-6 border-t border-gray-700">
-            {isAuthenticated ? (
-              <button
-                onClick={() => {
-                  signOut({ callbackUrl: `${window.location.origin}/login` });
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-400 hover:text-red-200 hover:bg-red-900/20"
-              >
-                Logout
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <Link href="/login" className="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-white bg-amber-600/20">Sign In</Link>
+        <div className="md:hidden border-b border-white/10 bg-[#070707]/95 backdrop-blur-xl transition-all">
+          <div className="px-4 pt-3 pb-4 space-y-2">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-bold transition-all ${
+                    isActive
+                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                      : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span>{link.name}</span>
+                </Link>
+              );
+            })}
+
+            {isAuthenticated && (
+              <div className="pt-2 border-t border-white/10 mt-2">
+                <button
+                  onClick={() => {
+                    signOut({ callbackUrl: `${window.location.origin}/login` });
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 active:scale-98 transition-all"
+                >
+                  <LogOut size={16} />
+                  <span>Logout</span>
+                </button>
               </div>
             )}
           </div>
