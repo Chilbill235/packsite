@@ -26,7 +26,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover",
+  viewportFit: "cover", // Vital for full-screen web apps & iOS notched displays
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const oneSignalSafariWebId = process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID || "";
 
   return (
-    <html lang="en" style={{ backgroundColor: "#070707" }}>
+    <html lang="en" className="dark scroll-smooth" style={{ backgroundColor: "#070707" }}>
       <head>
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />
@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
         />
       </head>
-      <body className="bg-[#070707] text-zinc-100 antialiased min-h-screen flex flex-col">
+      <body className="bg-[#070707] text-zinc-100 antialiased min-h-screen flex flex-col overflow-x-hidden selection:bg-amber-500/30 selection:text-amber-200">
         {/* Load and initialize OneSignal SDK only in production */}
         {oneSignalAppId && process.env.NODE_ENV !== "development" && (
           <>
