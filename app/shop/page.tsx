@@ -61,24 +61,6 @@ interface PackTheme {
   boxBody: string;
 }
 
-// --- Buff Definitions ---
-const BUFF_MAP: Record<string, BuffDetails> = {
-  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins credited to balance.", icon: Coins, color: "text-amber-400" },
-  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop credited!", icon: Coins, color: "text-cyan-400" },
-  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Enhanced mythic pack odds.", icon: Sparkles, color: "text-emerald-400" },
-  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active!", icon: Sparkles, color: "text-emerald-400" },
-  luck_boost_3x: { title: "3x Luck Active!", description: "Peak mythic pack luck!", icon: Sparkles, color: "text-purple-400" },
-  discount_10: { title: "10% Discount!", description: "10% off your next opening.", icon: Tag, color: "text-rose-400" },
-  discount_15: { title: "15% Discount!", description: "15% off your next opening.", icon: Tag, color: "text-rose-400" },
-  discount_20: { title: "20% Discount!", description: "20% off your next opening.", icon: Tag, color: "text-rose-500" },
-  exclusive_pack: { title: "Vault Unlocked!", description: "A special pack is now available.", icon: Crown, color: "text-indigo-400" },
-  xp_boost_2x: { title: "2x XP Active!", description: "Double level progression.", icon: Zap, color: "text-orange-400" }
-};
-
 const FALLBACK_PACKS: PackBasic[] = [
   { id: "1a91f6e0-03ce-4a1a-aae0-51ca4057ba8f", name: "ALPHA ARSENAL", price: 100 },
   { id: "5d2b1d7e-0f4d-4425-ba60-a0ddfeed968f", name: "APEX MATRIX", price: 500 },
@@ -104,7 +86,7 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
     return {
       tier: "EXCLUSIVE",
       accent: "indigo",
-      cardBg: "bg-gradient-to-br from-indigo-950/70 via-black to-slate-950",
+      cardBg: "bg-gradient-to-br from-indigo-950/80 via-black to-slate-950",
       border: "border-indigo-500/40 hover:border-indigo-400",
       glow: "from-indigo-500/20 via-fuchsia-500/10 to-transparent",
       halo: "bg-indigo-500",
@@ -123,7 +105,7 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
       border: "border-fuchsia-500/30 hover:border-fuchsia-400/60",
       glow: "from-fuchsia-500/20 via-rose-500/10 to-transparent",
       halo: "bg-fuchsia-400",
-      badge: "bg-gradient-to-r from-fuchsia-500/20 to-rose-500/20 border border-fuchsia-400/40 text-fuchsia-200",
+      badge: "bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-200",
       priceFrom: "from-white via-fuchsia-200 to-rose-300",
       ribbon: "from-white via-fuchsia-300 to-rose-400",
       boxLid: "from-white/90 via-fuchsia-400/80 to-rose-500/80",
@@ -666,7 +648,7 @@ export default function ShopPage() {
 
   if (packError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#070707] text-rose-400 p-6 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#070707] text-rose-400 p-6 text-center pt-16">
         <AlertCircle size={48} className="mb-4 text-rose-500 animate-bounce" />
         <p className="text-lg font-bold">{packError}</p>
         <button onClick={loadShopData} className="mt-4 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl font-bold flex items-center gap-2 hover:bg-rose-500/20 transition">
@@ -677,7 +659,7 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#070707] text-slate-100 font-sans relative overflow-hidden flex flex-col selection:bg-amber-500/30">
+    <div className="min-h-screen bg-[#070707] text-slate-100 font-sans relative overflow-x-hidden flex flex-col selection:bg-amber-500/30 pt-16 sm:pt-20 pb-10">
       
       {/* Background Cyber Grid Effects */}
       <div className="absolute inset-0 bg-[radial-gradient(#1f1f2e_1px,transparent_1px)] [background-size:24px_24px] opacity-30 pointer-events-none" />
@@ -753,11 +735,11 @@ export default function ShopPage() {
 
       {/* iOS Standalone Banner Notice */}
       {isMounted && isIOS && !isStandalone && (
-        <div className="mx-4 mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 relative z-10 max-w-4xl mx-auto w-full backdrop-blur-md">
-          <Smartphone className="text-amber-400 shrink-0" size={22} />
-          <div className="text-xs">
-            <span className="font-bold text-amber-400">Enable Safari Alerts: </span>
-            <span className="text-slate-300">Tap <strong className="text-white">Share</strong> & choose <strong className="text-white">&quot;Add to Home Screen&quot;</strong> for instant payouts!</span>
+        <div className="mx-4 mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2.5 relative z-10 max-w-4xl mx-auto w-full backdrop-blur-md">
+          <Smartphone className="text-amber-400 shrink-0" size={18} />
+          <div className="text-[11px] leading-tight">
+            <span className="font-bold text-amber-400">Safari Alerts: </span>
+            <span className="text-slate-300">Tap <strong className="text-white">Share</strong> & <strong className="text-white">&quot;Add to Home Screen&quot;</strong></span>
           </div>
         </div>
       )}
@@ -767,20 +749,20 @@ export default function ShopPage() {
         {isMounted && permission === "default" && showBanner && (
           <motion.div 
             initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
-            className="m-4 relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto w-full shadow-xl"
+            className="m-3 relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-3 flex items-center justify-between gap-3 z-10 max-w-4xl mx-auto w-full shadow-xl"
           >
-            <div className="flex items-center gap-3 relative z-10">
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
-                <Bell size={20} />
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400">
+                <Bell size={16} />
               </div>
               <div>
-                <h4 className="font-bold text-sm text-white">Enable Notifications</h4>
-                <p className="text-slate-400 text-xs">Stay tuned for rare vault drops and flash coin sales.</p>
+                <h4 className="font-bold text-xs text-white">Enable Notifications</h4>
+                <p className="text-slate-400 text-[10px]">Stay tuned for flash coin sales.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 relative z-10 w-full sm:w-auto">
-              <button onClick={handleEnableNotifications} className="w-full sm:w-auto px-4 py-2 text-xs bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-lg shadow-amber-500/20">ALLOW</button>
-              <button onClick={() => setShowBanner(false)} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
+            <div className="flex items-center gap-2 relative z-10">
+              <button onClick={handleEnableNotifications} className="px-3 py-1.5 text-[10px] bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg transition-all shadow-md">ALLOW</button>
+              <button onClick={() => setShowBanner(false)} className="p-1 text-slate-500 hover:text-white transition-colors"><X size={16} /></button>
             </div>
           </motion.div>
         )}
@@ -819,16 +801,16 @@ export default function ShopPage() {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <div className="max-w-6xl mx-auto flex flex-col items-center w-full relative z-10 px-4 flex-1 py-6">
+      <div className="max-w-6xl mx-auto flex flex-col items-center w-full relative z-10 px-3 sm:px-4 flex-1">
         
-        {/* Header Title */}
-        <div className="text-center mb-6">
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-amber-400 mb-3">
-            <Sparkles size={14} /> EXCLUSIVE VAULT STORE
+        {/* Compact Header Title */}
+        <div className="text-center mb-4 sm:mb-6">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-amber-400 mb-2">
+            <Sparkles size={12} /> EXCLUSIVE VAULT STORE
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500"
+            className="text-2xl sm:text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500 uppercase"
           >
             VAULT SHOP
           </motion.h1>
@@ -836,27 +818,27 @@ export default function ShopPage() {
 
         {/* Active Buffs Pill Displays */}
         {(activeDiscount > 0 || activeLuck > 1 || activeXpBoost) && (
-          <div className="flex flex-wrap gap-2 mb-6 justify-center items-center">
+          <div className="flex flex-wrap gap-1.5 mb-4 justify-center items-center">
             {activeDiscount > 0 && (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-xs font-bold shadow-lg shadow-rose-500/5">
-                <Tag size={13} className="animate-pulse" /> {activeDiscount * 100}% Off {discountTimeLeft && `(${discountTimeLeft})`}
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-[10px] font-bold shadow-sm">
+                <Tag size={12} className="animate-pulse" /> {activeDiscount * 100}% Off {discountTimeLeft && `(${discountTimeLeft})`}
               </div>
             )}
             {activeLuck > 1 && (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-bold shadow-lg shadow-emerald-500/5">
-                <Sparkles size={13} className="animate-pulse" /> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-bold shadow-sm">
+                <Sparkles size={12} className="animate-pulse" /> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
               </div>
             )}
             {activeXpBoost && (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-xs font-bold shadow-lg shadow-orange-500/5">
-                <Zap size={13} className="animate-pulse" /> 2x XP Boost {xpTimeLeft && `(${xpTimeLeft})`}
+              <div className="flex items-center gap-1 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-[10px] font-bold shadow-sm">
+                <Zap size={12} className="animate-pulse" /> 2x XP Boost {xpTimeLeft && `(${xpTimeLeft})`}
               </div>
             )}
           </div>
         )}
 
-        {/* Packs Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 w-full">
+        {/* Compact Packs Grid (2 columns on mobile, 3 on desktop) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-2.5 sm:gap-4 w-full">
           {displayPacks.map((pack, idx) => {
             if (!pack || typeof pack !== 'object' || !pack.id) return null;
 
@@ -874,28 +856,28 @@ export default function ShopPage() {
             return (
               <motion.div
                 key={pack.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05, type: "spring", stiffness: 120 }}
-                whileHover={{ y: -4 }}
+                transition={{ delay: idx * 0.04, type: "spring", stiffness: 120 }}
+                whileHover={{ y: -3 }}
                 onClick={() => requestOpenPack(pack.id)}
-                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/5 p-5 flex flex-col justify-between`}
+                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 p-3 sm:p-4 flex flex-col justify-between`}
               >
-                <div className={`pointer-events-none absolute -top-24 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
+                <div className={`pointer-events-none absolute -top-16 -inset-x-10 h-32 bg-gradient-to-b ${theme.glow} blur-xl opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
 
                 {/* Top Badges */}
-                <div className="flex items-center justify-between w-full relative z-20 mb-4">
-                  <span className={`text-[10px] font-black tracking-widest px-2.5 py-1 rounded-md ${theme.badge}`}>
+                <div className="flex items-center justify-between w-full relative z-20 mb-2">
+                  <span className={`text-[8px] sm:text-[10px] font-black tracking-widest px-1.5 sm:px-2 py-0.5 rounded ${theme.badge}`}>
                     {theme.tier}
                   </span>
                   <div className="flex gap-1">
                     {onSale && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-500 text-black animate-pulse">
+                      <span className="text-[8px] sm:text-[10px] font-black px-1.5 py-0.5 rounded bg-rose-500 text-black animate-pulse">
                         -{Math.round((1 - discountMultiplier) * 100)}%
                       </span>
                     )}
                     {isExclusive && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-fuchsia-500 text-white animate-pulse">
+                      <span className="text-[8px] sm:text-[10px] font-black px-1.5 py-0.5 rounded bg-fuchsia-500 text-white animate-pulse">
                         EXCLUSIVE
                       </span>
                     )}
@@ -903,28 +885,29 @@ export default function ShopPage() {
                 </div>
 
                 {/* Pack Box Visual */}
-                <div className="relative h-28 flex items-center justify-center my-2">
-                  <div className={`absolute w-24 h-24 rounded-full blur-2xl opacity-50 ${theme.halo} group-hover:scale-125 transition-transform duration-500`} />
+                <div className="relative h-16 sm:h-24 flex items-center justify-center my-1">
+                  <div className={`absolute w-14 sm:w-20 h-14 sm:h-20 rounded-full blur-xl opacity-50 ${theme.halo} group-hover:scale-125 transition-transform duration-500`} />
                   <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
-                    <div className={`relative h-6 w-24 rounded-t-lg bg-gradient-to-b ${theme.boxLid} border border-white/20 shadow-lg`} />
-                    <div className={`relative h-14 w-20 rounded-b-lg bg-gradient-to-b ${theme.boxBody} border border-white/20 border-t-0 shadow-2xl flex items-center justify-center`}>
-                      <Package size={22} className="text-white/40 group-hover:text-white/80 transition-colors" />
-                      <div className={`absolute inset-y-0 w-2.5 bg-gradient-to-b ${theme.ribbon} opacity-80`} />
+                    <div className={`relative h-4 sm:h-5 w-16 sm:w-20 rounded-t-md bg-gradient-to-b ${theme.boxLid} border border-white/20 shadow-md`} />
+                    <div className={`relative h-10 sm:h-12 w-14 sm:w-16 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/20 border-t-0 shadow-xl flex items-center justify-center`}>
+                      <Package size={16} className="text-white/50 group-hover:text-white/80 transition-colors sm:hidden" />
+                      <Package size={20} className="text-white/50 group-hover:text-white/80 transition-colors hidden sm:block" />
+                      <div className={`absolute inset-y-0 w-2 bg-gradient-to-b ${theme.ribbon} opacity-80`} />
                     </div>
                   </div>
                 </div>
 
                 {/* Pack Meta */}
-                <div className="relative z-10 flex flex-col items-center text-center mt-2">
-                  <h3 className="font-black text-lg text-white mb-1 group-hover:text-amber-300 transition-colors">
+                <div className="relative z-10 flex flex-col items-center text-center mt-1">
+                  <h3 className="font-black text-xs sm:text-base text-white mb-0.5 truncate w-full group-hover:text-amber-300 transition-colors">
                     {pack.name}
                   </h3>
-                  <div className={`text-xs font-bold tracking-wider uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-4 flex items-center gap-1`}>
+                  <div className={`text-[10px] sm:text-xs font-bold tracking-wider uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-2.5 flex items-center justify-center gap-1`}>
                     {isExclusive ? (
                       "FREE DROP"
                     ) : (
                       <>
-                        <Coins size={12} className="text-amber-400 shrink-0" />
+                        <Coins size={10} className="text-amber-400 shrink-0" />
                         <span>{finalPrice.toLocaleString()} COINS</span>
                       </>
                     )}
@@ -932,14 +915,14 @@ export default function ShopPage() {
 
                   <button
                     onClick={(e) => { e.stopPropagation(); requestOpenPack(pack.id); }}
-                    className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                    className={`w-full py-2 sm:py-2.5 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1 ${
                       isExclusive
-                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
+                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40"
                         : "bg-white/10 hover:bg-white text-white hover:text-black border border-white/10"
                     }`}
                   >
-                    <span>OPEN VAULT</span>
-                    <ChevronRight size={14} />
+                    <span>OPEN</span>
+                    <ChevronRight size={12} />
                   </button>
                 </div>
               </motion.div>
