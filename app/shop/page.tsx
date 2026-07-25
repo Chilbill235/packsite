@@ -3,10 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Bell, X, Smartphone, Sparkles, Crown, Zap, 
-  Coins, Tag, Package, ChevronRight, AlertCircle, RefreshCw
-} from "lucide-react";
+import { Bell, X, Smartphone, Sparkles, Crown, Diamond, Zap } from "lucide-react";
 import ErrorDialog from "@/components/ErrorDialog";
 import WonScreen from "@/components/WonScreen"; 
 import ExclusiveWonScreen from "@/components/ExclusiveWonScreen";
@@ -14,7 +11,37 @@ import ExclusiveWonScreen from "@/components/ExclusiveWonScreen";
 import { RewardedAdService } from "@/lib/adService";
 import { notificationService } from "@/lib/notificationService";
 
-// --- Types ---
+// --- Notification Buff Definitions ---
+interface BuffDetails {
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+}
+
+const BUFF_MAP: Record<string, BuffDetails> = {
+  coin_grant_100: { title: "+100 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
+  coin_grant_150: { title: "+150 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
+  coin_grant_200: { title: "+200 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
+  coin_grant_250: { title: "+250 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
+  coin_grant_300: { title: "+300 Coins Claimed!", description: "Coins have been credited to your balance.", icon: "🪙", color: "text-yellow-400" },
+  coin_grant_500: { title: "+500 Coins Claimed!", description: "Mega drop! Coins added to your account.", icon: "🪙", color: "text-blue-400" },
+  "luck_boost_1.5x": { title: "1.5x Luck Active!", description: "Your mythic pack odds are boosted by 1.5x on your next opening!", icon: "✨", color: "text-green-400" },
+  luck_boost_2x: { title: "Double Luck Active!", description: "2x Pack Luck active! Open a pack now to use it.", icon: "✨", color: "text-green-500" },
+  luck_boost_3x: { title: "3x Mythic Luck Active!", description: "Unbelievable luck active! Open a mythic pack now.", icon: "✨", color: "text-purple-400" },
+  discount_10: { title: "10% Discount Unlocked!", description: "Enjoy 10% off all packs on your next open.", icon: "🔥", color: "text-red-400" },
+  discount_15: { title: "15% Discount Unlocked!", description: "Enjoy 15% off all packs on your next open.", icon: "🔥", color: "text-red-400" },
+  discount_20: { title: "20% Discount Unlocked!", description: "Massive 20% discount active for your next pack!", icon: "🔥", color: "text-red-500" },
+  exclusive_pack: { title: "Exclusive Pack Unlocked!", description: "A special vault pack has been unlocked in your shop!", icon: "🎁", color: "text-indigo-400" },
+  xp_boost_2x: { title: "2x XP Buff Active!", description: "Earn double experience progression for your level!", icon: "⚡", color: "text-orange-400" }
+};
+
+interface PackBasic {
+  id: string;
+  name: string;
+  price: number;
+}
+
 interface UserProfile {
   id?: string;
   email?: string;
@@ -26,12 +53,6 @@ interface UserProfile {
   luckExpiresAt?: string | Date | null;
   discountExpiresAt?: string | Date | null;
   xpBoostExpiresAt?: string | Date | null;
-}
-
-interface PackBasic {
-  id: string;
-  name: string;
-  price: number;
 }
 
 interface ApiPack {
@@ -79,89 +100,89 @@ const getPackTheme = (basePrice: number, isExclusive: boolean): PackTheme => {
     return {
       tier: "EXCLUSIVE",
       accent: "indigo",
-      cardBg: "bg-gradient-to-br from-indigo-950/70 via-black to-slate-950",
-      border: "border-indigo-500/40 hover:border-indigo-400",
-      glow: "from-indigo-500/20 via-fuchsia-500/10 to-transparent",
+      cardBg: "bg-gradient-to-br from-indigo-950/90 via-[#0c0c0c] to-[#0c0c0c]",
+      border: "border-indigo-400/60",
+      glow: "from-indigo-500/30 via-fuchsia-500/20 to-transparent",
       halo: "bg-indigo-500",
-      badge: "bg-indigo-500/20 border border-indigo-400/50 text-indigo-300",
-      priceFrom: "from-indigo-300 via-fuchsia-300 to-indigo-100",
+      badge: "bg-indigo-500 text-white",
+      priceFrom: "from-indigo-300 to-fuchsia-300",
       ribbon: "from-indigo-400 via-fuchsia-400 to-indigo-400",
       boxLid: "from-indigo-500/80 to-fuchsia-500/80",
-      boxBody: "from-indigo-900/80 to-slate-950",
+      boxBody: "from-indigo-700/70 to-[#0a0a0a]",
     };
   }
   if (basePrice >= 5000) {
     return {
       tier: "OMEGA",
       accent: "omega",
-      cardBg: "bg-gradient-to-br from-zinc-950 via-black to-fuchsia-950/40",
-      border: "border-fuchsia-500/30 hover:border-fuchsia-400/60",
-      glow: "from-fuchsia-500/20 via-rose-500/10 to-transparent",
-      halo: "bg-fuchsia-400",
-      badge: "bg-gradient-to-r from-fuchsia-500/20 to-rose-500/20 border border-fuchsia-400/40 text-fuchsia-200",
-      priceFrom: "from-white via-fuchsia-200 to-rose-300",
-      ribbon: "from-white via-fuchsia-300 to-rose-400",
-      boxLid: "from-white/90 via-fuchsia-400/80 to-rose-500/80",
-      boxBody: "from-zinc-900 via-black to-fuchsia-950/60",
+      cardBg: "bg-gradient-to-br from-black via-zinc-950 to-[#0a0a0a]",
+      border: "border-white/40",
+      glow: "from-white/30 via-fuchsia-500/20 to-red-500/20",
+      halo: "bg-white",
+      badge: "bg-gradient-to-r from-white via-fuchsia-300 to-red-400 text-black shadow-[0_0_18px_rgba(255,255,255,0.5)]",
+      priceFrom: "from-white via-fuchsia-200 to-red-300",
+      ribbon: "from-white via-fuchsia-300 to-red-400",
+      boxLid: "from-white/90 via-fuchsia-400/80 to-red-500/80",
+      boxBody: "from-zinc-900 via-black to-red-950/60",
     };
   }
   if (basePrice >= 2000) {
     return {
       tier: "MYTHIC",
       accent: "red",
-      cardBg: "bg-gradient-to-br from-rose-950/40 via-black to-zinc-950",
-      border: "border-rose-500/30 hover:border-rose-400/60",
-      glow: "from-rose-500/20 via-orange-500/10 to-transparent",
-      halo: "bg-rose-500",
-      badge: "bg-rose-500/20 border border-rose-400/40 text-rose-300",
-      priceFrom: "from-rose-300 to-orange-300",
-      ribbon: "from-rose-400 via-orange-400 to-rose-400",
-      boxLid: "from-rose-500/80 to-orange-500/80",
-      boxBody: "from-rose-950/80 to-black",
+      cardBg: "bg-gradient-to-br from-red-950/60 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-red-500/50",
+      glow: "from-red-500/30 via-orange-500/15 to-transparent",
+      halo: "bg-red-500",
+      badge: "bg-gradient-to-r from-red-500 to-orange-400 text-black",
+      priceFrom: "from-red-300 to-orange-300",
+      ribbon: "from-red-400 via-orange-400 to-red-400",
+      boxLid: "from-red-500/80 to-orange-500/80",
+      boxBody: "from-red-900/70 to-[#0a0a0a]",
     };
   }
   if (basePrice >= 1000) {
     return {
       tier: "LEGENDARY",
       accent: "amber",
-      cardBg: "bg-gradient-to-br from-amber-950/40 via-black to-zinc-950",
-      border: "border-amber-500/30 hover:border-amber-400/60",
-      glow: "from-amber-500/20 via-yellow-500/10 to-transparent",
+      cardBg: "bg-gradient-to-br from-amber-950/50 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-amber-400/50",
+      glow: "from-amber-400/25 via-yellow-500/10 to-transparent",
       halo: "bg-amber-400",
-      badge: "bg-amber-500/20 border border-amber-400/40 text-amber-300",
-      priceFrom: "from-amber-200 to-yellow-300",
+      badge: "bg-gradient-to-r from-amber-300 to-yellow-400 text-black",
+      priceFrom: "from-amber-200 to-yellow-200",
       ribbon: "from-amber-300 via-yellow-300 to-amber-300",
       boxLid: "from-amber-400/80 to-yellow-500/80",
-      boxBody: "from-amber-950/80 to-black",
+      boxBody: "from-amber-700/70 to-[#0a0a0a]",
     };
   }
   if (basePrice >= 500) {
     return {
       tier: "EPIC",
       accent: "purple",
-      cardBg: "bg-gradient-to-br from-purple-950/40 via-black to-zinc-950",
-      border: "border-purple-500/30 hover:border-purple-400/60",
-      glow: "from-purple-500/20 via-fuchsia-500/10 to-transparent",
+      cardBg: "bg-gradient-to-br from-purple-950/50 via-[#0a0a0a] to-[#0c0c0c]",
+      border: "border-purple-400/50",
+      glow: "from-purple-500/25 via-fuchsia-500/10 to-transparent",
       halo: "bg-purple-500",
-      badge: "bg-purple-500/20 border border-purple-400/40 text-purple-300",
+      badge: "bg-gradient-to-r from-purple-400 to-fuchsia-400 text-white",
       priceFrom: "from-purple-200 to-fuchsia-200",
       ribbon: "from-purple-400 via-fuchsia-400 to-purple-400",
       boxLid: "from-purple-500/80 to-fuchsia-500/80",
-      boxBody: "from-purple-950/80 to-black",
+      boxBody: "from-purple-800/70 to-[#0a0a0a]",
     };
   }
   return {
     tier: "RARE",
     accent: "sky",
-    cardBg: "bg-gradient-to-br from-sky-950/30 via-black to-zinc-950",
-    border: "border-sky-500/30 hover:border-sky-400/60",
-    glow: "from-sky-500/20 via-cyan-500/10 to-transparent",
+    cardBg: "bg-gradient-to-br from-sky-950/40 via-[#0a0a0a] to-[#0c0c0c]",
+    border: "border-sky-400/40",
+    glow: "from-sky-400/20 via-cyan-400/10 to-transparent",
     halo: "bg-sky-400",
-    badge: "bg-sky-500/20 border border-sky-400/40 text-sky-300",
+    badge: "bg-gradient-to-r from-sky-300 to-cyan-300 text-black",
     priceFrom: "from-sky-200 to-cyan-200",
     ribbon: "from-sky-300 via-cyan-300 to-sky-300",
     boxLid: "from-sky-400/80 to-cyan-500/80",
-    boxBody: "from-sky-950/80 to-black",
+    boxBody: "from-sky-700/70 to-[#0a0a0a]",
   };
 };
 
@@ -180,8 +201,13 @@ export default function ShopPage() {
   const [isFetchingUser, setIsFetchingUser] = useState(false);
   const [isFetchingPacks, setIsFetchingPacks] = useState(false);
 
-  useEffect(() => { setIsMounted(true); }, []);
-  useEffect(() => { setIsStandalone(getIsStandalone()); }, []);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    setIsStandalone(getIsStandalone());
+  }, []);
 
   const getInitialNotificationPermission = (): NotificationPermission | "unsupported" => {
     if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
@@ -200,18 +226,26 @@ export default function ShopPage() {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(getInitialNotificationPermission);
   const [showBanner, setShowBanner] = useState(true);
 
-  // Lock scroll when modals/animations are active
+  // Lock body scroll logic
   useEffect(() => {
-    const shouldLockScroll = wonItems.length > 0 || showAdModal || isOpening || Boolean(pendingPack);
+    const shouldLockScroll = wonItems.length > 0 || showAdModal || isOpening || pendingPack;
+    
     if (shouldLockScroll) {
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
       document.body.style.touchAction = 'none';
     } else {
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
       document.body.style.touchAction = '';
     }
+    
     return () => {
       document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
       document.body.style.touchAction = '';
     };
   }, [wonItems.length, showAdModal, isOpening, pendingPack]);
@@ -221,6 +255,7 @@ export default function ShopPage() {
   const [hasExclusivePack, setHasExclusivePack] = useState<boolean>(false);
   const [packError, setPackError] = useState<string | null>(null);
   const [activeXpBoost, setActiveXpBoost] = useState<boolean>(false);
+  const [adStatus, setAdStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'completed'>('idle');
 
   const formatTimeLeft = (expirationTime: string | Date | null | undefined): string => {
     if (!expirationTime) return "";
@@ -244,16 +279,21 @@ export default function ShopPage() {
   const targetTimeRef = useRef<number | null>(null);
   const timerCompletedRef = useRef(false);
   const adService = useRef<RewardedAdService | null>(null);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastNotificationTimeRef = useRef<number>(0);
   const initializeFetchGuardRef = useRef(false);
 
   const syncUserState = useCallback((userData: UserProfile) => {
     setUser((current) => ({ ...current, ...userData }));
-    if (userData.id && userIdRef.current !== userData.id) {
-      userIdRef.current = userData.id;
-      notificationService.login(userData.id);
+    if (userData.id) {
+      if (userIdRef.current !== userData.id) {
+        userIdRef.current = userData.id;
+        notificationService.login(userData.id);
+      }
     }
 
     const now = Date.now();
+    
     const luckExpired = userData.luckExpiresAt ? new Date(userData.luckExpiresAt).getTime() <= now : false;
     setActiveLuck(luckExpired ? 1 : (userData.activeLuck ?? 1));
 
@@ -272,40 +312,50 @@ export default function ShopPage() {
 
   useEffect(() => {
     if (!user) return;
+
     const ticker = setInterval(() => {
       const now = Date.now();
       const dynamicUpdates: Partial<UserProfile> = {};
       let changed = false;
 
       if (user.luckExpiresAt) {
-        setLuckTimeLeft(formatTimeLeft(user.luckExpiresAt));
+        const timeStr = formatTimeLeft(user.luckExpiresAt);
+        setLuckTimeLeft(timeStr);
         if (new Date(user.luckExpiresAt).getTime() <= now && activeLuck !== 1) {
           setActiveLuck(1);
           dynamicUpdates.activeLuck = 1;
           dynamicUpdates.luckExpiresAt = null;
           changed = true;
         }
-      } else { setLuckTimeLeft(""); }
+      } else {
+        setLuckTimeLeft("");
+      }
 
       if (user.discountExpiresAt) {
-        setDiscountTimeLeft(formatTimeLeft(user.discountExpiresAt));
+        const timeStr = formatTimeLeft(user.discountExpiresAt);
+        setDiscountTimeLeft(timeStr);
         if (new Date(user.discountExpiresAt).getTime() <= now && activeDiscount !== 0) {
           setActiveDiscount(0);
           dynamicUpdates.activeDiscount = 0;
           dynamicUpdates.discountExpiresAt = null;
           changed = true;
         }
-      } else { setDiscountTimeLeft(""); }
+      } else {
+        setDiscountTimeLeft("");
+      }
 
       if (user.xpBoostExpiresAt) {
-        setXpTimeLeft(formatTimeLeft(user.xpBoostExpiresAt));
+        const timeStr = formatTimeLeft(user.xpBoostExpiresAt);
+        setXpTimeLeft(timeStr);
         if (new Date(user.xpBoostExpiresAt).getTime() <= now && activeXpBoost !== false) {
           setActiveXpBoost(false);
           dynamicUpdates.activeXpBoost = false;
           dynamicUpdates.xpBoostExpiresAt = null;
           changed = true;
         }
-      } else { setXpTimeLeft(""); }
+      } else {
+        setXpTimeLeft("");
+      }
 
       if (changed) {
         setUser(curr => curr ? { ...curr, ...dynamicUpdates } : null);
@@ -327,30 +377,65 @@ export default function ShopPage() {
       }
     } catch (err) { 
       console.error("Failed to refresh user:", err); 
-    } finally {
+    } fontally {
       setIsFetchingUser(false);
     }
     return null;
   }, [syncUserState, isFetchingUser]);
+
+  const applyBuff = useCallback(async (buff: string) => {
+    if (!buff) return;
+    try {
+      const res = await fetch("/api/rewards/apply-buff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ buffType: buff }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to apply reward");
+      }
+
+      const data = await res.json();
+      syncUserState(data);
+    } catch (err) {
+      console.error("Failed to apply buff:", err);
+      setErrorDialog({ message: err instanceof Error ? err.message : "Failed to apply reward" });
+    }
+  }, [syncUserState]);
 
   const handleAdRewarded = useCallback(async (amount: number) => {
     if (timerCompletedRef.current) return;
 
     timerCompletedRef.current = true;
     setIsWaiting(false);
+    setAdStatus('success');
     targetTimeRef.current = null;
 
     try {
-      await fetch("/api/user/add-coins", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ amount: amount || 500, suppressNotification: true }) 
-      });
+      const userId = userIdRef.current || (await fetchUserData())?.id;
+      if (userId) {
+        await fetch("/api/send-notification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: userId,
+            title: "Ad Reward Earned!",
+            message: `You've earned ${amount} coins!`,
+            ref: ""
+          }),
+        }).catch(err => console.warn("Reward notification failed to send:", err));
+      }
+
+      await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
       await fetchUserData();
-      setShowAdModal(false);
+      setAdStatus('completed');
+      setTimeout(() => { setAdStatus('idle'); }, 3000);
     } catch (error) {
       console.error("Failed to process ad reward:", error);
-      setIsWaiting(false);
+      setAdStatus('error');
+      setTimeout(() => { setAdStatus('idle'); setIsWaiting(false); }, 5000);
     }
   }, [fetchUserData]);
 
@@ -376,7 +461,7 @@ export default function ShopPage() {
           setPacks(FALLBACK_PACKS);
         }
       } catch (packErr) {
-        console.warn("[Shop] Failed to fetch packs, using fallback:", packErr);
+        console.warn("[Shop] Failed to fetch packs, using premium fallback items:", packErr);
         setPacks(FALLBACK_PACKS);
       }
 
@@ -389,6 +474,36 @@ export default function ShopPage() {
       setIsFetchingPacks(false);
     }
   }, [fetchUserData, isFetchingPacks]);
+
+  const handleNotificationRouting = useCallback(async (ref: string) => {
+    const currentUser = user || await fetchUserData();
+    if (!currentUser) return;
+
+    if (["flash-deal", "weekend-sale", "double-coins", "anniversary", "clearance", "night-owl", "classic-flash", "classic-midnight", "classic-golden", "classic-weekend"].includes(ref)) {
+      setIsFlashSaleActive(true);
+    } else if (["daily-bonus", "level-up", "streak", "classic-streak", "classic-level", "classic-freeroll", "classic-rain"].includes(ref)) {
+      try {
+        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 150 }) });
+        await fetchUserData();
+      } catch { console.error("Auto-claim failed"); }
+    } else if (ref === "reward-claim") {
+      try {
+        setAdStatus('completed');
+        await fetch("/api/user/add-coins", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 500, suppressNotification: true }) });
+        await fetchUserData();
+        setTimeout(() => { setAdStatus('idle'); }, 3000);
+      } catch (e) {
+        console.error("Reward claim failed:", e);
+        setAdStatus('error');
+        setTimeout(() => { setAdStatus('idle'); }, 3000);
+        setErrorDialog({ message: "Failed to claim reward: " + (e instanceof Error ? e.message : "Unknown error") });
+      }
+    } else if (["vault-drop", "mystery-box", "surprise", "classic-mystery", "classic-key"].includes(ref)) {
+      setShowAdModal(true);
+    } else if (["new-item", "best-seller", "refresh", "seasonal", "classic-weekly", "classic-collector", "classic-inventory"].includes(ref)) {
+      loadShopData();
+    }
+  }, [fetchUserData, loadShopData, user]);
 
   const handleEnableNotifications = async () => {
     if (!("Notification" in window)) {
@@ -414,6 +529,37 @@ export default function ShopPage() {
     targetTimeRef.current = Date.now() + 10000;
     setCountdown(10);
     setIsWaiting(true);
+    setAdStatus('loading');
+
+    if (!adService.current) {
+      console.error("Ad service not initialized");
+      setIsWaiting(false);
+      setAdStatus('error');
+      return;
+    }
+
+    try {
+      const adResult = await adService.current.showAd(user?.email || "anon");
+      if (adResult && adResult.completed) {
+        await handleAdRewarded(amount);
+        return;
+      }
+    } catch (adError) {
+      console.error("Ad failed to show or play:", adError);
+    }
+
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (registration.active) {
+          registration.active.postMessage({
+            type: "START_BACKGROUND_TIMER", delay: 10000, amount: amount, url: `${window.location.origin}/shop?ref=reward-claim`
+          });
+        }
+      } catch (err) {
+        console.error("Service Worker not ready for messaging:", err);
+      }
+    }
 
     setTimeout(() => {
       if (isWaiting) {
@@ -425,9 +571,14 @@ export default function ShopPage() {
   const requestOpenPack = (packId: string) => {
     const pack = packs.find((p) => p.id === packId);
     if (!pack && packId !== "exclusive_vault_pack") return;
-    const target: PackBasic = pack ?? ({ id: "exclusive_vault_pack", name: "APOCALYPSE VAULT", price: 0 } as PackBasic);
+    const target: PackBasic =
+      pack ?? ({ id: "exclusive_vault_pack", name: "🔥 APOCALYPSE VAULT", price: 0 } as PackBasic);
     setModalQuantity(openQuantity > 0 ? openQuantity : 1);
     setPendingPack(target);
+  };
+
+  const closePackModal = () => {
+    setPendingPack(null);
   };
 
   const confirmOpenPack = async () => {
@@ -452,14 +603,13 @@ export default function ShopPage() {
     const totalCost = finalPrice * qty;
 
     if (user && (user.balance ?? 0) < totalCost) {
-      setErrorDialog({ message: "Insufficient coins! Watch an ad or claim rewards." });
+      setErrorDialog({ message: "Insufficient coins! Wait for drops." });
       return;
     }
 
     setPendingPack(null);
     setOpenQuantity(qty);
     setIsOpening(true);
-
     try {
       const res = await fetch("/api/packs/open", {
         method: "POST",
@@ -468,11 +618,13 @@ export default function ShopPage() {
       });
       const data = await res.json();
 
-      await new Promise((resolve) => setTimeout(resolve, 1800));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       if (res.ok) {
-        setLastWasExclusive(packId === "exclusive_vault_pack");
+        const isExclusiveResult = packId === "exclusive_vault_pack";
+        setLastWasExclusive(isExclusiveResult);
         setLastNewBalance(data.newBalance);
+
         setWonItems(Array.isArray(data.wonItems) ? data.wonItems : []);
         syncUserState({
           balance: data.newBalance,
@@ -501,16 +653,43 @@ export default function ShopPage() {
     loadShopData();
     adService.current = new RewardedAdService();
 
-    // Listen for both event handlers from header/nav components
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "BACKGROUND_TIMER_COMPLETE") {
+        const amount = event.data.amount || 500;
+        handleAdRewarded(amount);
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
     const openModal = () => { setShowAdModal(true); };
-    window.addEventListener("openShopBalanceModal", openModal);
     window.addEventListener("openBalanceModal", openModal);
 
     return () => {
-      window.removeEventListener("openShopBalanceModal", openModal);
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
       window.removeEventListener("openBalanceModal", openModal);
     };
-  }, [loadShopData]);
+  }, [loadShopData, handleAdRewarded]);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    const buff = searchParams.get("buff");
+
+    if (!ref && !buff) return;
+
+    const routePayloads = async () => {
+      if (ref) await handleNotificationRouting(ref);
+      if (buff) await applyBuff(buff);
+
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("ref");
+      params.delete("buff");
+      const nextUrl = params.toString()
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, document.title, nextUrl);
+    };
+
+    routePayloads();
+  }, [applyBuff, handleNotificationRouting, searchParams]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -525,10 +704,57 @@ export default function ShopPage() {
     return () => clearInterval(intervalId);
   }, [isWaiting, handleAdRewarded]);
 
+  useEffect(() => {
+    if (notificationTimeoutRef.current !== null) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+
+    if (user?.id && permission === "granted") {
+      const scheduleNextNotification = () => {
+        const isFirstNotification = lastNotificationTimeRef.current === 0;
+        const delay = isFirstNotification
+          ? Math.floor(Math.random() * 60000) + 90000
+          : 600000;
+
+        notificationTimeoutRef.current = setTimeout(async () => {
+          try {
+            const now = Date.now();
+            lastNotificationTimeRef.current = now;
+
+            await fetch("/api/send-notification", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: user?.id,
+                title: "Daily Bonus!",
+                message: "Come back to claim your daily bonus coins!",
+                ref: "daily-bonus",
+              }),
+            });
+          } catch (error) {
+            console.error("Error sending periodic notification:", error);
+          } finally {
+            scheduleNextNotification();
+          }
+        }, delay);
+      };
+
+      scheduleNextNotification();
+    }
+
+    return () => {
+      if (notificationTimeoutRef.current !== null) {
+        clearTimeout(notificationTimeoutRef.current);
+        notificationTimeoutRef.current = null;
+      }
+    };
+  }, [user, permission]);
+
   const displayPacks = useMemo(() => {
     const real = packs.filter((p) => p && p.id !== "exclusive_vault_pack");
     const exclusive = hasExclusivePack
-      ? [{ id: "exclusive_vault_pack", name: "APOCALYPSE VAULT", price: 0 } as PackBasic]
+      ? [{ id: "exclusive_vault_pack", name: "🔥 APOCALYPSE VAULT", price: 0 } as PackBasic]
       : [];
     real.sort((a, b) => {
       const pa = typeof a.price === "string" ? parseInt(a.price) : a.price;
@@ -538,55 +764,43 @@ export default function ShopPage() {
     return [...real, ...exclusive];
   }, [packs, hasExclusivePack]);
 
-  if (packError) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#070707] text-rose-400 p-6 text-center">
-        <AlertCircle size={48} className="mb-4 text-rose-500 animate-bounce" />
-        <p className="text-lg font-bold">{packError}</p>
-        <button onClick={loadShopData} className="mt-4 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-xl font-bold flex items-center gap-2 hover:bg-rose-500/20 transition">
-          <RefreshCw size={16} /> Retry Connection
-        </button>
-      </div>
-    );
-  }
+  if (packError) return <div className="min-h-screen flex h-[64vh] items-center justify-center bg-[#070707] text-red-400 text-center p-4">{packError}</div>;
 
   return (
-    <div className="min-h-screen bg-[#070707] text-slate-100 font-sans relative overflow-hidden flex flex-col selection:bg-amber-500/30">
-      
-      {/* Background Grid */}
-      <div className="absolute inset-0 bg-[radial-gradient(#1f1f2e_1px,transparent_1px)] [background-size:24px_24px] opacity-30 pointer-events-none" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-amber-500/10 via-purple-500/5 to-transparent blur-[140px] rounded-full pointer-events-none" />
-
-      {/* Opening Animation Overlay */}
+    <div className="h-screen bg-[#070707] text-white font-sans relative overflow-hidden flex flex-col">
+      {/* PACK OPENING ANIMATION OVERLAY */}
       <AnimatePresence>
         {isOpening && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/90 backdrop-blur-2xl pointer-events-auto"
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/95 backdrop-blur-xl pointer-events-auto"
           >
             <motion.div
-              animate={{ rotate: [0, -8, 8, -8, 8, 0], scale: [1, 1.12, 1] }}
-              transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
-              className="relative p-6 rounded-3xl bg-gradient-to-b from-amber-500/20 to-transparent border border-amber-500/30 shadow-[0_0_50px_rgba(245,158,11,0.2)] mb-8"
+              animate={{
+                rotate: [0, -10, 10, -10, 10, 0],
+                scale: [1, 1.1, 1],
+              }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+              className="text-8xl mb-8"
             >
-              <Package size={80} className="text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
+              📦
             </motion.div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-widest text-white uppercase animate-pulse">
-              Decrypting Cyber Vault...
+            <h2 className="text-2xl font-black tracking-widest text-white uppercase animate-pulse">
+              Unlocking Vaults...
             </h2>
-            <div className="w-64 h-2 bg-white/10 mt-6 rounded-full overflow-hidden border border-white/5">
+            <div className="w-64 h-1.5 bg-white/10 mt-6 rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-amber-500 via-fuchsia-500 to-amber-300"
+                className="h-full bg-amber-500"
                 initial={{ width: "0%" }}
                 animate={{ width: "100%" }}
-                transition={{ duration: 1.8, ease: "easeInOut" }}
+                transition={{ duration: 2, ease: "linear" }}
               />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Purchase Modal */}
+      {/* PACK PURCHASE MODAL */}
       <AnimatePresence>
         {pendingPack && (
           <PackPurchaseModal
@@ -600,7 +814,7 @@ export default function ShopPage() {
               typeof pendingPack.price === "string" ? parseInt(pendingPack.price) : pendingPack.price,
               pendingPack.id === "exclusive_vault_pack"
             )}
-            onClose={() => setPendingPack(null)}
+            onClose={closePackModal}
             onConfirm={confirmOpenPack}
           />
         )}
@@ -625,66 +839,62 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* iOS Banner */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
+
       {isMounted && isIOS && !isStandalone && (
-        <div className="mx-4 mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 relative z-10 max-w-4xl mx-auto w-full backdrop-blur-md">
-          <Smartphone className="text-amber-400 shrink-0" size={22} />
-          <div className="text-xs">
-            <span className="font-bold text-amber-400">Enable Safari Alerts: </span>
-            <span className="text-slate-300">Tap <strong className="text-white">Share</strong> & choose <strong className="text-white">&quot;Add to Home Screen&quot;</strong> for instant payouts!</span>
+        <div className="mx-2 md:mx-4 p-2 md:p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-2 text-center sm:text-left relative z-10 max-w-4xl mx-auto w-full mb-4">
+          <Smartphone className="text-amber-500 shrink-0" size={24} />
+          <div>
+            <h4 className="font-bold text-amber-500 text-sm">Enable Safari Background Alerts</h4>
+            <p className="text-xs text-gray-300 mt-1">Tap the <strong className="text-white">Share</strong> button in Safari, then choose <strong className="text-white">&quot;Add to Home Screen&quot;</strong> to receive background timer payouts and free drops!</p>
           </div>
         </div>
       )}
 
-      {/* Notification Banner */}
       <AnimatePresence>
         {isMounted && permission === "default" && showBanner && (
           <motion.div 
-            initial={{ opacity: 0, y: -15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
-            className="m-4 relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto w-full shadow-xl"
+            initial={{ opacity: 0, y: -20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, height: 0 }} 
+            className="mb-4 relative overflow-hidden rounded-xl border border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 z-10 max-w-4xl mx-auto w-full"
           >
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent pointer-events-none" />
             <div className="flex items-center gap-3 relative z-10">
-              <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
-                <Bell size={20} />
-              </div>
+              <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500"><Bell size={20} /></div>
               <div>
-                <h4 className="font-bold text-sm text-white">Enable Notifications</h4>
-                <p className="text-slate-400 text-xs">Stay tuned for rare vault drops and flash coin sales.</p>
+                <h4 className="font-bold text-sm">Enable Notifications</h4>
+                <p className="text-gray-400 text-xs">Get alerts for shop drops, flash sales, and bonus claims.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 relative z-10 w-full sm:w-auto">
-              <button onClick={handleEnableNotifications} className="w-full sm:w-auto px-4 py-2 text-xs bg-amber-500 hover:bg-amber-400 text-black font-black rounded-xl transition-all shadow-lg shadow-amber-500/20">ALLOW</button>
-              <button onClick={() => setShowBanner(false)} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
+            <div className="flex items-center gap-2 relative z-10 w-full md:w-auto">
+              <button onClick={handleEnableNotifications} className="w-full md:w-auto px-4 py-2 text-sm bg-amber-500 hover:bg-amber-400 text-black font-black rounded-lg transition-all shadow-[0_0_15px_rgba(245,158,11,0.4)]">ALLOW ALERTS</button>
+              <button onClick={() => setShowBanner(false)} className="p-2 text-gray-500 hover:text-white transition-colors"><X size={18} /></button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Watch Ad Boost Balance Modal */}
       <AnimatePresence>
         {showAdModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div className="bg-slate-900 border border-white/10 p-6 rounded-3xl w-full max-w-xs text-center relative overflow-hidden shadow-2xl">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div className="bg-[#111111] border border-white/10 p-6 rounded-3xl w-full max-w-xs text-center relative overflow-hidden shadow-2xl">
               {isWaiting ? (
-                <div className="flex flex-col items-center py-4">
+                <div className="flex flex-col items-center py-6">
                   <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
                     <svg className="w-full h-full rotate-[-90deg]">
-                      <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800" />
+                      <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-zinc-800" />
                       <motion.circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-amber-500" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 10, ease: "linear" }} />
                     </svg>
-                    <span className="absolute text-2xl font-black text-white">{countdown}</span>
+                    <span className="absolute text-2xl font-black">{countdown}</span>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-300">Processing Stream...</h3>
+                  <h3 className="text-lg font-bold">Processing Stream</h3>
                 </div>
               ) : (
                 <>
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 w-fit rounded-2xl mx-auto mb-3">
-                    <Coins size={28} />
-                  </div>
-                  <h3 className="text-lg font-black mb-1 text-white">Boost Balance</h3>
-                  <p className="text-xs text-slate-400 mb-4">Watch a quick stream to claim bonus coins instantly.</p>
-                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black transition-all shadow-lg shadow-amber-500/20">WATCH AD (+500)</button>
-                  <button onClick={() => setShowAdModal(false)} className="mt-3 text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+                  <h3 className="text-xl font-black mb-2 tracking-tight">Boost Balance</h3>
+                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 mt-4 rounded-xl font-black text-sm bg-amber-500/10 border border-amber-500/20 text-amber-500">WATCH AD (+500)</button>
+                  <button onClick={() => setShowAdModal(false)} className="mt-4 text-xs text-zinc-600">Cancel</button>
                 </>
               )}
             </motion.div>
@@ -692,43 +902,35 @@ export default function ShopPage() {
         )}
       </AnimatePresence>
 
-      {/* Main Shop View */}
-      <div className="max-w-6xl mx-auto flex flex-col items-center w-full relative z-10 px-4 flex-1 py-6">
-        <div className="text-center mb-6">
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-amber-400 mb-3">
-            <Sparkles size={14} /> EXCLUSIVE VAULT STORE
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-500"
-          >
-            VAULT SHOP
-          </motion.h1>
-        </div>
+      <div className="max-w-7xl mx-auto flex flex-col items-center w-full relative z-10 px-2 sm:px-4 flex-1 overflow-hidden">
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="text-3xl md:text-4xl font-black mb-4 tracking-tighter text-center text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-sm flex-shrink-0"
+        >
+          VAULT SHOP
+        </motion.h1>
 
-        {/* Active Buff Badges */}
         {(activeDiscount > 0 || activeLuck > 1 || activeXpBoost) && (
-          <div className="flex flex-wrap gap-2 mb-6 justify-center items-center">
+          <div className="flex flex-wrap gap-1 md:gap-1.5 mb-2 md:mb-3 justify-center items-center flex-shrink-0">
             {activeDiscount > 0 && (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-xs font-bold shadow-lg shadow-rose-500/5">
-                <Tag size={13} className="animate-pulse" /> {activeDiscount * 100}% Off {discountTimeLeft && `(${discountTimeLeft})`}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(239,68,68,0.1)]">
+                <span className="animate-pulse">🔥</span> {activeDiscount * 100}% Discount {discountTimeLeft && `(${discountTimeLeft})`}
               </div>
             )}
             {activeLuck > 1 && (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-bold shadow-lg shadow-emerald-500/5">
-                <Sparkles size={13} className="animate-pulse" /> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(34,197,94,0.1)]">
+                <span className="animate-pulse">✨</span> {activeLuck}x Luck Boost {luckTimeLeft && `(${luckTimeLeft})`}
               </div>
             )}
             {activeXpBoost && (
-              <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-xs font-bold shadow-lg shadow-orange-500/5">
-                <Zap size={13} className="animate-pulse" /> 2x XP Boost {xpTimeLeft && `(${xpTimeLeft})`}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(249,115,22,0.1)]">
+                <span className="animate-pulse">⚡</span> 2x XP Active {xpTimeLeft && `(${xpTimeLeft})`}
               </div>
             )}
           </div>
         )}
 
-        {/* Packs Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 w-full max-w-5xl mx-auto flex-1 overflow-y-auto px-2 md:px-4 content-start items-start pb-6">
           {displayPacks.map((pack, idx) => {
             if (!pack || typeof pack !== 'object' || !pack.id) return null;
 
@@ -741,74 +943,87 @@ export default function ShopPage() {
             else if (activeDiscount > 0 && !isExclusive) discountMultiplier = 1 - activeDiscount;
 
             const finalPrice = Math.floor((basePrice || 0) * discountMultiplier);
+            const totalCost = finalPrice * openQuantity;
             const onSale = discountMultiplier < 1;
 
             return (
               <motion.div
                 key={pack.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05, type: "spring", stiffness: 120 }}
-                whileHover={{ y: -4 }}
-                onClick={() => requestOpenPack(pack.id)}
-                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/5 p-5 flex flex-col justify-between`}
+                transition={{ delay: idx * 0.05, type: "spring", stiffness: 120, damping: 18 }}
+                whileHover={{ y: -6 }}
+                className={`group relative w-full ${theme.cardBg} ${theme.border} border rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-[0_10px_30px_-12px_rgba(255,255,255,0.2)]`}
               >
-                <div className={`pointer-events-none absolute -top-24 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-500`} />
+                <div className={`pointer-events-none absolute -top-20 -inset-x-10 h-48 bg-gradient-to-b ${theme.glow} blur-2xl opacity-70 group-hover:opacity-100 transition-opacity duration-500`} />
+                <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute -inset-y-4 -left-1/2 w-1/3 rotate-12 bg-gradient-to-r from-transparent via-white/10 to-transparent blur-md" />
+                </div>
 
-                <div className="flex items-center justify-between w-full relative z-20 mb-4">
-                  <span className={`text-[10px] font-black tracking-widest px-2.5 py-1 rounded-md ${theme.badge}`}>
+                <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
+                  <span className={`text-[8px] font-black tracking-[0.15em] px-1.5 py-0.5 rounded-full ${theme.badge} shadow-lg`}>
                     {theme.tier}
                   </span>
-                  <div className="flex gap-1">
-                    {onSale && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-500 text-black animate-pulse">
-                        -{Math.round((1 - discountMultiplier) * 100)}%
-                      </span>
-                    )}
-                    {isExclusive && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-fuchsia-500 text-white animate-pulse">
-                        EXCLUSIVE
-                      </span>
-                    )}
-                  </div>
+                </div>
+                <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
+                  {onSale && (
+                    <span className="text-[9px] font-black tracking-wider px-2 py-1 rounded-full bg-red-500 text-black shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse">
+                      FLASH -{Math.round((1 - discountMultiplier) * 100)}%
+                    </span>
+                  )}
+                  {isExclusive && (
+                    <span className="text-[9px] font-black tracking-wider px-2 py-1 rounded-full bg-fuchsia-500 text-white shadow-[0_0_12px_rgba(217,70,239,0.6)] animate-pulse">
+                      LIMITED
+                    </span>
+                  )}
                 </div>
 
-                <div className="relative h-28 flex items-center justify-center my-2">
-                  <div className={`absolute w-24 h-24 rounded-full blur-2xl opacity-50 ${theme.halo} group-hover:scale-125 transition-transform duration-500`} />
+                <div className="relative h-16 sm:h-24 flex items-center justify-center mt-3 mb-0.5">
+                  <div className={`absolute w-24 h-24 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-60 ${theme.halo} group-hover:opacity-90 transition-opacity`} />
+                  {theme.tier === "OMEGA" ? (
+                    <>
+                      <span className="absolute top-2 left-6 text-fuchsia-300 text-xs animate-ping">✨</span>
+                      <span className="absolute bottom-2 right-6 text-red-300 text-[10px] animate-pulse">🔥</span>
+                      <span className="absolute top-6 right-10 text-white text-[9px] animate-pulse">✨</span>
+                    </>
+                  ) : (theme.tier === "MYTHIC" || theme.tier === "EXCLUSIVE") && (
+                    <>
+                      <span className="absolute top-2 left-6 text-yellow-200 text-xs animate-ping">✨</span>
+                      <span className="absolute bottom-2 right-6 text-yellow-200 text-[10px] animate-pulse">✨</span>
+                    </>
+                  )}
                   <div className="relative z-10 flex flex-col items-center group-hover:-translate-y-1 transition-transform duration-300">
-                    <div className={`relative h-6 w-24 rounded-t-lg bg-gradient-to-b ${theme.boxLid} border border-white/20 shadow-lg`} />
-                    <div className={`relative h-14 w-20 rounded-b-lg bg-gradient-to-b ${theme.boxBody} border border-white/20 border-t-0 shadow-2xl flex items-center justify-center`}>
-                      <Package size={22} className="text-white/40 group-hover:text-white/80 transition-colors" />
-                      <div className={`absolute inset-y-0 w-2.5 bg-gradient-to-b ${theme.ribbon} opacity-80`} />
+                    <div className={`relative h-5 w-20 sm:w-24 rounded-t-md bg-gradient-to-b ${theme.boxLid} shadow-[inset_0_-3px_0_rgba(0,0,0,0.35)] border border-white/10`}>
+                      <div className="absolute inset-x-2 top-1 h-1 rounded-full bg-white/40 blur-[1px]" />
                     </div>
+                    <div className={`relative h-12 w-16 sm:w-20 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/10 border-t-0 shadow-xl overflow-hidden`}>
+                      <div className={`absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-2 sm:w-2.5 bg-gradient-to-b ${theme.ribbon} opacity-90`} />
+                    </div>
+                    <div className="mt-1 w-24 sm:w-28 h-1.5 rounded-full bg-black/60 blur-md" />
                   </div>
                 </div>
 
-                <div className="relative z-10 flex flex-col items-center text-center mt-2">
-                  <h3 className="font-black text-lg text-white mb-1 group-hover:text-amber-300 transition-colors">
+                <div className="relative z-10 px-3 sm:px-4 pb-4 pt-1 flex flex-col items-center text-center">
+                  <h3 className="font-black text-sm sm:text-base md:text-lg mb-1 tracking-tight leading-tight break-words max-w-full text-white drop-shadow-sm">
                     {pack.name}
                   </h3>
-                  <div className={`text-xs font-bold tracking-wider uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-4 flex items-center gap-1`}>
-                    {isExclusive ? (
-                      "FREE DROP"
-                    ) : (
-                      <>
-                        <Coins size={12} className="text-amber-400 shrink-0" />
-                        <span>{finalPrice.toLocaleString()} COINS</span>
-                      </>
-                    )}
+                  <div className={`text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-3`}>
+                    {isExclusive ? "FREE DROP" : `FROM ${finalPrice.toLocaleString()} COINS`}
                   </div>
 
                   <button
                     onClick={(e) => { e.stopPropagation(); requestOpenPack(pack.id); }}
-                    className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 ${
+                    className={`relative w-full py-2.5 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider transition-all duration-200 overflow-hidden ${
                       isExclusive
-                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40"
-                        : "bg-white/10 hover:bg-white text-white hover:text-black border border-white/10"
-                    }`}
+                        ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.45)] hover:shadow-[0_0_30px_rgba(168,85,247,0.75)]"
+                        : `bg-gradient-to-r ${theme.priceFrom} text-black shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:shadow-[0_0_25px_rgba(255,255,255,0.35)]`
+                    } hover:scale-[1.03] active:scale-95`}
                   >
-                    <span>OPEN VAULT</span>
-                    <ChevronRight size={14} />
+                    <span className="relative z-10">
+                      {isExclusive
+                        ? "CLAIM"
+                        : `OPEN ${openQuantity > 1 ? `${openQuantity} × ` : ""}${totalCost.toLocaleString()} COINS`}
+                    </span>
                   </button>
                 </div>
               </motion.div>
@@ -822,7 +1037,9 @@ export default function ShopPage() {
   );
 }
 
-// --- Pack Purchase Modal Component ---
+// ---------------------------------------------------------------------------
+// PackPurchaseModal Components
+// ---------------------------------------------------------------------------
 const QUANTITY_CHIPS = [1, 3, 5, 10, 25, 50] as const;
 
 interface PackPurchaseModalProps {
@@ -861,82 +1078,110 @@ export function PackPurchaseModal({
   const remainingBalance = balance - totalCost;
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
       onClick={onClose}
-      className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
     >
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
+        initial={{ opacity: 0, y: 30, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 260, damping: 24 }}
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-md overflow-hidden rounded-3xl ${theme.cardBg} ${theme.border} border p-6 shadow-2xl`}
+        className={`relative w-full max-w-md overflow-hidden rounded-3xl ${theme.cardBg} ${theme.border} border shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]`}
       >
-        <button onClick={onClose} className="absolute top-4 right-4 z-30 p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+        <div className={`pointer-events-none absolute -top-24 -inset-x-10 h-56 bg-gradient-to-b ${theme.glow} blur-3xl opacity-80`} />
+
+        <button onClick={onClose} aria-label="Close" className="absolute top-3 right-3 z-30 p-2 rounded-full bg-white/5 hover:bg-white/15 transition-colors text-white/80 hover:text-white">
           <X size={18} />
         </button>
 
-        <div className="relative z-10 flex flex-col items-center">
-          <span className={`text-[10px] font-black tracking-widest px-3 py-1 rounded-md mb-4 ${theme.badge}`}>
-            {theme.tier}
-          </span>
+        <div className="relative z-10 p-6 sm:p-7">
+          <div className="flex justify-center mb-4">
+            <span className={`text-[10px] font-black tracking-[0.25em] px-3 py-1.5 rounded-full ${theme.badge} shadow-lg`}>
+              {theme.tier}
+            </span>
+          </div>
 
-          <h2 className="text-2xl font-black text-white text-center mb-1">{pack.name}</h2>
-          <p className="text-xs text-slate-400 mb-6">Select total vaults to decrypt</p>
-
-          <div className="w-full mb-6">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-medium">
-              <span>UNITS TO OPEN</span>
-              <span className="text-amber-400 font-bold">{quantity} Vaults</span>
-            </div>
-            <div className="grid grid-cols-6 gap-1.5">
-              {QUANTITY_CHIPS.map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setQuantity(q)}
-                  className={`py-2 rounded-xl text-xs font-black transition-all ${
-                    quantity === q 
-                      ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20" 
-                      : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5"
-                  }`}
-                >
-                  {q}
-                </button>
-              ))}
+          <div className="relative h-32 sm:h-36 flex items-center justify-center mb-5">
+            <div className={`absolute w-32 h-32 rounded-full blur-3xl opacity-60 ${theme.halo}`} />
+            <div className="relative z-10 flex flex-col items-center">
+              <div className={`relative h-6 w-28 sm:w-32 rounded-t-md bg-gradient-to-b ${theme.boxLid} shadow-[inset_0_-3px_0_rgba(0,0,0,0.35)] border border-white/10`}></div>
+              <div className={`relative h-20 w-28 sm:w-32 rounded-b-md bg-gradient-to-b ${theme.boxBody} border border-white/10 border-t-0 shadow-2xl overflow-hidden`}></div>
             </div>
           </div>
 
-          <div className="w-full bg-black/40 border border-white/5 rounded-2xl p-4 mb-6 space-y-2 text-xs">
-            <div className="flex justify-between text-slate-400">
-              <span>Unit Price</span>
-              <span className="text-slate-200 font-bold">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}</span>
+          <h2 className="text-center text-2xl sm:text-3xl font-black tracking-tight text-white mb-1 leading-tight">
+            {pack.name}
+          </h2>
+          <p className={`text-center text-[11px] sm:text-xs font-bold tracking-[0.25em] uppercase bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent mb-5`}>
+            {isExclusive ? "FREE EXCLUSIVE DROP" : `FROM ${finalPrice.toLocaleString()} 🪙 / PACK`}
+          </p>
+
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">Select Bulk Quantity</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/50">Qty {quantity}</span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {QUANTITY_CHIPS.map((q) => {
+                const selected = quantity === q;
+                return (
+                  <button
+                    key={q}
+                    onClick={() => setQuantity(q)}
+                    className={`relative py-2.5 rounded-xl font-black text-sm transition-all ${
+                      selected ? `bg-gradient-to-b ${theme.priceFrom} text-black shadow-[0_0_18px_rgba(255,255,255,0.3)] scale-105` : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10"
+                    }`}
+                  >
+                    {q}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-black/40 border border-white/10 p-4 mb-5 backdrop-blur">
+            <div className="flex items-center justify-between text-xs text-white/60 mb-1.5">
+              <span>Price per pack</span>
+              <span className="font-bold text-white/90">{isExclusive ? "FREE" : `${finalPrice.toLocaleString()} 🪙`}</span>
             </div>
             {discountMultiplier < 1 && (
-              <div className="flex justify-between text-emerald-400">
-                <span>Sale Bonus</span>
+              <div className="flex items-center justify-between text-[11px] text-emerald-300 mb-1.5">
+                <span>Discount</span>
                 <span className="font-bold">-{Math.round((1 - discountMultiplier) * 100)}%</span>
               </div>
             )}
-            <div className="flex justify-between text-slate-400 border-b border-white/5 pb-2">
+            <div className="flex items-center justify-between text-xs text-white/60 mb-2">
               <span>Quantity</span>
-              <span className="text-slate-200 font-bold">{quantity}</span>
+              <span className="font-bold text-white/90">{quantity}</span>
             </div>
-            <div className="flex justify-between text-sm font-bold text-white pt-1">
-              <span>Total Cost</span>
-              <span className="text-amber-400">{isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}</span>
+            <div className="border-t border-white/10 pt-2 flex items-center justify-between">
+              <span className="text-sm font-bold text-white/80">Total Cost</span>
+              <span className={`text-xl font-black bg-gradient-to-r ${theme.priceFrom} bg-clip-text text-transparent`}>
+                {isExclusive ? "FREE" : `${totalCost.toLocaleString()} 🪙`}
+              </span>
             </div>
 
             {!isExclusive && (
-              <div className="pt-2 border-t border-white/5 flex justify-between text-[11px]">
-                <span className="text-slate-500">Remaining Balance</span>
-                <span className={insufficient ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                  {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` : `${remainingBalance.toLocaleString()} 🪙`}
-                </span>
+              <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-[10px] text-white/50">
+                  <span>Current balance</span>
+                  <span>{balance.toLocaleString()} 🪙</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-white/70">
+                  <span>Balance after purchase</span>
+                  <span className={insufficient ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+                    {insufficient ? `Short by ${Math.abs(remainingBalance).toLocaleString()} 🪙` : `${remainingBalance.toLocaleString()} 🪙`}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -944,15 +1189,17 @@ export function PackPurchaseModal({
           <button
             onClick={onConfirm}
             disabled={insufficient}
-            className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all ${
+            className={`relative w-full py-4 rounded-2xl font-black text-base uppercase tracking-wider overflow-hidden transition-all ${
               isExclusive
-                ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-lg shadow-indigo-500/20"
+                ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white shadow-[0_0_25px_rgba(168,85,247,0.5)]"
                 : insufficient
-                ? "bg-white/10 text-slate-500 cursor-not-allowed"
-                : "bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20"
+                ? "bg-white/10 text-white/40 cursor-not-allowed"
+                : `bg-gradient-to-r ${theme.priceFrom} text-black shadow-[0_0_20px_rgba(255,255,255,0.25)]`
             }`}
           >
-            {isExclusive ? "CLAIM FREE VAULT" : insufficient ? "INSUFFICIENT FUNDS" : `OPEN ${quantity} VAULT${quantity > 1 ? "S" : ""}`}
+            <span className="relative z-10">
+              {isExclusive ? "CLAIM FREE PACK" : insufficient ? "INSUFFICIENT COINS" : `OPEN ${quantity} ${quantity > 1 ? "PACKS" : "PACK"}`}
+            </span>
           </button>
         </div>
       </motion.div>
