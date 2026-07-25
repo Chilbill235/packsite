@@ -189,7 +189,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [adActive, adCountdown, adToken, errorMessage, isVerifying, playSound, soundEnabled]);
 
-  // Page Routing & Splash Logic
+  // Page Routing & Splash Logic (Enforcing a 10s minimum loading duration)
   useEffect(() => {
     if (status === "loading") return;
 
@@ -203,10 +203,20 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
       if (pathname !== "/") {
         setLoading(false);
       } else {
-        const timer = setTimeout(() => {
-          setFadeOut(true);
-          setTimeout(() => setLoading(false), 500);
-        }, 1000);
+        const startTime = Date.now();
+        const minDuration = 10000; // 10 seconds minimum
+
+        const checkTimer = () => {
+          const elapsedTime = Date.now() - startTime;
+          if (elapsedTime >= minDuration) {
+            setFadeOut(true);
+            setTimeout(() => setLoading(false), 500);
+          } else {
+            setTimeout(checkTimer, minDuration - elapsedTime);
+          }
+        };
+
+        const timer = setTimeout(checkTimer, minDuration);
         return () => clearTimeout(timer);
       }
     }
