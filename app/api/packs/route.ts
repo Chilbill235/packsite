@@ -21,7 +21,7 @@ export async function GET() {
         price: true,
         image: true,
         category: true,
-      }
+      },
     });
     return NextResponse.json(packs);
   } catch (error) {
@@ -33,16 +33,23 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+
+    // Check for user ID or fallback email to guarantee session validity
+    if (!session?.user?.id && !session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const userId = session.user.id;
+    const userEmail = session.user.email;
 
     const { packId, quantity = 1, isFlashSale = false } = await req.json();
     const qty = Math.max(1, parseInt(quantity, 10) || 1);
 
     const result = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { email: session.user.email } });
+      // Primary lookup by ID, secondary fallback by non-null email string
+      const user = userId
+        ? await tx.user.findUnique({ where: { id: userId } })
+        : await tx.user.findUnique({ where: { email: userEmail as string } });
 
       if (!user) throw new Error("User not found");
 
@@ -176,6 +183,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-
-
