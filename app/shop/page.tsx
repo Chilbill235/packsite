@@ -452,7 +452,7 @@ export default function ShopPage() {
       console.error("[Shop] Error in loadShopData:", err);
       setPackError("An error occurred while loading packs");
       setPacks(FALLBACK_PACKS);
-    } finally {
+    } fontally {
       setIsFetchingPacks(false);
     }
   }, [fetchUserData, isFetchingPacks]);
