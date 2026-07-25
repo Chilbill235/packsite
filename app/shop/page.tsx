@@ -520,7 +520,7 @@ export default function ShopPage() {
 
     try {
       const adResult = await adService.current.showAd(user?.email || "anon");
-      if (adResult && adResult.completed) {
+      if (adResult && (adResult as { completed?: boolean }).completed) {
         await handleAdRewarded(amount);
         return;
       }
@@ -533,7 +533,7 @@ export default function ShopPage() {
         handleAdRewarded(amount);
       }
     }, 10000);
-  };
+  }
 
   const requestOpenPack = (packId: string) => {
     const pack = packs.find((p) => p.id === packId);
