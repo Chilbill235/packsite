@@ -11,18 +11,17 @@ const withPWA = withPWAInit({
   },
 });
 
-// next.config.js
-module.exports = {
-  allowedDevOrigins: ['192.168.12.237', '*'],
-} 
-
 // 2. Define your base Next.js configuration
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/client", "pg"],
   
-  // Add your ngrok hostname here. 
-  // You can also use "*.ngrok-free.dev" if you want to allow all ngrok subdomains.
-  allowedDevOrigins: ["localhost", "127.0.0.1", "franklin-deputy-resolved-paso.trycloudflare.com"],
+  // Combined allowedDevOrigins
+  allowedDevOrigins: [
+    "localhost", 
+    "127.0.0.1", 
+    "192.168.12.237", 
+    "franklin-deputy-resolved-paso.trycloudflare.com"
+  ],
   
   turbopack: {},
 };
