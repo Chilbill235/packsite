@@ -1,6 +1,4 @@
-﻿"use client";
-
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { 
@@ -165,7 +163,10 @@ export default function HomePage() {
       <ParticleCanvas />
       <div className="absolute inset-0 bg-[radial-gradient(#27272a_1px,transparent_1px)] [background-size:32px_32px] opacity-15 pointer-events-none z-0" />
 
-      
+      {/* Radiant Glowing Orbs */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-gradient-to-b from-amber-500/20 via-orange-500/5 to-transparent blur-[140px] rounded-full pointer-events-none z-0" />
+      <div className="absolute top-[25%] left-[-100px] w-[500px] h-[500px] bg-indigo-600/10 blur-[160px] rounded-full pointer-events-none z-0" />
+      <div className="absolute bottom-[-50px] right-[-50px] w-[600px] h-[600px] bg-fuchsia-600/10 blur-[180px] rounded-full pointer-events-none z-0" />
 
       
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useScroll } from "framer-motion";
-import { Menu, X, LogOut, Store, User, Home, Sparkles, Zap, ShieldAlert, Trophy } from "lucide-react";
+import { Menu, X, LogOut, Store, User, Home, Sparkles, Trophy } from "lucide-react";
 import { useBalanceSync } from "@/hooks/useBalanceSync";
 import Balance from "./Balance";
 import { useProgression } from "@/context/ProgressionContext";
@@ -17,7 +17,8 @@ export default function Navbar() {
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
   const [balance, setBalance] = useState<number>(0);
-  const { accountLevel, xp, nextLevelXp } = useProgression();
+  const { accountLevel, accountXp, progressionMetrics } = useProgression();
+  const nextLevelXp = progressionMetrics.nextLevelXpThreshold;
   const [scrolled, setScrolled] = useState(false);
 
   // Advanced mouse coordinates for holographic spotlight tracking
@@ -91,7 +92,7 @@ export default function Navbar() {
   ];
 
   // Calculate XP percentage for mini progression bar if available
-  const xpPercent = xp && nextLevelXp ? Math.min(100, Math.max(0, (xp / nextLevelXp) * 100)) : 0;
+  const xpPercent = accountXp && nextLevelXp ? Math.min(100, Math.max(0, (accountXp / nextLevelXp) * 100)) : 0;
 
   return (
     <motion.nav 
