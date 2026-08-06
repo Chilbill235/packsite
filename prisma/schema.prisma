@@ -37,42 +37,77 @@ model Session {
 }
 
 model User {
-  id                String        @id @default(cuid())
-  username          String        @unique
-  email             String        @unique
+  id                String    @id @default(cuid())
+  username          String    @unique
+  email             String    @unique
   password          String?
-  role              Role          @default(USER)
-  balance           Int           @default(100000)
-  createdAt         DateTime      @default(now())
+  role              Role      @default(USER)
+  balance           Int       @default(100000)
+  createdAt         DateTime  @default(now())
   lastAdWatched     DateTime?
-  pendingReward     Boolean       @default(false)
-  activeLuck        Float         @default(1.0)
-  activeDiscount    Float         @default(0.0)
-  hasExclusivePack  Boolean       @default(false)
-  activeXpBoost     Boolean       @default(false)
+  pendingReward     Boolean   @default(false)
+  activeLuck        Float     @default(1.0)
+  activeDiscount    Float     @default(0.0)
+  hasExclusivePack  Boolean   @default(false)
+  activeXpBoost     Boolean   @default(false)
   discountExpiresAt DateTime?
   luckExpiresAt     DateTime?
   xpBoostExpiresAt  DateTime?
-  level             Int           @default(1)
-  xp                Int           @default(0)
+  level             Int       @default(1)
+  xp                Int       @default(0)
   image             String?
   bio               String?
   location          String?
-  
-  // Customization & Settings Fields
-  theme             String?       @default("dark")
-  pushNotifications Boolean       @default(true)
-  emailNotifications Boolean      @default(false)
-  showInventory     Boolean       @default(true)
-  showBalance       Boolean       @default(true)
-  showActivity      Boolean       @default(true)
-  publicProfile     Boolean       @default(true)
 
-  accounts          Account[]
-  inventory         Inventory[]
-  openings          Opening[]
-  sessions          Session[]
-  subscriptions     Subscription?
+  // Customization & Settings Fields
+  theme              String? @default("dark")
+  pushNotifications  Boolean @default(true)
+  emailNotifications Boolean @default(false)
+  showInventory      Boolean @default(true)
+  showBalance        Boolean @default(true)
+  showActivity       Boolean @default(true)
+  publicProfile      Boolean @default(true)
+
+  // Auth & Pack Relations
+  accounts      Account[]
+  inventory     Inventory[]
+  openings      Opening[]
+  sessions      Session[]
+  subscriptions Subscription?
+
+  // Follow Relations (Mapped precisely to Follow model relations)
+  followedBy Follow[] @relation("following") // Users who follow this user
+  following  Follow[] @relation("follower") // Users this user is following
+
+  // Message Relations
+  sentMessages     Message[]  @relation("sentMessages")
+  receivedMessages Message[]  @relation("receivedMessages")
+  activities       Activity[]
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender    User @relation("sentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("receivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
 }
 
 model Pack {
@@ -106,6 +141,17 @@ model Inventory {
   createdAt DateTime @default(now())
   item      Item     @relation(fields: [itemId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  description String
+  timestamp   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Subscription {

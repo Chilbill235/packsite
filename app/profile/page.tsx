@@ -454,22 +454,84 @@ export default function ProfilePage() {
       {/* LEVEL UP TOAST */}
       <AnimatePresence>
         {showLevelUpAlert && (
-          <motion.div initial={{ opacity: 0, y: -50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.9 }} className="fixed top-6 left-4 right-4 sm:left-auto sm:right-6 z-[999999] sm:w-96 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 p-[2px] rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.4)]">
-            <div className="bg-[#05070f] p-4 rounded-[14px] flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/30 animate-bounce text-amber-400">
-                  <Sparkles size={24} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-black text-white uppercase tracking-tight">Level Promoted!</h4>
-                  <p className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
-                    Matrix Tier Upgraded <ChevronRight size={10}/> <span className="text-amber-400 font-bold">LVL {leveledUpTo}</span>
-                  </p>
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1.1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.8 }}
+            transition={{ duration: 0.6 }}
+            className="fixed top-6 left-4 right-4 sm:left-auto sm:right-6 z-[999999] sm:w-96 pointer-events-none"
+          >
+            <div className="relative flex h-[120px] w-full max-w-sm flex-col items-center justify-center p-6 bg-gradient-to-br from-amber-500/20 via-yellow-500/10 to-transparent border-2 border-amber-500/30 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.4)]">
+              {/* Sparkle Burst */}
+              <div className="absolute inset-0 -z-10">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1, rotate: [0, 45, 90, 135, 180, 225, 270, 315] }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                  className="w-full h-full"
+                >
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Sparkles className="h-8 w-8 text-amber-400/80" />
+                  </div>
+                </motion.div>
+              </div>
+              {/* Level Badge */}
+              <div className="relative flex h-12 w-12 items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-500/20 blur-3xl" />
+                <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-amber-950/80 border border-amber-500/40">
+                  <motion.div
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    className="flex h-10 w-10 items-center justify-center"
+                  >
+                    <span className="text-2xl font-black text-amber-400">
+                      LVL {leveledUpTo}
+                    </span>
+                  </motion.div>
                 </div>
               </div>
-              <button onClick={() => setShowLevelUpAlert(false)} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[10px] uppercase font-black text-white hover:bg-white/10 transition">
-                Dismiss
-              </button>
+              {/* Message */}
+              <div className="mt-4 text-center space-y-2">
+                <h3 className="text-xl font-black text-white tracking-tight">
+                  Level Promoted!
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Matrix Tier Upgraded <span className="text-amber-400 font-bold">LVL {leveledUpTo}</span>
+                </p>
+                <button
+                  onClick={() => setShowLevelUpAlert(false)}
+                  className="mt-4 flex h-10 w-28 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-black uppercase tracking-widest text-amber-400 hover:bg-amber-500/30 transition"
+                >
+                  Continue
+                </button>
+              </div>
+              {/* Floating Coins */}
+              <div className="absolute -z-0 inset-0 pointer-events-none overflow-hidden">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <motion.keyframes
+                    key={i}
+                    style={{
+                      "--x": `${Math.random() * 100 - 50}%`,
+                      "--y": `${Math.random() * 100 - 50}%`,
+                      "--delay": `${Math.random() * 2}s`,
+                      "--duration": `${Math.random() * 3 + 2}s`,
+                      "--size": `${Math.random() * 20 + 10}px`,
+                    }}
+                    className="absolute left-[var(--x)] top-[var(--y)]"
+                  >
+                    <Coins
+                      className={`w-[var(--size)] h-[var(--size)] text-amber-400/50 animate-[float_ var(--duration) ease-in-out var(--delay) infinite]`}
+                    />
+                  </motion.keyframes>
+                ))}
+                <style>{`
+                  @keyframes float {
+                    0%, 100% { transform: translateY(0) rotate(0deg); }
+                    50% { transform: translateY(-20px) rotate(180deg); }
+                  }
+                `}</style>
+              </div>
             </div>
           </motion.div>
         )}
