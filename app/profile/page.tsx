@@ -501,10 +501,36 @@ export default function ProfilePage() {
                 </p>
                 <button
                   onClick={() => setShowLevelUpAlert(false)}
-                  className="mt-4 flex h-10 w-28 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-black uppercase tracking-widest text-amber-400 hover:bg-amber-500/30 transition pointer-events-auto"
+                  className="mt-4 flex h-10 w-28 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-black uppercase tracking-widest text-amber-400 hover:bg-amber-500/30 transition"
                 >
                   Continue
                 </button>
+              </div>
+              {/* Floating Coins */}
+              <div className="absolute -z-0 inset-0 pointer-events-none overflow-hidden">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <motion.keyframes
+                    key={i}
+                    style={{
+                      "--x": `${Math.random() * 100 - 50}%`,
+                      "--y": `${Math.random() * 100 - 50}%`,
+                      "--delay": `${Math.random() * 2}s`,
+                      "--duration": `${Math.random() * 3 + 2}s`,
+                      "--size": `${Math.random() * 20 + 10}px`,
+                    }}
+                    className="absolute left-[var(--x)] top-[var(--y)]"
+                  >
+                    <Coins
+                      className={`w-[var(--size)] h-[var(--size)] text-amber-400/50 animate-[float_ var(--duration) ease-in-out var(--delay) infinite]`}
+                    />
+                  </motion.keyframes>
+                ))}
+                <style>{`
+                  @keyframes float {
+                    0%, 100% { transform: translateY(0) rotate(0deg); }
+                    50% { transform: translateY(-20px) rotate(180deg); }
+                  }
+                `}</style>
               </div>
             </div>
           </motion.div>
