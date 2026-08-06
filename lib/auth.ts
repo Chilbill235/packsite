@@ -25,6 +25,8 @@ declare module "@auth/core/jwt" {
     sub?: string;
     username?: string;
     balance?: number;
+    email?: string;
+    picture?: string;
   }
 }
 
@@ -75,6 +77,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.sub = user.id;
         token.balance = user.balance;
         token.username = user.username;
+        token.email = user.email;
+        token.picture = user.image;
         return token;
       }
 
@@ -110,6 +114,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.sub;
         session.user.balance = token.balance;
         session.user.username = token.username;
+        session.user.email = token.email;
+        session.user.image = token.picture;
       }
 
       return session;

@@ -34,7 +34,7 @@ const BUFF_DURATIONS: Record<string, number> = {
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!session?.user?.email || !session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

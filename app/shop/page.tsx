@@ -14,6 +14,8 @@ import ExclusiveWonScreen from "@/components/ExclusiveWonScreen";
 import { RewardedAdService } from "@/lib/adService";
 import { notificationService } from "@/lib/notificationService";
 
+const SHOP_AD_TIMER_SECONDS = 10;
+
 // --- Types ---
 interface BuffDetails {
   title: string;
@@ -186,9 +188,17 @@ export default function ShopPage() {
 
   const [isFetchingUser, setIsFetchingUser] = useState(false);
   const [isFetchingPacks, setIsFetchingPacks] = useState(false);
+  const [lastAdTimestamp, setLastAdTimestamp] = useState<number>(0);
+  const AD_COOLDOWN_MS = 15000; // 15 seconds
 
   useEffect(() => { setIsMounted(true); }, []);
   useEffect(() => { setIsStandalone(getIsStandalone()); }, []);
+  useEffect(() => {
+    const savedTimestamp = localStorage.getItem('lastAdTimestamp');
+    if (savedTimestamp) {
+      setLastAdTimestamp(parseInt(savedTimestamp, 10));
+    }
+  }, []);
 
   const getInitialNotificationPermission = (): NotificationPermission | "unsupported" => {
     if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
@@ -242,6 +252,16 @@ export default function ShopPage() {
     if (hours > 0) return `${hours}h ${mins % 60}m`;
     if (mins > 0) return `${mins}m ${secs % 60}s`;
     return `${secs}s`;
+  };
+
+  const getAdCooldownStatus = () => {
+    const now = Date.now();
+    const timeSinceLastAd = now - lastAdTimestamp;
+    if (timeSinceLastAd >= AD_COOLDOWN_MS) {
+      return { isOnCooldown: false, remainingTime: 0 };
+    }
+    const remainingTime = AD_COOLDOWN_MS - timeSinceLastAd;
+    return { isOnCooldown: true, remainingTime: Math.ceil(remainingTime / 1000) };
   };
 
   const [luckTimeLeft, setLuckTimeLeft] = useState("");
@@ -380,18 +400,28 @@ export default function ShopPage() {
           body: JSON.stringify({
             userId,
             title: "Ad Reward Earned!",
-            message: `You've earned ${amount} coins!`,
+            message: `You've earned ${amount} coins and 50 XP!`,
             ref: ""
           }),
         }).catch(err => console.warn("Reward notification failed to send:", err));
       }
 
-      await fetch("/api/user/add-coins", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ amount: 500, suppressNotification: true }) 
+      await fetch("/api/user/add-coins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 500, suppressNotification: true })
+      });
+      await fetch("/api/user/add-xp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: 50 })
       });
       await fetchUserData();
+      // Update last ad timestamp for cooldown tracking
+      const now = Date.now();
+      setLastAdTimestamp(now);
+      localStorage.setItem('lastAdTimestamp', now.toString());
+
       setAdStatus('completed');
       setTimeout(() => { setAdStatus('idle'); }, 3000);
     } catch (error) {
@@ -486,9 +516,16 @@ export default function ShopPage() {
   const handleWatchAdClick = async (amount: number) => {
     if (isWaiting) return;
 
+    // Check if ad is on cooldown
+    const { isOnCooldown, remainingTime } = getAdCooldownStatus();
+    if (isOnCooldown) {
+      setErrorDialog({ message: `Ad is on cooldown. Try again in ${remainingTime} seconds.` });
+      return;
+    }
+
     timerCompletedRef.current = false;
-    targetTimeRef.current = Date.now() + 10000;
-    setCountdown(10);
+    targetTimeRef.current = Date.now() + (SHOP_AD_TIMER_SECONDS * 1000);
+    setCountdown(SHOP_AD_TIMER_SECONDS);
     setIsWaiting(true);
     setAdStatus('loading');
 
@@ -775,23 +812,54 @@ export default function ShopPage() {
             <motion.div className="bg-slate-900 border border-white/10 p-6 rounded-3xl w-full max-w-xs text-center relative overflow-hidden shadow-2xl">
               {isWaiting ? (
                 <div className="flex flex-col items-center py-4">
-                  <div className="relative w-20 h-20 mb-4 flex items-center justify-center">
+                  <div className="relative w-24 h-24 mb-4 flex items-center justify-center">
                     <svg className="w-full h-full rotate-[-90deg]">
-                      <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800" />
-                      <motion.circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-amber-500" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 10, ease: "linear" }} />
+                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-slate-800" />
+                      <motion.circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-amber-500" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: SHOP_AD_TIMER_SECONDS, ease: "linear" }} />
                     </svg>
-                    <span className="absolute text-2xl font-black text-white">{countdown}</span>
+                    <span className={`absolute text-3xl font-black text-white tracking-tighter -mt-2 ${countdown <= 3 ? 'text-red-400' : countdown <= 6 ? 'text-amber-400' : 'text-cyan-400'}`}>
+                      {countdown}<span className="text-xs font-bold text-amber-400 tracking-widest uppercase -mt-1">
+                        SECS</span></span>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-300">Processing Stream...</h3>
+                  <h3 className="text-sm font-black text-amber-400">Engaging with Sponsor</h3>
+                  <p className="text-xs text-slate-400">Your interaction fuels free rewards for the community.</p>
                 </div>
               ) : (
                 <>
                   <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 w-fit rounded-2xl mx-auto mb-3">
-                    <Coins size={28} />
+                    <Coins size={28} className="animate-pulse" />
+                    <Zap size={28} className="ml-3 animate-pulse" />
                   </div>
-                  <h3 className="text-lg font-black mb-1 text-white">Boost Balance</h3>
-                  <p className="text-xs text-slate-400 mb-4">Watch a quick stream to claim bonus coins instantly.</p>
-                  <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black transition-all shadow-lg shadow-amber-500/20">WATCH AD (+500)</button>
+                  <h3 className="text-lg font-black mb-1 text-white">Boost Balance & XP</h3>
+                  <p className="text-xs text-slate-400 mb-4">Watch a quick stream to claim bonus coins and XP instantly.</p>
+
+                  {/* Check if ad is on cooldown */}
+                  {(function() {
+                    const { isOnCooldown, remainingTime } = getAdCooldownStatus();
+                    if (isOnCooldown) {
+                      return (
+                        <>
+                          <p className="text-xs text-amber-400 mb-2">Ad is on cooldown</p>
+                          <div className="flex items-center justify-center mb-4">
+                            <div className="relative w-16 h-16">
+                              <svg className="w-full h-full rotate-[-90deg]">
+                                <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-800" />
+                                <motion.circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-amber-500" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: remainingTime, ease: "linear" }} />
+                              </svg>
+                              <span className="absolute text-xs font-black text-amber-400">{remainingTime}s</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-400">Try again in {remainingTime} second{remainingTime !== 1 ? 's' : ''}</p>
+                        </>
+                      );
+                    }
+
+                    return (
+                      <button onClick={() => handleWatchAdClick(500)} className="w-full py-3 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black transition-all shadow-lg shadow-amber-500/20">
+                        WATCH AD (+500 coins, +50 XP)</button>
+                    );
+                  })()}
+
                   <button onClick={() => setShowAdModal(false)} className="mt-3 text-xs text-slate-500 hover:text-slate-300">Cancel</button>
                 </>
               )}

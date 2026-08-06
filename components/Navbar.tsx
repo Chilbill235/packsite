@@ -10,6 +10,30 @@ import { useBalanceSync } from "@/hooks/useBalanceSync";
 import Balance from "./Balance";
 import { useProgression } from "@/context/ProgressionContext";
 
+// Level Up Notification Component
+const LevelUpNotification = ({ level }: { level: number }) => {
+  return (
+    <div className="fixed top-6 left-4 right-4 sm:left-auto sm:right-6 z-[999999] sm:w-96 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 p-[2px] rounded-2xl shadow-[0_0_40px_rgba(245,158,11,0.4)]">
+      <div className="bg-[#05070f] p-4 rounded-[14px] flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/30 animate-bounce text-amber-400">
+            <Trophy size={24} />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-white uppercase tracking-tight">Level Promoted!</h4>
+            <p className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+              Matrix Tier Upgraded <ChevronRight size={10}/> <span className="text-amber-400 font-bold">LVL {level}</span>
+            </p>
+          </div>
+        </div>
+        <button onClick={() => {/* Dismiss handled by ProgressionContext */}} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/5 text-[10px] uppercase font-black text-white hover:bg-white/10 transition">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -17,7 +41,7 @@ export default function Navbar() {
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
   const [balance, setBalance] = useState<number>(0);
-  const { accountLevel, accountXp, progressionMetrics } = useProgression();
+  const { accountLevel, accountXp, progressionMetrics, levelUpNotification } = useProgression();
   const nextLevelXp = progressionMetrics.nextLevelXpThreshold;
   const [scrolled, setScrolled] = useState(false);
 
@@ -32,9 +56,9 @@ export default function Navbar() {
 
   // Scroll position mapping for dynamic border intensity & blur
   const { scrollY } = useScroll();
-  
+
   useEffect(() => {
-    return scrollY.onChange((latest) => {
+    return scrollY.on("change", (latest) => {
       setScrolled(latest > 15);
     });
   }, [scrollY]);
@@ -242,7 +266,7 @@ export default function Navbar() {
       {/* iOS Safari Optimized Glassmorphic Mobile Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -290,6 +314,11 @@ export default function Navbar() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Level Up Notification */}
+      {levelUpNotification && (
+        <LevelUpNotification level={levelUpNotification.level} />
+      )}
     </motion.nav>
   );
 }

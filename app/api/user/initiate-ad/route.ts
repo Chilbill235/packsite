@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
 const REWARD_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
-const AD_SECRET = process.env.NEXTAUTH_SECRET || "super-secret-ad-key";
+const AD_SECRET = process.env.NEXTAUTH_SECRET || "yBJPdybgTUmoFtlacrrXA2KKpNF8Hzv81vTl6i6g3fkeboEnofsjLWucRQx-kIU_2UDmEiypwkmPXS6Jqz9CUGKLfPmTI4d28wBQ";
 
 // Store in-memory ad tokens -> { userId, startTime, claimed }
 export const activeAdSessions = new Map<
@@ -15,7 +15,7 @@ export const activeAdSessions = new Map<
 export async function POST() {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!session?.user?.email || !session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -1,0 +1,1 @@
+- [Ad Enhancements Complete](ad-enhancements-complete.jsonl) — All requested improvements to make ad screens "way better" have been implemented

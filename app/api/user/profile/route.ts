@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 export async function GET() {
   const session = await auth();
 
-  if (!session?.user?.email && !session?.user?.id) {
+  if (!session?.user?.email || !session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -24,8 +24,10 @@ export async function GET() {
       image: true,
       bio: true,
       location: true,
-      balance: true, // 👈 Fixed: using 'balance' instead of 'coins'
+      balance: true, // ��� Fixed: using 'balance' instead of 'coins'
       createdAt: true,
+      xp: true,
+      level: true,
     },
   });
 
@@ -40,7 +42,7 @@ export async function PUT(req: Request) {
   try {
     const session = await auth();
 
-    if (!session?.user?.email && !session?.user?.id) {
+    if (!session?.user?.email || !session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -102,7 +104,9 @@ export async function PUT(req: Request) {
         image: updatedUser.image,
         bio: updatedUser.bio,
         location: updatedUser.location,
-        balance: updatedUser.balance, // 👈 Fixed: returning 'balance' instead of 'coins'
+        balance: updatedUser.balance, // ��� Fixed: returning 'balance' instead of 'coins'
+        xp: updatedUser.xp,
+        level: updatedUser.level,
       },
     });
   } catch (error: any) {

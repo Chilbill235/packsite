@@ -7,6 +7,7 @@ interface ProgressionMetrics {
   currentLevelXp: number;
   nextLevelXpThreshold: number;
   progressPercentage: number;
+  level: number;
 }
 
 interface ProgressionContextType {
@@ -15,6 +16,7 @@ interface ProgressionContextType {
   progressionMetrics: ProgressionMetrics;
   fetchProgress: () => Promise<void>;
   updateXpLocally: (newXp: number) => void;
+  addXp: (amount: number) => Promise<void>;
 }
 
 const ProgressionContext = createContext<ProgressionContextType | undefined>(undefined);
@@ -23,6 +25,7 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
   const { data: session } = useSession();
   const [accountXp, setAccountXp] = useState(0);
   const [accountLevel, setAccountLevel] = useState(1);
+  const [levelUpNotification, setLevelUpNotification] = useState<{ level: number; timestamp: number } | null>(null);
 
   // XP Formula - EXACT MATCH to backend (app/api/packs/open/route.ts)
   const getXpForLevel = useCallback((level: number) => {
@@ -57,6 +60,7 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
       currentLevelXp: Math.max(0, xpEarnedInCurrentLevel),
       nextLevelXpThreshold: xpNeededForNextLevel,
       progressPercentage: percentage,
+      level: accountLevel
     };
   }, [accountXp, accountLevel, getXpForLevel, getTotalXpForLevel]);
 
@@ -89,6 +93,38 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
     setAccountXp(newXp);
     setAccountLevel(newLvl);
   }, [calculateLevelFromXp]);
+
+  const addXp = useCallback(async (amount: number) => {
+    try {
+      const res = await fetch("/api/user/add-xp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to add XP");
+      }
+
+      const data = await res.json();
+      // Update local state with new XP
+      const newXp = data.newXp;
+      const newLevel = calculateLevelFromXp(newXp);
+
+      setAccountXp(newXp);
+      setAccountLevel(newLevel);
+
+      // Trigger level up notification if level increased
+      if (newLevel > accountLevel) {
+        setLevelUpNotification({ level: newLevel, timestamp: Date.now() });
+
+        // Also dispatch the event for any listeners
+        window.dispatchEvent(new CustomEvent("triggerLevelUpToast", { detail: { level: newLevel } }));
+      }
+    } catch (error) {
+      console.error("Failed to add XP:", error);
+    }
+  }, [accountLevel, calculateLevelFromXp]);
 
   useEffect(() => {
     if (session?.user) {
@@ -126,8 +162,25 @@ export function ProgressionProvider({ children }: { children: React.ReactNode })
     };
   }, [fetchProgress, calculateLevelFromXp]);
 
+  // Clear old level up notifications after 5 seconds
+  useEffect(() => {
+    if (levelUpNotification) {
+      const timeout = setTimeout(() => {
+        setLevelUpNotification(null);
+      }, 5000);
+      return () => clearTimeout(timeout);
+    }
+  }, [levelUpNotification]);
+
   return (
-    <ProgressionContext.Provider value={{ accountXp, accountLevel, progressionMetrics, fetchProgress, updateXpLocally }}>
+    <ProgressionContext.Provider value={{
+      accountXp,
+      accountLevel,
+      progressionMetrics,
+      fetchProgress,
+      updateXpLocally,
+      addXp
+    }}>
       {children}
     </ProgressionContext.Provider>
   );

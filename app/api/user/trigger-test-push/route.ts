@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const session = await auth(); 
     
-    if (!session || !session.user || !session.user.id) {
+    if (!session || !session.user || !session.user.email || !session.user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -32,7 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const oneSignalSafariWebId = process.env.NEXT_PUBLIC_ONESIGNAL_SAFARI_WEB_ID || "";
 
   return (
-    <html lang="en" className="dark scroll-smooth" style={{ backgroundColor: "#070707" }}>
+    <html lang="en" className="dark scroll-smooth" data-scroll-behavior="smooth" style={{ backgroundColor: "#070707" }}>
       <head>
         <meta name="google-adsense-account" content="ca-pub-1167000799645777" />
         <meta name="monetag" content="ed7820a28006a4e3879c0bc5afd4410c" />

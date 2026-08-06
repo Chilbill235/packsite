@@ -39,6 +39,8 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [adToken, setAdToken] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastAdTimestamp, setLastAdTimestamp] = useState<number>(0);
+  const AD_COOLDOWN_MS = 15000; // 15 seconds to match AD_TIMER_SECONDS
 
   // Shop Redirection Choice Modal State
   const [showHomeChoicePrompt, setShowHomeChoicePrompt] = useState(false);
@@ -76,8 +78,26 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Helper function to check ad cooldown status
+  const getAdCooldownStatus = () => {
+    const now = Date.now();
+    const timeSinceLastAd = now - lastAdTimestamp;
+    if (timeSinceLastAd >= AD_COOLDOWN_MS) {
+      return { isOnCooldown: false, remainingTime: 0 };
+    }
+    const remainingTime = AD_COOLDOWN_MS - timeSinceLastAd;
+    return { isOnCooldown: true, remainingTime: Math.ceil(remainingTime / 1000) };
+  };
+
   // Initiate Sequence
   const triggerAdSequence = useCallback(async () => {
+    // Check if ad is on cooldown
+    const { isOnCooldown, remainingTime } = getAdCooldownStatus();
+    if (isOnCooldown) {
+      setErrorMessage(`Ad is on cooldown. Try again in ${remainingTime} seconds.`);
+      return;
+    }
+
     setErrorMessage(null);
     setAdCountdown(AD_TIMER_SECONDS);
     setHasVisitedAd(false);
@@ -170,6 +190,11 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
                 detail: { balance: Number(data.newBalance) },
               })
             );
+            // Update last ad timestamp for cooldown tracking
+            const now = Date.now();
+            setLastAdTimestamp(now);
+            localStorage.setItem('lastAdTimestamp', now.toString());
+
             setAdActive(false);
             setIsVerifying(false);
             setShowRewardModal(true);
@@ -210,6 +235,12 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
       }
     } else {
       setShowHomeChoicePrompt(false);
+    }
+
+    // Initialize last ad timestamp from localStorage
+    const savedTimestamp = localStorage.getItem('lastAdTimestamp');
+    if (savedTimestamp) {
+      setLastAdTimestamp(parseInt(savedTimestamp, 10));
     }
   }, [status, pathname, router]);
 
@@ -291,7 +322,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
             {/* Header */}
             <div className="w-full flex justify-between items-center z-10 border-b border-cyan-500/10 pb-3">
               <div className="flex items-center gap-2">
-                <Lock size={12} className="text-cyan-400" />
+                <Lock size={12} className={`text-cyan-400 ${adActive ? 'animate-pulse' : ''}`} />
                 <span className="text-[10px] font-black text-cyan-400 tracking-widest uppercase">
                   VERIFIED AD SEQUENCE
                 </span>
@@ -299,9 +330,9 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
 
               <button
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white transition-all cursor-pointer"
+                className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white transition-all cursor-pointer ${adActive ? 'animate-pulse' : ''}"
               >
-                {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                {soundEnabled ? <Volume2 size={14} className="${adActive ? 'animate-pulse' : ''}" /> : <VolumeX size={14} className="${adActive ? 'animate-pulse' : ''}" />}
               </button>
             </div>
 
@@ -370,7 +401,8 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
                       <RefreshCw size={24} className="text-cyan-400 animate-spin" />
                     ) : (
                       <>
-                        <span className="text-3xl font-black text-white tracking-tighter drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]">
+                        {/* Dynamic countdown with color based on time left */}
+                        <span className={`text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_10px_rgba(6,182,212,0.8)] ${adCountdown <= 5 ? 'text-red-400' : adCountdown <= 10 ? 'text-amber-400' : 'text-cyan-400'}`}>
                           {adCountdown}
                         </span>
                         <span className="text-[9px] font-bold text-cyan-400 tracking-widest uppercase -mt-1">
@@ -392,7 +424,7 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
 
                   <div className="w-full h-3 bg-zinc-900/80 rounded-full overflow-hidden p-0.5 border border-cyan-500/30 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]">
                     <div
-                      className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 rounded-full shadow-[0_0_20px_#06b6d4] transition-all duration-1000 ease-linear"
+                      className={`h-full bg-gradient-to-r from-cyan-500 via-${progressPercent > 50 ? 'amber-500' : 'blue-500'} to-indigo-500 rounded-full shadow-[0_0_20px_#06b6d4] transition-all duration-1000 ease-linear`}
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
@@ -402,21 +434,14 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
                 <div className="grid grid-cols-3 gap-2.5 w-full z-10">
                   <div className="flex flex-col items-center p-2.5 bg-black/40 rounded-2xl border border-cyan-500/20 backdrop-blur-md">
                     <span className="text-[9px] text-zinc-500 font-black uppercase">Session</span>
-                    <span className="text-[11px] font-black text-cyan-400 mt-0.5">
-                      ACTIVE
-                    </span>
+                    <div className={`h-6 w-6 rounded-full bg-cyan-500/20 ${adActive ? 'animate-pulse' : ''}`} />
                   </div>
-
                   <div className="flex flex-col items-center p-2.5 bg-black/40 rounded-2xl border border-amber-500/20 backdrop-blur-md">
                     <span className="text-[9px] text-zinc-500 font-black uppercase">Bounty</span>
-                    <span className="text-[11px] font-black text-amber-400 flex items-center gap-0.5 mt-0.5">
-                      <Flame size={11} /> +50K
-                    </span>
-                  </div>
-
+                    <span className={`text-[11px] font-black text-amber-400 flex items-center gap-0.5 mt-0.5 ${adActive ? 'animate-pulse' : ''}`}><Flame size={11} /> +50K</span></div>
                   <div className="flex flex-col items-center p-2.5 bg-black/40 rounded-2xl border border-emerald-500/20 backdrop-blur-md">
                     <span className="text-[9px] text-zinc-500 font-black uppercase">Focus</span>
-                    <span className={`text-[11px] font-black mt-0.5 ${userReturned ? "text-emerald-400" : "text-zinc-400"}`}>
+                    <span className={`text-[11px] font-black mt-0.5 ${userReturned ? 'text-emerald-400' : 'text-zinc-400'} ${adActive ? 'animate-pulse' : ''}`}>
                       {userReturned ? "RETURNED" : "WAITING"}
                     </span>
                   </div>
@@ -438,11 +463,23 @@ export function LayoutInner({ children }: { children: React.ReactNode }) {
 
             <div className="space-y-2 z-10">
               <h3 className="text-3xl font-black text-white tracking-tight uppercase">
-                BOUNTY SECURED!
-              </h3>
+                BOUNTY SECURED!</h3>
               <p className="text-zinc-400 text-xs px-2 leading-relaxed font-medium">
                 Verification complete! Your profile balance has been credited:
               </p>
+
+              <div className="relative w-24 h-24 flex items-center justify-center">
+                <div className="absolute inset-0 w-24 h-24 bg-gradient-to-b from-amber-400 via-orange-500 to-amber-700 rounded-full" />
+                <div className="relative w-20 h-20 flex items-center justify-center">
+                  <div className="absolute inset-0 w-20 h-20 bg-yellow-400/50 rounded-full" />
+                  <div className="relative w-16 h-16 flex items-center justify-center">
+                    <div className="absolute inset-0 w-16 h-16 bg-yellow-300/50 rounded-full" />
+                    <Sparkles size={16} className="absolute -top-2 -right-2 text-yellow-300 animate-spin" />
+                    <span className="text-5xl font-black text-amber-400">����</span>
+                  </div>
+                </div>
+                <Sparkles className="absolute -top-2 -right-2 text-yellow-300 animate-spin" size={24} />
+              </div>
 
               <div className="inline-flex items-center gap-2 px-5 py-2 bg-amber-500/10 border border-amber-500/40 rounded-full text-amber-400 font-black tracking-wide text-xl mt-3 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
                 <span>+{REWARD_AMOUNT.toLocaleString()}</span>
