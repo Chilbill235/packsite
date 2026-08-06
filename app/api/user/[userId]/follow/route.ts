@@ -50,19 +50,38 @@ export async function POST(
       );
     }
 
+    // Check current follow relationship status in the database
+    const existingFollow = await prisma.follow.findUnique({
+      where: {
+        followerId_followingId: { followerId, followingId },
+      },
+    });
+
     if (action === "follow") {
-      await prisma.follow.upsert({
-        where: {
-          followerId_followingId: { followerId, followingId },
-        },
-        create: { followerId, followingId },
-        update: {},
+      if (existingFollow) {
+        return NextResponse.json(
+          { error: "You are already following this user", isFollowing: true },
+          { status: 400 }
+        );
+      }
+
+      await prisma.follow.create({
+        data: { followerId, followingId },
       });
 
       return NextResponse.json({ success: true, isFollowing: true, action });
     } else {
-      await prisma.follow.deleteMany({
-        where: { followerId, followingId },
+      if (!existingFollow) {
+        return NextResponse.json(
+          { error: "You are not following this user", isFollowing: false },
+          { status: 400 }
+        );
+      }
+
+      await prisma.follow.delete({
+        where: {
+          followerId_followingId: { followerId, followingId },
+        },
       });
 
       return NextResponse.json({ success: true, isFollowing: false, action });

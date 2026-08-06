@@ -4,13 +4,13 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const session = await auth();
     const requestingUserId = session?.user?.id;
 
-    const userId = params.userId;
+    const { userId } = await params;
 
     // Fetch the user to check if profile is public
     const user = await prisma.user.findUnique({
