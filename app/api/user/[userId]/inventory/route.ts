@@ -27,8 +27,8 @@ export async function GET(
       return NextResponse.json({ inventory: [] });
     }
 
-    // Fetch inventory for the user
-    const inventory = await prisma.inventoryItem.findMany({
+    // Fetch inventory for the user using the correct Prisma model name
+    const inventory = await prisma.inventory.findMany({
       where: { userId },
       include: {
         item: true,
