@@ -59,7 +59,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Send a message supporting recipientId or recipientIdentifier
+// POST: Send a message supporting recipientId or recipientIdentifier (handles both username or UUID)
 export async function POST(req: Request) {
   try {
     const session = await auth(); // Use auth() instead of getServerSession
@@ -77,12 +77,15 @@ export async function POST(req: Request) {
 
     let resolvedRecipientId = recipientId;
 
-    // If a username handle was sent as recipientIdentifier, resolve it to an ID
+    // If recipientIdentifier was passed instead, check if it's a UUID or a Username handle
     if (!resolvedRecipientId && recipientIdentifier) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipientIdentifier);
+
       const userRecord = await db.user.findUnique({
-        where: { username: recipientIdentifier },
+        where: isUUID ? { id: recipientIdentifier } : { username: recipientIdentifier },
         select: { id: true },
       });
+
       if (!userRecord) {
         return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
       }

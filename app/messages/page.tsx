@@ -24,6 +24,7 @@ export default function MessagesPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [partner, setPartner] = useState<UserPartner | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
@@ -57,6 +58,9 @@ export default function MessagesPage() {
           if (isMounted) {
             setMessages(Array.isArray(data) ? data : data.messages || []);
             setPartner(data.otherUser || null);
+            if (data.currentUserId) {
+              setCurrentUserId(data.currentUserId);
+            }
           }
         } else {
           if (isMounted) setMessages([]);
@@ -159,7 +163,8 @@ export default function MessagesPage() {
             </div>
           ) : messages.length > 0 ? (
             messages.map((msg) => {
-              const isMe = msg.senderId !== recipientId;
+              // Properly check if message sender is the logged-in user
+              const isMe = currentUserId ? msg.senderId === currentUserId : false;
               return (
                 <div
                   key={msg.id || Math.random()}
