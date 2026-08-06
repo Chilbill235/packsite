@@ -509,7 +509,7 @@ export default function ProfilePage() {
               {/* Floating Coins */}
               <div className="absolute -z-0 inset-0 pointer-events-none overflow-hidden">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <motion.keyframes
+                  <motion.div
                     key={i}
                     style={{
                       "--x": `${Math.random() * 100 - 50}%`,
@@ -517,13 +517,13 @@ export default function ProfilePage() {
                       "--delay": `${Math.random() * 2}s`,
                       "--duration": `${Math.random() * 3 + 2}s`,
                       "--size": `${Math.random() * 20 + 10}px`,
-                    }}
+                    } as React.CSSProperties}
                     className="absolute left-[var(--x)] top-[var(--y)]"
                   >
                     <Coins
                       className={`w-[var(--size)] h-[var(--size)] text-amber-400/50 animate-[float_ var(--duration) ease-in-out var(--delay) infinite]`}
                     />
-                  </motion.keyframes>
+                  </motion.div>
                 ))}
                 <style>{`
                   @keyframes float {
@@ -806,7 +806,7 @@ export default function ProfilePage() {
                   </span>
 
                   {pushPermission !== "granted" && (
-                    <button onClick={requestNotificationPermission} className="text-[10px] font-mono text-indigo-400 flex items-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 px-2.5 py-0.5 rounded border border-indigo-500/20 transition">
+                    <button onClick={requestNotificationPermission} className="text-[10px] font-mono text-indigo-400 flex items-center gap-1 bg-indigo-500/15 hover:bg-indigo-500/25 px-2.5 py-0.5 rounded border border-indigo-500/20 transition">
                       <Bell size={10} /> Enable Push Alerts
                     </button>
                   )}
@@ -819,7 +819,7 @@ export default function ProfilePage() {
             </div>
 
             {/* RADIAL XP BAR */}
-            <div className="w-full lg:w-80 bg-slate-900/30 backdrop-blur-md border border-white/5 p-4 rounded-xl sm:rounded-2xl flex flex-col gap-2 relative">
+            <div className="w-full lg:w-80 bg-slate-900/35 backdrop-blur-md border border-white/5 p-4 rounded-xl sm:rounded-2xl flex flex-col gap-2 relative">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] uppercase font-black tracking-widest text-slate-400 flex items-center gap-1">
                   <Sparkles size={10} className="text-amber-400" /> Account Progression Curves
