@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, useRef, useTransition } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { MessageSquare, Send, SearchX, User as UserIcon } from "lucide-react";
 
 type Message = {
@@ -20,8 +20,14 @@ type UserPartner = {
 
 export default function MessagesPage() {
   const searchParams = useSearchParams();
-  const recipientId = searchParams.get("userId") || searchParams.get("username");
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  
+  const urlUserId = searchParams.get("userId");
+  const urlUsername = searchParams.get("username");
+  const currentUrlParam = urlUserId || urlUsername;
 
+  const [recipientId, setRecipientId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [partner, setPartner] = useState<UserPartner | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -34,6 +40,26 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Sync recipient state with URL params or localStorage fallback smoothly
+  useEffect(() => {
+    if (currentUrlParam && currentUrlParam !== "undefined" && currentUrlParam.trim() !== "") {
+      setRecipientId(currentUrlParam);
+      localStorage.setItem("last_chat_recipient", currentUrlParam);
+    } else {
+      const savedRecipient = localStorage.getItem("last_chat_recipient");
+      if (savedRecipient) {
+        setRecipientId(savedRecipient);
+        startTransition(() => {
+          const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(savedRecipient);
+          router.replace(`/messages?${isUUID ? "userId" : "username"}=${savedRecipient}`);
+        });
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [currentUrlParam, router]);
+
+  // Fetch messages cleanly in the background without clearing the UI or lagging
   useEffect(() => {
     if (!recipientId || recipientId === "undefined" || recipientId.trim() === "") {
       setLoading(false);
@@ -43,9 +69,9 @@ export default function MessagesPage() {
 
     let isMounted = true;
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (isInitial = false) => {
       try {
-        setLoading(true);
+        if (isInitial) setLoading(true);
         const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
           recipientId
         );
@@ -56,25 +82,36 @@ export default function MessagesPage() {
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {
-            setMessages(Array.isArray(data) ? data : data.messages || []);
-            setPartner(data.otherUser || null);
-            if (data.currentUserId) {
-              setCurrentUserId(data.currentUserId);
+            const fetchedMessages = Array.isArray(data) ? data : data.messages || [];
+            
+            setMessages((prev) => {
+              if (prev.length !== fetchedMessages.length) {
+                return fetchedMessages;
+              }
+              return prev;
+            });
+
+            if (data.otherUser) {
+              setPartner(data.otherUser);
+              // If we originally loaded by username, automatically map/upgrade localStorage & state to their permanent UUID
+              if (!isUUID && data.otherUser.id) {
+                localStorage.setItem("last_chat_recipient", data.otherUser.id);
+              }
             }
+            if (data.currentUserId) setCurrentUserId(data.currentUserId);
           }
-        } else {
-          if (isMounted) setMessages([]);
         }
       } catch (err) {
         console.error("FAILED_TO_FETCH_MESSAGES", err);
-        if (isMounted) setMessages([]);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted && isInitial) setLoading(false);
       }
     };
 
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
+    fetchMessages(true);
+    
+    // Silent background refresh every 2.5 seconds without blinking or resetting layout
+    const interval = setInterval(() => fetchMessages(false), 2500);
 
     return () => {
       isMounted = false;
@@ -112,7 +149,17 @@ export default function MessagesPage() {
       if (res.ok) {
         const data = await res.json();
         const newMsg = data.message || data;
+        
+        // Optimistically add message instantly
         setMessages((prev) => [...prev, newMsg]);
+
+        // Resolve precise ID returned from server
+        const resolvedId = data.resolvedRecipientId || data.message?.recipientId || recipientId;
+        if (resolvedId) {
+          setRecipientId(resolvedId);
+          localStorage.setItem("last_chat_recipient", resolvedId);
+          router.push(`/messages?userId=${resolvedId}`);
+        }
       }
     } catch (err) {
       console.error("SEND_MESSAGE_ERROR", err);
@@ -163,7 +210,6 @@ export default function MessagesPage() {
             </div>
           ) : messages.length > 0 ? (
             messages.map((msg) => {
-              // Properly check if message sender is the logged-in user
               const isMe = currentUserId ? msg.senderId === currentUserId : false;
               return (
                 <div

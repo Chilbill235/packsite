@@ -52,7 +52,8 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "asc" },
     });
 
-    return NextResponse.json({ messages, otherUser });
+    // Return currentUserId along with messages and partner info
+    return NextResponse.json({ messages, otherUser, currentUserId });
   } catch (err) {
     console.error("MESSAGES_GET_ERROR", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -77,12 +78,13 @@ export async function POST(req: Request) {
 
     let resolvedRecipientId = recipientId;
 
-    // If recipientIdentifier was passed instead, check if it's a UUID or a Username handle
-    if (!resolvedRecipientId && recipientIdentifier) {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipientIdentifier);
+    // If a username handle or identifier was passed instead, resolve it to a UUID
+    const targetLookup = recipientId || recipientIdentifier;
+    if (targetLookup) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetLookup);
 
       const userRecord = await db.user.findUnique({
-        where: isUUID ? { id: recipientIdentifier } : { username: recipientIdentifier },
+        where: isUUID ? { id: targetLookup } : { username: targetLookup },
         select: { id: true },
       });
 
@@ -105,7 +107,8 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ message: newMessage }, { status: 201 });
+    // Return the message and the resolved recipient ID so the frontend can redirect seamlessly
+    return NextResponse.json({ message: newMessage, resolvedRecipientId }, { status: 201 });
   } catch (err) {
     console.error("MESSAGES_POST_ERROR", err);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

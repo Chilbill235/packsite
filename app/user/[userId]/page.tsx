@@ -66,7 +66,7 @@ interface PageProps {
 export default function UserProfilePage({ params }: PageProps) {
   const { data: session } = useSession();
 
-  // Unwrap params safely using React.use() for Next.js compatibility
+  // Unwrap params safely using React.use() for Next.js 15+ compatibility
   const resolvedParams = use(params);
   const targetId =
     resolvedParams?.userId || resolvedParams?.id || resolvedParams?.slug || null;
@@ -273,7 +273,7 @@ export default function UserProfilePage({ params }: PageProps) {
               <span className="text-amber-400 font-mono font-semibold">
                 &quot;{targetId || "unknown"}&quot;
               </span>
-              .
+              . Make sure your folder matches the parameter name (e.g. `[userId]` vs `[id]`).
             </p>
           </div>
 
