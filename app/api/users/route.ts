@@ -16,11 +16,13 @@ export async function GET() {
         id: true,
         username: true,
         image: true,
+        balance: true,
+        xp: true,
         level: true,
       },
       take: 10,
       orderBy: {
-        level: "desc",
+        balance: "desc",
       },
     });
 

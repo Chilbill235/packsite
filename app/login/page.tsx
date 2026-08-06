@@ -22,11 +22,11 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      // 🌟 FIXED: Mapping 'identifier' to 'email' key so lib/auth.ts receives the payload
+      // FIXED: Mapping 'identifier' to 'email' key so lib/auth.ts receives the payload
       const res = await signIn("credentials", {
-        redirect: false,
-        email: identifier, // 👈 CHANGED FROM 'identifier: identifier' TO 'email: identifier'
-        password,
+        email: identifier,
+        password: password,
+        redirect: false, // prevent automatic redirect, handle it ourselves
       });
 
       if (res?.error) {
@@ -35,7 +35,8 @@ function LoginForm() {
         router.push(callbackUrl);
         router.refresh();
       }
-    } catch {
+    } catch (err) {
+      console.error("SignIn error:", err);
       setError("An unexpected error occurred");
     } finally {
       setLoading(false);
@@ -45,11 +46,11 @@ function LoginForm() {
   return (
     <div className="w-full max-w-md mx-auto relative group">
       <div className="absolute -inset-1 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 rounded-3xl blur-xl opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
-      
+
       <div className="relative w-full p-8 sm:p-10 bg-zinc-950/80 border border-zinc-800/80 rounded-3xl shadow-2xl backdrop-blur-xl transition-all duration-300">
         <div className="mb-8 text-center sm:text-left">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 mb-4 shadow-[0_0_15px_rgba(245,158,11,0.1)]">
-            <span className="text-xl">🔐</span>
+            <span className="text-xl">{'\u{1F512}'}</span>
           </div>
           <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
             Welcome Back
@@ -61,7 +62,7 @@ function LoginForm() {
 
         {error && (
           <div className="p-4 mb-6 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-light flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-            <span>⚠️</span>
+            <span>{'\u{26A0}'}</span>
             <span>{error}</span>
           </div>
         )}
@@ -71,11 +72,11 @@ function LoginForm() {
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
               Username or Email
             </label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl text-white placeholder-zinc-600 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 focus:outline-none transition-all duration-200 text-sm" 
+              className="w-full px-4 py-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl text-white placeholder-zinc-600 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 focus:outline-none transition-all duration-200 text-sm"
               placeholder="you@example.com or LuckyCollector"
               required
             />
@@ -86,11 +87,11 @@ function LoginForm() {
               Password
             </label>
             <div className="relative">
-              <input 
-                type={showPassword ? "text" : "password"} 
+              <input
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-4 pr-12 py-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl text-white placeholder-zinc-600 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 focus:outline-none transition-all duration-200 text-sm" 
+                className="w-full pl-4 pr-12 py-3 bg-zinc-900/60 border border-zinc-800/80 rounded-xl text-white placeholder-zinc-600 focus:border-amber-500/50 focus:ring-4 focus:ring-amber-500/10 focus:outline-none transition-all duration-200 text-sm"
                 placeholder="••••••••"
                 required
               />
@@ -104,13 +105,13 @@ function LoginForm() {
             </div>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
             className="group/btn relative w-full py-3.5 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 disabled:from-zinc-800 disabled:to-zinc-800 text-black font-extrabold rounded-xl transition-all duration-200 active:scale-[0.98] disabled:pointer-events-none mt-6 shadow-lg shadow-amber-950/20 overflow-hidden"
           >
             <span className={`flex items-center justify-center gap-2 transition-all duration-200 ${loading ? "opacity-0" : "opacity-100"}`}>
-              Sign In ⚡
+              Sign In {'\u{1F511}'}
             </span>
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -118,14 +119,14 @@ function LoginForm() {
               </div>
             )}
           </button>
-        </form>
 
-        <p className="mt-8 text-center text-xs text-zinc-500 font-light">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="text-white hover:text-amber-400 font-medium transition duration-200 underline underline-offset-4 decoration-zinc-800 hover:decoration-amber-500/50">
-            Create one free
-          </Link>
-        </p>
+          <p className="mt-8 text-center text-xs text-zinc-500 font-light">
+            Don&apos;t have an account?{" "}
+            <Link href="/register" className="text-white hover:text-amber-400 font-medium transition duration-200 underline underline-offset-4 decoration-zinc-800 hover:decoration-amber-500/50">
+              Create one free
+            </Link>
+          </p>
+        </form>
       </div>
     </div>
   );

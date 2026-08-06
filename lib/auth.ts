@@ -10,12 +10,14 @@ declare module "next-auth" {
     id?: string;
     username?: string;
     balance?: number;
+    image?: string;
   }
   interface Session {
     user: {
       id: string;
       username?: string;
       balance?: number;
+      image?: string;
     } & DefaultSession["user"];
   }
 }
@@ -23,10 +25,6 @@ declare module "next-auth" {
 declare module "@auth/core/jwt" {
   interface JWT {
     sub?: string;
-    username?: string;
-    balance?: number;
-    email?: string;
-    picture?: string;
   }
 }
 
@@ -34,6 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   providers: [
     Credentials({
+      id: "credentials",
       name: "Credentials",
       credentials: {
         email: { label: "Email or Username", type: "text" },
@@ -72,51 +71,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // 1. Initial login: attach initial properties to the token
       if (user) {
         token.sub = user.id;
-        token.balance = user.balance;
-        token.username = user.username;
-        token.email = user.email;
-        token.picture = user.image;
-        return token;
       }
-
-      // 2. Subsequent calls: sync token with latest DB state
-      if (token.sub) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { email: true, username: true, image: true, balance: true },
-        });
-
-        // CRITICAL FIX: If the user no longer exists in DB, wipe the sub property
-        if (!dbUser) {
-          token.sub = undefined;
-          return token;
-        }
-
-        token.balance = dbUser.balance;
-        token.email = dbUser.email;
-        token.username = dbUser.username || undefined;
-        token.picture = dbUser.image || undefined;
-      }
-
       return token;
     },
 
     async session({ session, token }) {
-      // If token.sub was cleared because the DB user was missing, return empty session
       if (!token.sub) {
         return { ...session, user: { id: "" } as any };
       }
 
-      if (session.user) {
-        session.user.id = token.sub;
-        session.user.balance = token.balance;
-        session.user.username = token.username;
-        session.user.email = token.email;
-        session.user.image = token.picture;
+      const dbUser = await prisma.user.findUnique({
+        where: { id: token.sub },
+        select: { id: true, username: true, balance: true, image: true, email: true },
+      });
+
+      if (!dbUser) {
+        return { ...session, user: { id: "" } as any };
       }
+
+      session.user.id = dbUser.id;
+      session.user.username = dbUser.username;
+      session.user.balance = dbUser.balance;
+      session.user.image = dbUser.image;
+      session.user.email = dbUser.email;
 
       return session;
     },
