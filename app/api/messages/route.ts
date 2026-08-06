@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { auth } from "@/lib/auth"; // Update path to your auth options if needed
-import { db } from "@/lib/prisma";
+import { auth } from "@/lib/auth"; // Correct way to get session in Auth.js / NextAuth v5
+import { prisma as db } from "@/lib/prisma"; // Import prisma and alias it as db
 
 export const dynamic = "force-dynamic";
 
 // GET: Fetch messages and partner info by userId or username
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth(); // Use auth() instead of getServerSession
     if (!session || !session.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -63,7 +62,7 @@ export async function GET(req: Request) {
 // POST: Send a message supporting recipientId or recipientIdentifier
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth(); // Use auth() instead of getServerSession
     if (!session || !session.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
